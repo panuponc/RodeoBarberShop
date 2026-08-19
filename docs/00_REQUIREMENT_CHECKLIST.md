@@ -1,96 +1,306 @@
-# Requirement Gathering Checklist
+# Requirement Gathering Interview Form
 
-**Project:** Rodeo Barber Shop Booking System
+Project: Rodeo Barber Shop Booking System
 
-**Version:** 1.0
+Version: 1.0
 
-**Status:** Requirement Gathering
+Status: Requirement Gathering
 
----
+Interview Date:
 
-# Objective
+Interviewer:
 
-This checklist is used during the requirement gathering session with Rodeo Barber Shop.
-
-The goal is to understand the current business workflow before designing the system.
-
-Do not assume any requirement.
-
-Record actual business processes instead.
+Interviewee:
 
 ---
 
-# Shop Information
+# 1. Shop Information
 
 ## Basic Information
 
 - [ ] Shop Name
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
 - [ ] Address
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
 - [ ] Phone Number
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
 - [ ] Facebook
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
 - [ ] Instagram
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
 - [ ] LINE Official Account
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
 - [ ] Website
 
+Answer:
+
+Notes:
+
+Decision:
+
 ---
 
-## Business Hours
+# 2. Business Hours
 
 - [ ] Opening Time
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
 - [ ] Closing Time
-- [ ] Open Every Day
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Open Every Day?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
 - [ ] Regular Holidays
-- [ ] Public Holidays
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
 - [ ] Lunch Break
-- [ ] Special Working Hours
+
+Answer:
+
+Notes:
+
+Decision:
 
 ---
 
-# Barber Information
+# 3. Barber Information
 
-For each barber collect:
+- [ ] How many barbers?
 
-- [ ] Name
-- [ ] Nickname
-- [ ] Profile Photo
-- [ ] Experience
-- [ ] Specialty
-- [ ] Available Services
-- [ ] Working Days
-- [ ] Working Hours
-- [ ] Break Time
+Answer:
 
-Questions
+Notes:
 
-- [ ] Can customers choose a barber?
-- [ ] Can the shop assign a barber automatically?
-- [ ] Can a barber disable bookings?
-- [ ] Can a barber update their own schedule?
+Decision:
 
 ---
 
-# Services
+- [ ] Customer can choose barber?
 
-For every service record:
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Shop can assign barber automatically?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Each barber has different working hours?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Each barber has different holidays?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Barber can disable booking?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+# 4. Services
+
+สำหรับบริการแต่ละประเภท ให้จดข้อมูลด้านล่าง
+
+---
+
+### Service 1
 
 - [ ] Service Name
-- [ ] Description
+
+Answer:
+
 - [ ] Price
-- [ ] Duration (minutes)
-- [ ] Active / Inactive
 
-Questions
+Answer:
 
-- [ ] Can customers select multiple services?
-- [ ] Does price depend on the barber?
-- [ ] Are there add-on services?
-- [ ] Are promotions available?
+- [ ] Duration (Minutes)
+
+Answer:
+
+- [ ] Description
+
+Answer:
+
+Notes:
+
+Decision:
 
 ---
 
-# Booking Process
+### Service 2
 
-Current booking channels
+- [ ] Service Name
+
+Answer:
+
+- [ ] Price
+
+Answer:
+
+- [ ] Duration
+
+Answer:
+
+- [ ] Description
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+### General Questions
+
+- [ ] Customer can select multiple services?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Price depends on barber?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Any add-on services?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+# 5. Booking Process
+
+**Please explain the current booking workflow from start to finish.**
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+Current Booking Channels
 
 - [ ] Walk-in
 - [ ] Phone
@@ -99,177 +309,287 @@ Current booking channels
 - [ ] Instagram
 - [ ] Website
 
-Questions
+Answer:
 
-- [ ] Can customers book online?
-- [ ] How many days in advance?
-- [ ] Can customers edit bookings?
-- [ ] Can customers cancel bookings?
-- [ ] Is there a cancellation deadline?
-- [ ] Is there a waiting list?
-- [ ] How are walk-in customers handled?
+Notes:
+
+Decision:
 
 ---
 
-# Time Slot Management
+- [ ] Maximum booking days in advance?
 
-Questions
+Answer:
 
-- [ ] Fixed time slots?
-- [ ] Dynamic slots based on service duration?
+Notes:
+
+Decision:
+
+---
+
+- [ ] Customer can edit booking?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Customer can cancel booking?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Cancellation deadline?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+# 6. Schedule
+
+- [ ] Fixed time slots or dynamic?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
 - [ ] Buffer time between customers?
-- [ ] Maximum bookings per barber per day?
-- [ ] Maximum bookings for the whole shop?
+
+Answer:
+
+Notes:
+
+Decision:
 
 ---
 
-# Payment
+- [ ] Maximum bookings per barber per day?
 
-Current payment methods
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Walk-in and online booking use the same queue?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+# 7. Payment
+
+Current Payment Methods
 
 - [ ] Cash
 - [ ] PromptPay
 - [ ] Credit Card
 - [ ] QR Payment
 
-Future payment methods
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+Preferred Payment Method for New System
 
 - [ ] Pay at Shop
 - [ ] Deposit
 - [ ] Full Payment
 
-Questions
+Answer:
 
-- [ ] Refund policy?
-- [ ] Cancellation fee?
-- [ ] Deposit amount?
-- [ ] Need slip verification?
-- [ ] EasySlip acceptable?
+Notes:
+
+Decision:
 
 ---
 
-# Queue Management
+- [ ] Refund Policy
 
-Questions
+Answer:
 
-- [ ] How is today's queue managed?
-- [ ] How do customers know their turn?
-- [ ] Can staff manually change queue order?
-- [ ] Can appointments be delayed?
-- [ ] How are No Show customers handled?
+Notes:
+
+Decision:
 
 ---
 
-# Dashboard
+- [ ] Need Slip Verification?
 
-Ask the owner:
+Answer:
 
-"When opening the dashboard every morning, what information would you like to see?"
+Notes:
 
-Possible answers:
-
-- [ ] Today's bookings
-- [ ] Revenue today
-- [ ] Revenue this month
-- [ ] Available time slots
-- [ ] Waiting customers
-- [ ] Completed bookings
-- [ ] Cancelled bookings
-- [ ] No Show customers
+Decision:
 
 ---
 
-# Notifications
+# 8. Queue Management
 
-Questions
+- [ ] Current queue management process
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Staff can manually change queue?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] How to handle No Show customers?
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+# 9. Dashboard
+
+Question:
+
+"What information do you want to see when opening the dashboard every morning?"
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+# 10. Notification
 
 - [ ] Booking Confirmation
-- [ ] Appointment Reminder
-- [ ] Cancellation Notification
-- [ ] Payment Confirmation
 
-Notification Channels
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Appointment Reminder
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+- [ ] Cancellation Notification
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+Preferred Notification Channel
 
 - [ ] LINE
 - [ ] SMS
 - [ ] Email
 
----
+Answer:
 
-# Current Problems (Pain Points)
+Notes:
 
-Ask open-ended questions.
-
-Do not suggest answers.
-
-Record actual problems.
-
-Examples:
-
-- [ ] Customers forget appointments
-- [ ] Double bookings
-- [ ] Long response time
-- [ ] Difficult schedule management
-- [ ] Walk-in conflicts
-- [ ] Manual paperwork
+Decision:
 
 ---
 
-# Future Features
+# 11. Current Problems (Pain Points)
 
-Ask:
+Question:
 
-"If there were no technical limitations, what would you like the system to do?"
+"What are the biggest problems with the current booking process?"
 
-Possible ideas:
+Answer:
 
-- [ ] Membership
-- [ ] Loyalty Points
-- [ ] Promotions
-- [ ] Coupon System
-- [ ] Gift Cards
-- [ ] Hair Style Gallery
-- [ ] Customer Reviews
-- [ ] Online Payments
+Notes:
+
+Decision:
 
 ---
 
-# Priority
+# 12. Future Features
+
+Question:
+
+"If there were no technical limitations, what features would you like to have?"
+
+Answer:
+
+Notes:
+
+Decision:
+
+---
+
+# 13. Priority
 
 ## Must Have
 
-_____________________________________________________
-
-_____________________________________________________
-
-_____________________________________________________
-
-## Nice to Have
-
-_____________________________________________________
-
-_____________________________________________________
-
-_____________________________________________________
-
-## Future Version
-
-_____________________________________________________
-
-_____________________________________________________
-
-_____________________________________________________
+Answer:
 
 ---
 
-# Notes
+## Nice to Have
 
-_____________________________________________________
+Answer:
 
-_____________________________________________________
+---
 
-_____________________________________________________
+## Future Version
 
-_____________________________________________________
+Answer:
 
-_____________________________________________________
+---
+
+# Additional Notes
+
+Answer:
