@@ -1,143 +1,135 @@
-# 💈 Rodeo Barber Shop Booking System
+# Rodeo Barber Shop Management System
 
-A modern barber shop booking system built with **ASP.NET Core**, **React**, and **Supabase**.
+Rodeo Barber Shop Management System is a web application for managing a single barber shop.
 
-This project is designed for a single barber shop and focuses on providing a smooth booking experience for customers while helping barbers and administrators manage appointments efficiently.
+The system supports online booking, guest booking, walk-in queue management, barber scheduling, service management, counter payment recording, promotions, dashboards, notifications, and reports.
 
----
+## Project Status
 
-# ✨ Features
+```text
+Current Phase: Planning / System Design
+Implementation: Not started
+Version: 1.0
+```
 
-## Customer
+The current work focuses on project documentation, system analysis, database design, ERD, system flow, and data flow design before starting implementation.
 
-- Register & Login
-- View barber services
-- Choose barber
-- Choose available date & time
-- Book appointment
-- View booking history
-- Cancel booking
-- Pay at Shop
-- PromptPay payment with EasySlip verification
+## Main Users
 
----
+- Customer
+- Guest
+- Barber
+- Front Desk Staff
+- Owner
+- Admin
 
-## Barber
+## Core Features
 
-- View today's appointments
-- View upcoming appointments
-- Start haircut
-- Complete haircut
-
----
-
-## Admin
-
+- Customer registration and login
+- Role-based access control
+- Guest booking with Email OTP
+- Service management
+- Barber and staff management
+- Online booking
+- Walk-in queue management
+- Barber assignment and reassignment
+- Barber service workflow
+- Add-on services during service
+- Counter payment recording
+- Cash, bank transfer, and QR Payment support
+- Shop information management
+- Barber working schedule
+- Barber leave request and approval
+- Internal website notifications
+- Promotions and discounts
 - Dashboard
-- Manage barbers
-- Manage services
-- Manage bookings
-- Manage working hours
-- View payment status
-- Verify PromptPay slips automatically
+- Reports and PDF export
 
----
+## Tech Stack
 
-# 🛠 Tech Stack
+| Layer | Technology |
+|------|------------|
+| Frontend | React + TypeScript + Vite |
+| Backend | ASP.NET Core Web API |
+| Runtime | .NET 9 |
+| Database | Supabase PostgreSQL |
+| ORM | Entity Framework Core + Npgsql |
+| Authentication | JWT + Email OTP |
+| Authorization | Role-based Access Control |
+| Realtime | SignalR |
+| Storage | Supabase Storage |
+| Source Control | Git + GitHub |
+| IDE | Visual Studio Code |
 
-## Frontend
+## Project Structure
 
-- React
-- TypeScript
-- Vite
-
-## Backend
-
-- ASP.NET Core Web API
-- Entity Framework Core
-- JWT Authentication
-- SignalR
-
-## Database
-
-- Supabase (PostgreSQL)
-
-## Payment
-
-- Pay at Shop
-- PromptPay
-- EasySlip API
-
----
-
-# 📁 Project Structure
-
-```
+```text
 RodeoBarberShop/
-
-README.md
-
-backend/
-
-frontend/
-
-docs/
+  README.md
+  docs/
 ```
 
----
+Backend and frontend folders will be created during Sprint 1.
 
-# 📚 Documentation
+## Documentation
 
-Project documentation can be found inside the `docs` folder.
+Project documentation is stored in the `docs` folder.
 
 | Document | Description |
 |----------|-------------|
-| 01_PROJECT_BRIEF.md | Project overview and business requirements |
-| 02_TECH_STACK.md | Technology stack |
-| 03_DATABASE_DESIGN.md | Database design |
-| 04_API_REQUIREMENTS.md | API specification |
-| 05_SPRINT_PLAN.md | Development roadmap |
+| docs/00_REQUIREMENT_CHECKLIST.md | Requirement gathering checklist |
+| docs/01_PROJECT_BRIEF.md | Project overview, scope, users, and business rules |
+| docs/02_TECH_STACK.md | Approved technology stack |
+| docs/03_DATABASE_DESIGN.md | Database tables, relationships, rules, and indexes |
+| docs/04_API_REQUIREMENTS.md | API groups, endpoints, roles, and rules |
+| docs/05_SPRINT_PLAN.md | Development plan for Project 1 and Project 2 |
+| docs/06_DATABASE_ERD.md | Mermaid Entity Relationship Diagram |
+| docs/07_SYSTEM_FLOW.md | Main system flows and status flow |
+| docs/08_DATA_FLOW_DIAGRAM.md | Context Diagram, Level 0 DFD, and Level 1 DFD |
 
----
+## Recommended Reading Order
 
-# 🚀 Development Roadmap
+1. `docs/01_PROJECT_BRIEF.md`
+2. `docs/02_TECH_STACK.md`
+3. `docs/03_DATABASE_DESIGN.md`
+4. `docs/06_DATABASE_ERD.md`
+5. `docs/07_SYSTEM_FLOW.md`
+6. `docs/08_DATA_FLOW_DIAGRAM.md`
+7. `docs/04_API_REQUIREMENTS.md`
+8. `docs/05_SPRINT_PLAN.md`
 
-- [ ] Project Setup
-- [ ] Authentication
-- [ ] Database Design
-- [ ] Booking Module
-- [ ] Payment Module
-- [ ] Admin Dashboard
-- [ ] Barber Dashboard
-- [ ] SignalR Realtime Queue
-- [ ] Deployment
+## Current Progress
 
----
+- [x] Requirement checklist
+- [x] Project brief
+- [x] Tech stack
+- [x] Database design
+- [x] API requirements draft
+- [x] Sprint plan draft
+- [x] Database ERD
+- [x] System flow
+- [x] Data Flow Diagram
+- [ ] Backend project setup
+- [ ] Frontend project setup
+- [ ] Database migration
+- [ ] Authentication implementation
 
-# 📌 Project Status
+## Next Steps
 
-Current Version
+1. Review and finalize ERD, System Flow, and DFD.
+2. Start Sprint 1: Project Setup And Core Foundation.
+3. Create ASP.NET Core Web API backend.
+4. Configure Swagger/OpenAPI.
+5. Create React + TypeScript + Vite frontend.
+6. Configure Entity Framework Core and PostgreSQL connection.
+7. Implement authentication and role foundation.
 
-```
-v1.0.0 (Planning)
-```
+## Author
 
-Current Phase
-
-```
-Documentation
-```
-
----
-
-# 👨‍💻 Author
-
-Developed by **Panupong Chainet**
+Developed by Panupong Chainet
 
 Portfolio Project 2026
 
----
-
-# 📄 License
+## License
 
 This project is licensed under the MIT License.

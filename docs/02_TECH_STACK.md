@@ -10,9 +10,9 @@ Environment: Windows 10 Home + VS Code
 
 ## Overview
 
-This document defines the technology stack for the Rodeo Barber Shop Booking System.
+This document defines the technology stack for the Rodeo Barber Shop Management System.
 
-The stack is selected to support full-stack development, easy deployment, PostgreSQL database usage, realtime queue updates, and payment slip verification.
+The stack is selected to support full-stack development, easy deployment, PostgreSQL database usage, realtime queue updates, internal notifications, dashboards, reports, and counter payment recording.
 
 ---
 
@@ -77,7 +77,7 @@ The project uses .NET because the developer already has experience with the Micr
 - Django
 - Laravel
 
-ASP.NET Core was selected because it fits the developer’s background and is suitable for portfolio-level full-stack projects.
+ASP.NET Core was selected because it fits the developer's background and is suitable for portfolio-level full-stack projects.
 
 ---
 
@@ -93,7 +93,7 @@ Supabase provides a managed PostgreSQL database with a web dashboard.
 
 It is easier to manage than running PostgreSQL locally and is suitable for development, testing, and deployment.
 
-Supabase also provides Storage, which can be used to store uploaded PromptPay slip images.
+Supabase also provides Storage, which can be used to store uploaded profile images, barber photos, shop logos, and other project assets.
 
 ### Alternatives
 
@@ -129,16 +129,21 @@ Npgsql is the PostgreSQL provider for EF Core.
 
 - JWT Authentication
 - Role-based Access Control
+- Email OTP for guest booking verification
 
 ### Why
 
 JWT works well with REST APIs and frontend applications like React.
 
-Role-based access control is required because the system has three user roles:
+Role-based access control is required because the system has multiple user roles:
 
 - Customer
 - Barber
+- FrontDeskStaff
+- Owner
 - Admin
+
+Email OTP is required by the approved scope for guest booking identity verification.
 
 ---
 
@@ -152,13 +157,15 @@ Role-based access control is required because the system has three user roles:
 
 SignalR allows realtime updates between the backend and frontend.
 
-This is useful for queue updates, booking status changes, and payment verification updates.
+This is useful for queue updates, booking status changes, internal notifications, and payment status updates.
 
 Example use cases:
 
-- Admin changes booking status
-- Barber completes a booking
-- Customer sees queue updates without refreshing the page
+- Staff changes queue status
+- Staff adds a walk-in customer
+- Staff assigns or changes a barber
+- Barber sees upcoming queue updates
+- Customer sees booking status updates without refreshing the page
 
 ---
 
@@ -166,26 +173,28 @@ Example use cases:
 
 ### Selected
 
-- Pay at Shop
-- PromptPay Slip Verification
-- EasySlip API
+- Counter payment recording
+- Cash
+- Bank transfer
+- QR Payment
 
 ### Why
 
-Pay at Shop is simple and suitable for normal barber shop bookings.
+The approved project scope defines payment after service at the front counter.
 
-PromptPay with EasySlip allows the system to verify payment slips automatically without using a payment gateway.
+Front desk staff records the payment method, payment date and time, payment receiver, service summary, discount, and net total.
 
-This avoids percentage-based payment gateway fees.
+This keeps Version 1 practical and focused on shop operations without integrating an external payment gateway.
 
 ### Alternatives
 
 - Omise / Opn PromptPay Gateway
 - GB Prime Pay
 - Stripe
-- Manual admin slip verification
+- Automatic slip verification
+- Online prepayment
 
-EasySlip was selected for Version 1 because it supports slip verification while keeping the payment flow simple.
+External payment gateway integration is not part of the current approved scope.
 
 ---
 
@@ -197,11 +206,26 @@ EasySlip was selected for Version 1 because it supports slip verification while 
 
 ### Why
 
-Uploaded PromptPay slips need to be stored securely.
+Profile images, barber photos, and shop logos need to be stored securely.
 
 Supabase Storage is suitable because the project already uses Supabase PostgreSQL.
 
-Slip image URLs will be stored in the Payment table.
+Uploaded file URLs will be stored in the related database tables.
+
+---
+
+## Reporting
+
+### Selected
+
+- Backend-generated report data
+- PDF export library to be selected during implementation
+
+### Why
+
+The approved scope requires revenue, customer, booking, barber performance, payment method, and PDF export reports.
+
+The exact PDF export library can be selected when the reporting sprint starts.
 
 ---
 
@@ -245,11 +269,12 @@ Codex must not change business rules unless explicitly instructed.
 | Runtime | .NET 9 |
 | Database | Supabase PostgreSQL |
 | ORM | Entity Framework Core + Npgsql |
-| Authentication | JWT |
+| Authentication | JWT + Email OTP |
 | Authorization | Role-based Access Control |
 | Realtime | SignalR |
-| Payment | Pay at Shop + EasySlip |
+| Payment | Counter payment recording: Cash + Bank Transfer + QR Payment |
 | Storage | Supabase Storage |
+| Reports | Backend report APIs + PDF export |
 | Source Control | Git + GitHub |
 | IDE | VS Code |
 | AI Assistant | Codex |
