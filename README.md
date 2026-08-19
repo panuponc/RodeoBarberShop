@@ -7,12 +7,12 @@ The system supports online booking, guest booking, walk-in queue management, bar
 ## Project Status
 
 ```text
-Current Phase: Planning / System Design
-Implementation: Not started
+Current Phase: Sprint 1 - Project Setup And Core Foundation
+Implementation: Started
 Version: 1.0
 ```
 
-The current work focuses on project documentation, system analysis, database design, ERD, system flow, and data flow design before starting implementation.
+The current work focuses on setting up the backend, frontend, Swagger/OpenAPI, and the foundation required before implementing authentication and database features.
 
 ## Main Users
 
@@ -66,10 +66,14 @@ The current work focuses on project documentation, system analysis, database des
 ```text
 RodeoBarberShop/
   README.md
+  RodeoBarberShop.sln
+  backend/
+    RodeoBarberShop.Api/
+  frontend/
   docs/
 ```
 
-Backend and frontend folders will be created during Sprint 1.
+Backend and frontend projects were created during Sprint 1.
 
 ## Documentation
 
@@ -109,20 +113,20 @@ Project documentation is stored in the `docs` folder.
 - [x] Database ERD
 - [x] System flow
 - [x] Data Flow Diagram
-- [ ] Backend project setup
-- [ ] Frontend project setup
+- [x] Backend project setup
+- [x] Swagger/OpenAPI setup
+- [x] Frontend project setup
 - [ ] Database migration
 - [ ] Authentication implementation
 
 ## Next Steps
 
-1. Review and finalize ERD, System Flow, and DFD.
-2. Start Sprint 1: Project Setup And Core Foundation.
-3. Create ASP.NET Core Web API backend.
-4. Configure Swagger/OpenAPI.
-5. Create React + TypeScript + Vite frontend.
-6. Configure Entity Framework Core and PostgreSQL connection.
-7. Implement authentication and role foundation.
+1. Configure Entity Framework Core and PostgreSQL connection.
+2. Create initial domain entities from the database design.
+3. Create the first database migration.
+4. Implement authentication and role foundation.
+5. Add customer registration and login APIs.
+6. Connect the frontend to the backend health endpoint.
 
 ## Author
 
