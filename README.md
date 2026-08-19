@@ -90,6 +90,7 @@ Project documentation is stored in the `docs` folder.
 | docs/06_DATABASE_ERD.md | Mermaid Entity Relationship Diagram |
 | docs/07_SYSTEM_FLOW.md | Main system flows and status flow |
 | docs/08_DATA_FLOW_DIAGRAM.md | Context Diagram, Level 0 DFD, and Level 1 DFD |
+| docs/09_SUPABASE_SETUP.md | Supabase PostgreSQL setup and migration guide |
 
 ## Recommended Reading Order
 
@@ -101,6 +102,7 @@ Project documentation is stored in the `docs` folder.
 6. `docs/08_DATA_FLOW_DIAGRAM.md`
 7. `docs/04_API_REQUIREMENTS.md`
 8. `docs/05_SPRINT_PLAN.md`
+9. `docs/09_SUPABASE_SETUP.md`
 
 ## Current Progress
 
