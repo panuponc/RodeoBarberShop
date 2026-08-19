@@ -116,14 +116,16 @@ Project documentation is stored in the `docs` folder.
 - [x] Backend project setup
 - [x] Swagger/OpenAPI setup
 - [x] Frontend project setup
+- [x] EF Core foundation
+- [x] Initial database entities
 - [ ] Database migration
 - [ ] Authentication implementation
 
 ## Next Steps
 
-1. Configure Entity Framework Core and PostgreSQL connection.
-2. Create initial domain entities from the database design.
-3. Create the first database migration.
+1. Add the real PostgreSQL or Supabase connection string.
+2. Create the first database migration.
+3. Apply the migration to the development database.
 4. Implement authentication and role foundation.
 5. Add customer registration and login APIs.
 6. Connect the frontend to the backend health endpoint.

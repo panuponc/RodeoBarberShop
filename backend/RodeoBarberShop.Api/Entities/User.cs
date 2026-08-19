@@ -22,4 +22,9 @@ public class User
     public BarberProfile? BarberProfile { get; set; }
     public ICollection<Booking> CustomerBookings { get; set; } = [];
     public ICollection<Booking> CreatedBookings { get; set; } = [];
+    public ICollection<LeaveRequest> ReviewedLeaveRequests { get; set; } = [];
+    public ICollection<Payment> ReceivedPayments { get; set; } = [];
+    public ICollection<Notification> Notifications { get; set; } = [];
+    public ICollection<QueueEvent> QueueEvents { get; set; } = [];
+    public ICollection<BarberAssignmentEvent> BarberAssignmentEvents { get; set; } = [];
 }

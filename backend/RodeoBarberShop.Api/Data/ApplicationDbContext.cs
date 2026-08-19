@@ -11,6 +11,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Service> Services => Set<Service>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<BookingService> BookingServices => Set<BookingService>();
+    public DbSet<ShopSetting> ShopSettings => Set<ShopSetting>();
+    public DbSet<ShopHoliday> ShopHolidays => Set<ShopHoliday>();
+    public DbSet<BarberService> BarberServices => Set<BarberService>();
+    public DbSet<BarberWorkingHour> BarberWorkingHours => Set<BarberWorkingHour>();
+    public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Promotion> Promotions => Set<Promotion>();
+    public DbSet<PromotionService> PromotionServices => Set<PromotionService>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<QueueEvent> QueueEvents => Set<QueueEvent>();
+    public DbSet<BarberAssignmentEvent> BarberAssignmentEvents => Set<BarberAssignmentEvent>();
+    public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,6 +33,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         ConfigureServices(modelBuilder);
         ConfigureBookings(modelBuilder);
         ConfigureBookingServices(modelBuilder);
+        ConfigureShop(modelBuilder);
+        ConfigureBarberSchedules(modelBuilder);
+        ConfigurePayments(modelBuilder);
+        ConfigurePromotions(modelBuilder);
+        ConfigureNotifications(modelBuilder);
+        ConfigureEvents(modelBuilder);
+        ConfigureEmailOtps(modelBuilder);
     }
 
     private static void ConfigureUsers(ModelBuilder modelBuilder)
@@ -195,6 +214,310 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .WithMany()
                 .HasForeignKey(bookingService => bookingService.AddedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureShop(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ShopSetting>(entity =>
+        {
+            entity.ToTable("shop_settings");
+            entity.HasKey(setting => setting.Id);
+
+            entity.Property(setting => setting.ShopName).HasColumnName("shop_name").HasMaxLength(150).IsRequired();
+            entity.Property(setting => setting.Address).HasColumnName("address");
+            entity.Property(setting => setting.PhoneNumber).HasColumnName("phone_number").HasMaxLength(30);
+            entity.Property(setting => setting.FacebookUrl).HasColumnName("facebook_url");
+            entity.Property(setting => setting.InstagramUrl).HasColumnName("instagram_url");
+            entity.Property(setting => setting.LineOfficial).HasColumnName("line_official").HasMaxLength(100);
+            entity.Property(setting => setting.WebsiteUrl).HasColumnName("website_url");
+            entity.Property(setting => setting.LogoUrl).HasColumnName("logo_url");
+            entity.Property(setting => setting.OpeningTime).HasColumnName("opening_time").IsRequired();
+            entity.Property(setting => setting.ClosingTime).HasColumnName("closing_time").IsRequired();
+            entity.Property(setting => setting.BookingAdvanceDays).HasColumnName("booking_advance_days").IsRequired();
+            entity.Property(setting => setting.CancellationDeadlineHours).HasColumnName("cancellation_deadline_hours").IsRequired();
+            entity.Property(setting => setting.SlotIntervalMinutes).HasColumnName("slot_interval_minutes").IsRequired();
+            entity.Property(setting => setting.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(setting => setting.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        });
+
+        modelBuilder.Entity<ShopHoliday>(entity =>
+        {
+            entity.ToTable("shop_holidays");
+            entity.HasKey(holiday => holiday.Id);
+
+            entity.Property(holiday => holiday.HolidayType).HasColumnName("holiday_type").HasMaxLength(30).HasConversion<string>().IsRequired();
+            entity.Property(holiday => holiday.DayOfWeek).HasColumnName("day_of_week");
+            entity.Property(holiday => holiday.HolidayDate).HasColumnName("holiday_date");
+            entity.Property(holiday => holiday.Reason).HasColumnName("reason");
+            entity.Property(holiday => holiday.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(holiday => holiday.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        });
+    }
+
+    private static void ConfigureBarberSchedules(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<BarberService>(entity =>
+        {
+            entity.ToTable("barber_services");
+            entity.HasKey(barberService => barberService.Id);
+
+            entity.Property(barberService => barberService.BarberId).HasColumnName("barber_id").IsRequired();
+            entity.Property(barberService => barberService.ServiceId).HasColumnName("service_id").IsRequired();
+            entity.Property(barberService => barberService.CreatedAt).HasColumnName("created_at").IsRequired();
+
+            entity.HasIndex(barberService => new { barberService.BarberId, barberService.ServiceId }).IsUnique();
+
+            entity.HasOne(barberService => barberService.Barber)
+                .WithMany(barber => barber.BarberServices)
+                .HasForeignKey(barberService => barberService.BarberId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(barberService => barberService.Service)
+                .WithMany(service => service.BarberServices)
+                .HasForeignKey(barberService => barberService.ServiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BarberWorkingHour>(entity =>
+        {
+            entity.ToTable("barber_working_hours");
+            entity.HasKey(workingHour => workingHour.Id);
+
+            entity.Property(workingHour => workingHour.BarberId).HasColumnName("barber_id").IsRequired();
+            entity.Property(workingHour => workingHour.DayOfWeek).HasColumnName("day_of_week").IsRequired();
+            entity.Property(workingHour => workingHour.StartTime).HasColumnName("start_time").IsRequired();
+            entity.Property(workingHour => workingHour.EndTime).HasColumnName("end_time").IsRequired();
+            entity.Property(workingHour => workingHour.IsWorkingDay).HasColumnName("is_working_day").IsRequired();
+            entity.Property(workingHour => workingHour.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(workingHour => workingHour.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            entity.HasIndex(workingHour => new { workingHour.BarberId, workingHour.DayOfWeek });
+
+            entity.HasOne(workingHour => workingHour.Barber)
+                .WithMany(barber => barber.WorkingHours)
+                .HasForeignKey(workingHour => workingHour.BarberId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<LeaveRequest>(entity =>
+        {
+            entity.ToTable("leave_requests");
+            entity.HasKey(leaveRequest => leaveRequest.Id);
+
+            entity.Property(leaveRequest => leaveRequest.BarberId).HasColumnName("barber_id").IsRequired();
+            entity.Property(leaveRequest => leaveRequest.LeaveType).HasColumnName("leave_type").HasMaxLength(50).IsRequired();
+            entity.Property(leaveRequest => leaveRequest.StartAt).HasColumnName("start_at").IsRequired();
+            entity.Property(leaveRequest => leaveRequest.EndAt).HasColumnName("end_at").IsRequired();
+            entity.Property(leaveRequest => leaveRequest.Reason).HasColumnName("reason").IsRequired();
+            entity.Property(leaveRequest => leaveRequest.Status).HasColumnName("status").HasMaxLength(30).HasConversion<string>().IsRequired();
+            entity.Property(leaveRequest => leaveRequest.ReviewedByUserId).HasColumnName("reviewed_by_user_id");
+            entity.Property(leaveRequest => leaveRequest.ReviewedAt).HasColumnName("reviewed_at");
+            entity.Property(leaveRequest => leaveRequest.ReviewNote).HasColumnName("review_note");
+            entity.Property(leaveRequest => leaveRequest.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(leaveRequest => leaveRequest.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            entity.HasIndex(leaveRequest => new { leaveRequest.BarberId, leaveRequest.StartAt, leaveRequest.EndAt });
+
+            entity.HasOne(leaveRequest => leaveRequest.Barber)
+                .WithMany(barber => barber.LeaveRequests)
+                .HasForeignKey(leaveRequest => leaveRequest.BarberId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(leaveRequest => leaveRequest.ReviewedByUser)
+                .WithMany(user => user.ReviewedLeaveRequests)
+                .HasForeignKey(leaveRequest => leaveRequest.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigurePayments(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.ToTable("payments");
+            entity.HasKey(payment => payment.Id);
+
+            entity.Property(payment => payment.BookingId).HasColumnName("booking_id").IsRequired();
+            entity.Property(payment => payment.PaymentNumber).HasColumnName("payment_number").HasMaxLength(30).IsRequired();
+            entity.Property(payment => payment.PaymentMethod).HasColumnName("payment_method").HasMaxLength(30).HasConversion<string>().IsRequired();
+            entity.Property(payment => payment.PaymentStatus).HasColumnName("payment_status").HasMaxLength(30).HasConversion<string>().IsRequired();
+            entity.Property(payment => payment.SubtotalAmount).HasColumnName("subtotal_amount").HasPrecision(10, 2).IsRequired();
+            entity.Property(payment => payment.DiscountAmount).HasColumnName("discount_amount").HasPrecision(10, 2).IsRequired();
+            entity.Property(payment => payment.TotalAmount).HasColumnName("total_amount").HasPrecision(10, 2).IsRequired();
+            entity.Property(payment => payment.PaidAt).HasColumnName("paid_at").IsRequired();
+            entity.Property(payment => payment.ReceivedByUserId).HasColumnName("received_by_user_id").IsRequired();
+            entity.Property(payment => payment.Note).HasColumnName("note");
+            entity.Property(payment => payment.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(payment => payment.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            entity.HasIndex(payment => payment.BookingId).IsUnique();
+            entity.HasIndex(payment => payment.PaymentNumber).IsUnique();
+
+            entity.HasOne(payment => payment.Booking)
+                .WithOne(booking => booking.Payment)
+                .HasForeignKey<Payment>(payment => payment.BookingId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(payment => payment.ReceivedByUser)
+                .WithMany(user => user.ReceivedPayments)
+                .HasForeignKey(payment => payment.ReceivedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigurePromotions(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Promotion>(entity =>
+        {
+            entity.ToTable("promotions");
+            entity.HasKey(promotion => promotion.Id);
+
+            entity.Property(promotion => promotion.Name).HasColumnName("name").HasMaxLength(150).IsRequired();
+            entity.Property(promotion => promotion.Description).HasColumnName("description");
+            entity.Property(promotion => promotion.StartDate).HasColumnName("start_date").IsRequired();
+            entity.Property(promotion => promotion.EndDate).HasColumnName("end_date").IsRequired();
+            entity.Property(promotion => promotion.DiscountType).HasColumnName("discount_type").HasMaxLength(30).HasConversion<string>().IsRequired();
+            entity.Property(promotion => promotion.DiscountValue).HasColumnName("discount_value").HasPrecision(10, 2).IsRequired();
+            entity.Property(promotion => promotion.IsActive).HasColumnName("is_active").IsRequired();
+            entity.Property(promotion => promotion.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(promotion => promotion.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            entity.HasIndex(promotion => new { promotion.StartDate, promotion.EndDate, promotion.IsActive });
+        });
+
+        modelBuilder.Entity<PromotionService>(entity =>
+        {
+            entity.ToTable("promotion_services");
+            entity.HasKey(promotionService => promotionService.Id);
+
+            entity.Property(promotionService => promotionService.PromotionId).HasColumnName("promotion_id").IsRequired();
+            entity.Property(promotionService => promotionService.ServiceId).HasColumnName("service_id").IsRequired();
+            entity.Property(promotionService => promotionService.CreatedAt).HasColumnName("created_at").IsRequired();
+
+            entity.HasIndex(promotionService => new { promotionService.PromotionId, promotionService.ServiceId }).IsUnique();
+
+            entity.HasOne(promotionService => promotionService.Promotion)
+                .WithMany(promotion => promotion.PromotionServices)
+                .HasForeignKey(promotionService => promotionService.PromotionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(promotionService => promotionService.Service)
+                .WithMany(service => service.PromotionServices)
+                .HasForeignKey(promotionService => promotionService.ServiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureNotifications(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.ToTable("notifications");
+            entity.HasKey(notification => notification.Id);
+
+            entity.Property(notification => notification.RecipientUserId).HasColumnName("recipient_user_id");
+            entity.Property(notification => notification.RecipientRole).HasColumnName("recipient_role").HasMaxLength(30).HasConversion<string>();
+            entity.Property(notification => notification.Title).HasColumnName("title").HasMaxLength(150).IsRequired();
+            entity.Property(notification => notification.Message).HasColumnName("message").IsRequired();
+            entity.Property(notification => notification.NotificationType).HasColumnName("notification_type").HasMaxLength(50).HasConversion<string>().IsRequired();
+            entity.Property(notification => notification.RelatedBookingId).HasColumnName("related_booking_id");
+            entity.Property(notification => notification.IsRead).HasColumnName("is_read").IsRequired();
+            entity.Property(notification => notification.ReadAt).HasColumnName("read_at");
+            entity.Property(notification => notification.CreatedAt).HasColumnName("created_at").IsRequired();
+
+            entity.HasIndex(notification => new { notification.RecipientUserId, notification.IsRead });
+
+            entity.HasOne(notification => notification.RecipientUser)
+                .WithMany(user => user.Notifications)
+                .HasForeignKey(notification => notification.RecipientUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(notification => notification.RelatedBooking)
+                .WithMany(booking => booking.Notifications)
+                .HasForeignKey(notification => notification.RelatedBookingId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
+    private static void ConfigureEvents(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<QueueEvent>(entity =>
+        {
+            entity.ToTable("queue_events");
+            entity.HasKey(queueEvent => queueEvent.Id);
+
+            entity.Property(queueEvent => queueEvent.BookingId).HasColumnName("booking_id").IsRequired();
+            entity.Property(queueEvent => queueEvent.FromStatus).HasColumnName("from_status").HasMaxLength(30).HasConversion<string>();
+            entity.Property(queueEvent => queueEvent.ToStatus).HasColumnName("to_status").HasMaxLength(30).HasConversion<string>().IsRequired();
+            entity.Property(queueEvent => queueEvent.ChangedByUserId).HasColumnName("changed_by_user_id");
+            entity.Property(queueEvent => queueEvent.Note).HasColumnName("note");
+            entity.Property(queueEvent => queueEvent.CreatedAt).HasColumnName("created_at").IsRequired();
+
+            entity.HasIndex(queueEvent => new { queueEvent.BookingId, queueEvent.CreatedAt });
+
+            entity.HasOne(queueEvent => queueEvent.Booking)
+                .WithMany(booking => booking.QueueEvents)
+                .HasForeignKey(queueEvent => queueEvent.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(queueEvent => queueEvent.ChangedByUser)
+                .WithMany(user => user.QueueEvents)
+                .HasForeignKey(queueEvent => queueEvent.ChangedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<BarberAssignmentEvent>(entity =>
+        {
+            entity.ToTable("barber_assignment_events");
+            entity.HasKey(assignmentEvent => assignmentEvent.Id);
+
+            entity.Property(assignmentEvent => assignmentEvent.BookingId).HasColumnName("booking_id").IsRequired();
+            entity.Property(assignmentEvent => assignmentEvent.FromBarberId).HasColumnName("from_barber_id");
+            entity.Property(assignmentEvent => assignmentEvent.ToBarberId).HasColumnName("to_barber_id");
+            entity.Property(assignmentEvent => assignmentEvent.ChangedByUserId).HasColumnName("changed_by_user_id").IsRequired();
+            entity.Property(assignmentEvent => assignmentEvent.Reason).HasColumnName("reason");
+            entity.Property(assignmentEvent => assignmentEvent.CreatedAt).HasColumnName("created_at").IsRequired();
+
+            entity.HasIndex(assignmentEvent => assignmentEvent.BookingId);
+
+            entity.HasOne(assignmentEvent => assignmentEvent.Booking)
+                .WithMany(booking => booking.BarberAssignmentEvents)
+                .HasForeignKey(assignmentEvent => assignmentEvent.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(assignmentEvent => assignmentEvent.FromBarber)
+                .WithMany()
+                .HasForeignKey(assignmentEvent => assignmentEvent.FromBarberId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(assignmentEvent => assignmentEvent.ToBarber)
+                .WithMany()
+                .HasForeignKey(assignmentEvent => assignmentEvent.ToBarberId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(assignmentEvent => assignmentEvent.ChangedByUser)
+                .WithMany(user => user.BarberAssignmentEvents)
+                .HasForeignKey(assignmentEvent => assignmentEvent.ChangedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureEmailOtps(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmailOtp>(entity =>
+        {
+            entity.ToTable("email_otps");
+            entity.HasKey(emailOtp => emailOtp.Id);
+
+            entity.Property(emailOtp => emailOtp.Email).HasColumnName("email").HasMaxLength(255).IsRequired();
+            entity.Property(emailOtp => emailOtp.OtpHash).HasColumnName("otp_hash").IsRequired();
+            entity.Property(emailOtp => emailOtp.Purpose).HasColumnName("purpose").HasMaxLength(50).IsRequired();
+            entity.Property(emailOtp => emailOtp.ExpiresAt).HasColumnName("expires_at").IsRequired();
+            entity.Property(emailOtp => emailOtp.VerifiedAt).HasColumnName("verified_at");
+            entity.Property(emailOtp => emailOtp.CreatedAt).HasColumnName("created_at").IsRequired();
+
+            entity.HasIndex(emailOtp => new { emailOtp.Email, emailOtp.Purpose, emailOtp.ExpiresAt });
         });
     }
 }

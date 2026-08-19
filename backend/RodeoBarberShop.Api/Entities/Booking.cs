@@ -34,4 +34,8 @@ public class Booking
     public BarberProfile? Barber { get; set; }
     public User? CreatedByUser { get; set; }
     public ICollection<BookingService> BookingServices { get; set; } = [];
+    public Payment? Payment { get; set; }
+    public ICollection<QueueEvent> QueueEvents { get; set; } = [];
+    public ICollection<BarberAssignmentEvent> BarberAssignmentEvents { get; set; } = [];
+    public ICollection<Notification> Notifications { get; set; } = [];
 }

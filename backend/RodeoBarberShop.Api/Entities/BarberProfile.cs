@@ -14,4 +14,7 @@ public class BarberProfile
 
     public User User { get; set; } = null!;
     public ICollection<Booking> Bookings { get; set; } = [];
+    public ICollection<BarberService> BarberServices { get; set; } = [];
+    public ICollection<BarberWorkingHour> WorkingHours { get; set; } = [];
+    public ICollection<LeaveRequest> LeaveRequests { get; set; } = [];
 }
