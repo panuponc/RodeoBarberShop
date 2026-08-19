@@ -58,6 +58,14 @@ type Receipt = {
   totalAmount: number
 }
 
+type QrPreview = {
+  paymentAccountId: string
+  accountName: string
+  amount: number
+  qrPayload: string
+  qrImageDataUrl: string
+}
+
 const nextStatus: Record<string, string> = {
   PendingConfirmation: 'Confirmed',
   Confirmed: 'WaitingService',
@@ -84,6 +92,10 @@ function App() {
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null)
   const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([])
+  const [qrPreview, setQrPreview] = useState<QrPreview | null>(null)
+  const [qrTestAmount, setQrTestAmount] = useState('100')
+  const [qrTestAccountId, setQrTestAccountId] = useState('')
+  const [isQrTestOpen, setIsQrTestOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<'queue' | 'accounts'>('queue')
   const [message, setMessage] = useState('')
   const [isBusy, setIsBusy] = useState(false)
@@ -162,6 +174,7 @@ function App() {
     try {
       const result = await api<PaymentAccount[]>('/api/payment-accounts')
       setPaymentAccounts(result)
+      setQrTestAccountId((current) => current || result.find((account) => account.isDefault && account.isActive)?.id || '')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'โหลดบัญชีร้านไม่สำเร็จ')
     }
@@ -308,6 +321,29 @@ function App() {
       setMessage('ตั้งบัญชีหลักแล้ว')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'ตั้งบัญชีหลักไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function generateQrPreview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsBusy(true)
+    setMessage('')
+    setQrPreview(null)
+
+    try {
+      const amount = Number(qrTestAmount)
+      const path = qrTestAccountId ? `/api/payment-accounts/${qrTestAccountId}/qr-preview` : '/api/payment-accounts/qr-preview'
+      const result = await api<QrPreview>(path, {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      })
+
+      setQrPreview(result)
+      setMessage('สร้าง QR ทดสอบแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'สร้าง QR ทดสอบไม่สำเร็จ')
     } finally {
       setIsBusy(false)
     }
@@ -584,6 +620,69 @@ function App() {
                 </article>
               ))
             )}
+
+            <section className={isQrTestOpen ? 'qr-test-box open' : 'qr-test-box'}>
+              <div className="panel-heading">
+                <div>
+                  <h2>ทดสอบ QR</h2>
+                  <p className="muted">ใช้ตรวจบัญชีหลัก โดยไม่สร้างรายการชำระเงินจริง</p>
+                </div>
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    setIsQrTestOpen((current) => !current)
+                    setQrPreview(null)
+                  }}
+                  type="button"
+                >
+                  {isQrTestOpen ? 'พับเก็บ' : 'เปิดทดสอบ'}
+                </button>
+              </div>
+
+              {isQrTestOpen && (
+                <form className="qr-test-form" onSubmit={generateQrPreview}>
+                  <label>
+                    บัญชีสำหรับทดสอบ
+                    <select value={qrTestAccountId} onChange={(event) => setQrTestAccountId(event.target.value)}>
+                      <option value="">บัญชีหลักอัตโนมัติ</option>
+                      {paymentAccounts
+                        .filter((account) => account.isActive)
+                        .map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.accountName} {account.isDefault ? '(บัญชีหลัก)' : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    ยอดทดสอบ
+                    <input
+                      min="1"
+                      step="0.01"
+                      type="number"
+                      value={qrTestAmount}
+                      onChange={(event) => setQrTestAmount(event.target.value)}
+                    />
+                  </label>
+
+                  <button disabled={isBusy} type="submit">
+                    Gen QR ทดสอบ
+                  </button>
+
+                  {qrPreview && (
+                    <div className="qr-preview-result">
+                      <img alt="QR preview" src={qrPreview.qrImageDataUrl} />
+                      <div>
+                        <strong>{formatMoney(qrPreview.amount)}</strong>
+                        <span>{qrPreview.accountName}</span>
+                        <small>พร้อมให้สแกนทดสอบผ่านแอปธนาคาร</small>
+                      </div>
+                    </div>
+                  )}
+                </form>
+              )}
+            </section>
           </div>
         </section>
       )}

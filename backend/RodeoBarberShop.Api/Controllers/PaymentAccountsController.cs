@@ -5,13 +5,16 @@ using RodeoBarberShop.Api.Contracts.PaymentAccounts;
 using RodeoBarberShop.Api.Data;
 using RodeoBarberShop.Api.Entities;
 using RodeoBarberShop.Api.Enums;
+using RodeoBarberShop.Api.Services.Payments;
 
 namespace RodeoBarberShop.Api.Controllers;
 
 [ApiController]
 [Route("api/payment-accounts")]
 [Authorize(Roles = "Owner,Admin")]
-public class PaymentAccountsController(ApplicationDbContext dbContext) : ControllerBase
+public class PaymentAccountsController(
+    ApplicationDbContext dbContext,
+    IThaiQrPaymentService thaiQrPaymentService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PaymentAccountResponse>>> GetPaymentAccounts(CancellationToken cancellationToken)
@@ -151,6 +154,46 @@ public class PaymentAccountsController(ApplicationDbContext dbContext) : Control
         return NoContent();
     }
 
+    [HttpPost("qr-preview")]
+    public async Task<ActionResult<PreviewPaymentQrResponse>> PreviewDefaultPaymentQr(
+        PreviewPaymentQrRequest request,
+        CancellationToken cancellationToken)
+    {
+        var account = await dbContext.PaymentAccounts
+            .FirstOrDefaultAsync(
+                account => account.IsActive
+                    && account.IsDefault
+                    && (account.AccountType == PaymentAccountType.PromptPayPhone
+                        || account.AccountType == PaymentAccountType.PromptPayNationalId),
+                cancellationToken);
+
+        return account is null
+            ? BadRequest(new { message = "No active default PromptPay account is available." })
+            : CreateQrPreview(account, request.Amount);
+    }
+
+    [HttpPost("{id:guid}/qr-preview")]
+    public async Task<ActionResult<PreviewPaymentQrResponse>> PreviewPaymentQr(
+        Guid id,
+        PreviewPaymentQrRequest request,
+        CancellationToken cancellationToken)
+    {
+        var account = await dbContext.PaymentAccounts
+            .FirstOrDefaultAsync(account => account.Id == id, cancellationToken);
+
+        if (account is null)
+        {
+            return NotFound();
+        }
+
+        if (!account.IsActive)
+        {
+            return BadRequest(new { message = "Payment account is inactive." });
+        }
+
+        return CreateQrPreview(account, request.Amount);
+    }
+
     private async Task ClearDefaultAccounts(CancellationToken cancellationToken)
     {
         await dbContext.PaymentAccounts
@@ -174,6 +217,22 @@ public class PaymentAccountsController(ApplicationDbContext dbContext) : Control
             account.IsDefault,
             account.CreatedAt,
             account.UpdatedAt);
+    }
+
+    private ActionResult<PreviewPaymentQrResponse> CreateQrPreview(PaymentAccount account, decimal amount)
+    {
+        if (amount <= 0)
+        {
+            return BadRequest(new { message = "Amount must be greater than zero." });
+        }
+
+        var qr = thaiQrPaymentService.CreatePromptPayQr(account, amount);
+        if (qr is null)
+        {
+            return BadRequest(new { message = "QR preview supports active PromptPay phone or national id accounts only." });
+        }
+
+        return Ok(new PreviewPaymentQrResponse(account.Id, account.AccountName, amount, qr.Payload, qr.ImageDataUrl));
     }
 
     private static ParsedAccount ParseAccount(string accountType, string accountName, string accountNumber)

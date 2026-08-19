@@ -63,10 +63,15 @@ small {
 }
 
 .login-form,
-.account-form {
+.account-form,
+.qr-test-form {
   display: grid;
   gap: 14px;
   margin-top: 22px;
+}
+
+.qr-test-form {
+  margin-top: 14px;
 }
 
 label {
@@ -285,7 +290,8 @@ button.secondary {
 }
 
 .payment-box,
-.receipt-box {
+.receipt-box,
+.qr-test-box {
   display: grid;
   gap: 10px;
   border-radius: 8px;
@@ -299,6 +305,42 @@ button.secondary {
   border-radius: 8px;
   background: #fff;
   padding: 10px;
+}
+
+.qr-test-box {
+  margin-top: 6px;
+}
+
+.qr-test-box .panel-heading {
+  margin-bottom: 0;
+}
+
+.qr-test-box.open .panel-heading {
+  margin-bottom: 14px;
+}
+
+.qr-preview-result {
+  display: grid;
+  align-items: start;
+  gap: 12px;
+  grid-template-columns: 160px minmax(0, 1fr);
+}
+
+.qr-preview-result img {
+  width: 160px;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+}
+
+.qr-preview-result small {
+  display: block;
+  margin-top: 4px;
+}
+
+.qr-preview-result strong,
+.qr-preview-result span {
+  display: block;
 }
 
 .account-form {
@@ -355,6 +397,10 @@ button.secondary {
   }
 
   .queue-item button {
+    grid-template-columns: 1fr;
+  }
+
+  .qr-preview-result {
     grid-template-columns: 1fr;
   }
 
