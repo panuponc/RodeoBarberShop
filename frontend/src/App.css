@@ -114,6 +114,12 @@ button.secondary {
   color: #2b2117;
 }
 
+button.link-button {
+  background: transparent;
+  color: #856015;
+  padding: 0;
+}
+
 .user-box {
   display: flex;
   align-items: center;
@@ -358,9 +364,74 @@ button.secondary {
   width: auto;
 }
 
-.account-list {
+.account-list,
+.booking-panel,
+.history-panel {
   display: grid;
   gap: 10px;
+}
+
+.booking-panel,
+.history-panel {
+  border: 1px solid #ddd7ce;
+  border-radius: 8px;
+  background: #fffdf8;
+  box-shadow: 0 16px 40px rgb(62 49 32 / 8%);
+  padding: 18px;
+}
+
+.customer-grid {
+  display: grid;
+  align-items: start;
+  gap: 16px;
+  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
+}
+
+.compact-tabs {
+  margin: 18px 0 0;
+}
+
+.auth-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.service-choice-grid,
+.slot-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.choice-card {
+  display: grid;
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+  border: 1px solid #ebe3d8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.choice-card input {
+  width: auto;
+}
+
+.choice-card small {
+  display: block;
+}
+
+.slot-grid {
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+
+.inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #ebe3d8;
+  padding: 10px 12px;
 }
 
 .account-card {
@@ -392,7 +463,8 @@ button.secondary {
   }
 
   .work-grid,
-  .accounts-grid {
+  .accounts-grid,
+  .customer-grid {
     grid-template-columns: 1fr;
   }
 

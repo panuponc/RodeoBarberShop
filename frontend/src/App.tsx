@@ -9,7 +9,30 @@ type AuthResponse = {
   accessToken: string
 }
 
-type QueueService = {
+type Service = {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  durationMinutes: number
+}
+
+type Barber = {
+  id: string
+  fullName: string
+  specialty: string | null
+  experienceYears: number | null
+  isAvailable: boolean
+  acceptsBooking: boolean
+}
+
+type AvailabilitySlot = {
+  startAt: string
+  endAt: string
+  isAvailable: boolean
+}
+
+type BookingService = {
   serviceId: string
   serviceName: string
   unitPrice: number
@@ -18,7 +41,7 @@ type QueueService = {
   lineTotal: number
 }
 
-type QueueBooking = {
+type Booking = {
   id: string
   bookingNumber: string
   customerName: string | null
@@ -28,11 +51,10 @@ type QueueBooking = {
   totalAmount: number
   bookingStatus: string
   paymentStatus: string
-  services: QueueService[]
+  services: BookingService[]
 }
 
 type PaymentSummary = {
-  bookingId: string
   totalAmount: number
   paymentAccount: {
     id: string
@@ -55,14 +77,17 @@ type Receipt = {
   paymentNumber: string
   bookingNumber: string
   shopName: string
+  customerName: string | null
+  barberName: string | null
+  paidAt: string
+  paymentMethod: string
   totalAmount: number
+  services: BookingService[]
 }
 
 type QrPreview = {
-  paymentAccountId: string
   accountName: string
   amount: number
-  qrPayload: string
   qrImageDataUrl: string
 }
 
@@ -85,20 +110,24 @@ const statusLabels: Record<string, string> = {
 
 function App() {
   const [auth, setAuth] = useState<AuthResponse | null>(null)
-  const [email, setEmail] = useState('owner@rodeobarber.local')
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [queue, setQueue] = useState<QueueBooking[]>([])
-  const [selectedBooking, setSelectedBooking] = useState<QueueBooking | null>(null)
+  const [fullName, setFullName] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [message, setMessage] = useState('')
+  const [isBusy, setIsBusy] = useState(false)
+
+  const [queue, setQueue] = useState<Booking[]>([])
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null)
-  const [receipt, setReceipt] = useState<Receipt | null>(null)
+  const [staffReceipt, setStaffReceipt] = useState<Receipt | null>(null)
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([])
   const [qrPreview, setQrPreview] = useState<QrPreview | null>(null)
   const [qrTestAmount, setQrTestAmount] = useState('100')
   const [qrTestAccountId, setQrTestAccountId] = useState('')
   const [isQrTestOpen, setIsQrTestOpen] = useState(false)
-  const [activePanel, setActivePanel] = useState<'queue' | 'accounts'>('queue')
-  const [message, setMessage] = useState('')
-  const [isBusy, setIsBusy] = useState(false)
+  const [activeStaffPanel, setActiveStaffPanel] = useState<'queue' | 'accounts'>('queue')
   const [accountForm, setAccountForm] = useState({
     accountName: 'Rodeo PromptPay',
     accountType: 'PromptPayPhone',
@@ -107,17 +136,32 @@ function App() {
     isDefault: true,
   })
 
+  const [services, setServices] = useState<Service[]>([])
+  const [barbers, setBarbers] = useState<Barber[]>([])
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
+  const [selectedBarberId, setSelectedBarberId] = useState('')
+  const [bookingDate, setBookingDate] = useState(getTomorrowDate())
+  const [availability, setAvailability] = useState<AvailabilitySlot[]>([])
+  const [myBookings, setMyBookings] = useState<Booking[]>([])
+  const [customerReceipt, setCustomerReceipt] = useState<Receipt | null>(null)
+
   const defaultPaymentAccount = useMemo(
     () => paymentAccounts.find((account) => account.isActive && account.isDefault),
     [paymentAccounts],
   )
 
+  const selectedServices = services.filter((service) => selectedServiceIds.includes(service.id))
+  const selectedTotal = selectedServices.reduce((total, service) => total + service.price, 0)
+
   useEffect(() => {
     if (!auth) return
 
-    void refreshQueue()
-    void refreshPaymentAccounts()
-    // The refresh functions depend on the current token and are only needed when auth changes.
+    if (auth.role === 'Customer') {
+      void refreshCustomerData()
+    } else {
+      void refreshQueue()
+      void refreshPaymentAccounts()
+    }
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [auth])
 
@@ -141,21 +185,107 @@ function App() {
     return response.json() as Promise<T>
   }
 
-  async function login(event: FormEvent<HTMLFormElement>) {
+  async function submitAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsBusy(true)
     setMessage('')
 
     try {
-      const result = await api<AuthResponse>('/api/auth/login', {
+      const path = authMode === 'login' ? '/api/auth/login' : '/api/auth/register'
+      const body =
+        authMode === 'login'
+          ? { email, password }
+          : { fullName, phoneNumber, email, password }
+      const result = await api<AuthResponse>(path, {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
       })
 
       setAuth(result)
       setMessage(`เข้าสู่ระบบแล้ว: ${result.fullName} (${result.role})`)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Login failed')
+      setMessage(error instanceof Error ? error.message : 'เข้าสู่ระบบไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function refreshCustomerData() {
+    try {
+      const [serviceResult, barberResult, bookingResult] = await Promise.all([
+        api<Service[]>('/api/services'),
+        api<Barber[]>('/api/barbers'),
+        api<Booking[]>('/api/bookings/my'),
+      ])
+
+      setServices(serviceResult)
+      setBarbers(barberResult)
+      setMyBookings(bookingResult)
+      setSelectedBarberId((current) => current || barberResult[0]?.id || '')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'โหลดข้อมูลลูกค้าไม่สำเร็จ')
+    }
+  }
+
+  async function checkAvailability(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsBusy(true)
+    setMessage('')
+    setAvailability([])
+
+    try {
+      if (!selectedBarberId || selectedServiceIds.length === 0) {
+        throw new Error('กรุณาเลือกบริการและช่างก่อน')
+      }
+
+      const params = new URLSearchParams({ barberId: selectedBarberId, date: bookingDate })
+      selectedServiceIds.forEach((serviceId) => params.append('serviceIds', serviceId))
+
+      const result = await api<AvailabilitySlot[]>(`/api/bookings/availability?${params}`)
+      setAvailability(result.filter((slot) => slot.isAvailable))
+      setMessage(result.some((slot) => slot.isAvailable) ? 'เลือกเวลาที่ต้องการจองได้เลย' : 'วันนี้ยังไม่มีเวลาว่าง')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'เช็คเวลาว่างไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function createBooking(slot: AvailabilitySlot) {
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await api('/api/bookings', {
+        method: 'POST',
+        body: JSON.stringify({
+          barberId: selectedBarberId,
+          startAt: slot.startAt,
+          serviceIds: selectedServiceIds,
+          customerNote: 'Booked from customer dashboard',
+        }),
+      })
+
+      setAvailability([])
+      await refreshCustomerData()
+      setMessage('จองคิวสำเร็จแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'จองคิวไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function loadCustomerReceipt(booking: Booking) {
+    setIsBusy(true)
+    setCustomerReceipt(null)
+    setMessage('')
+
+    try {
+      const result = await api<Receipt>(`/api/payments/booking/${booking.id}/receipt`)
+      setCustomerReceipt(result)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'ยังไม่พบใบเสร็จของรายการนี้')
     } finally {
       setIsBusy(false)
     }
@@ -163,7 +293,7 @@ function App() {
 
   async function refreshQueue() {
     try {
-      const result = await api<QueueBooking[]>('/api/queue/today')
+      const result = await api<Booking[]>('/api/queue/today')
       setQueue(result)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'โหลดคิวไม่สำเร็จ')
@@ -180,7 +310,7 @@ function App() {
     }
   }
 
-  async function moveStatus(booking: QueueBooking) {
+  async function moveStatus(booking: Booking) {
     const targetStatus = nextStatus[booking.bookingStatus]
     if (!targetStatus) return
 
@@ -198,7 +328,7 @@ function App() {
       await refreshQueue()
       setSelectedBooking(null)
       setPaymentSummary(null)
-      setReceipt(null)
+      setStaffReceipt(null)
       setMessage(`เปลี่ยนสถานะเป็น ${statusLabels[targetStatus] ?? targetStatus} แล้ว`)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'เปลี่ยนสถานะไม่สำเร็จ')
@@ -207,9 +337,9 @@ function App() {
     }
   }
 
-  async function loadPaymentSummary(booking: QueueBooking) {
+  async function loadPaymentSummary(booking: Booking) {
     setSelectedBooking(booking)
-    setReceipt(null)
+    setStaffReceipt(null)
     setIsBusy(true)
     setMessage('')
 
@@ -241,7 +371,7 @@ function App() {
       })
       const receiptResult = await api<Receipt>(`/api/payments/${payment.id}/receipt`)
 
-      setReceipt(receiptResult)
+      setStaffReceipt(receiptResult)
       setPaymentSummary(null)
       await refreshQueue()
       setMessage('ยืนยันชำระเงินและออกใบเสร็จแล้ว')
@@ -349,15 +479,42 @@ function App() {
     }
   }
 
+  function logout() {
+    setAuth(null)
+    setQueue([])
+    setMyBookings([])
+    setAvailability([])
+    setSelectedBooking(null)
+    setPaymentSummary(null)
+    setCustomerReceipt(null)
+    setStaffReceipt(null)
+  }
+
   if (!auth) {
     return (
       <main className="login-shell">
         <section className="login-panel">
           <p className="eyebrow">Rodeo Barber Shop</p>
-          <h1>Staff Dashboard</h1>
-          <p className="muted">เข้าสู่ระบบด้วยบัญชี Owner หรือ Staff เพื่อจัดการคิว รับเงิน และออกใบเสร็จ</p>
+          <h1>{authMode === 'login' ? 'Login' : 'Customer Signup'}</h1>
+          <p className="muted">
+            {authMode === 'login'
+              ? 'เข้าสู่ระบบครั้งเดียว ระบบจะพาไปหน้าลูกค้าหรือหน้าร้านตามสิทธิ์ของบัญชี'
+              : 'สมัครสมาชิกสำหรับลูกค้าเพื่อจองคิวออนไลน์'}
+          </p>
 
-          <form className="login-form" onSubmit={login}>
+          <form className="login-form" onSubmit={submitAuth}>
+            {authMode === 'register' && (
+              <>
+                <label>
+                  ชื่อ-นามสกุล
+                  <input value={fullName} onChange={(event) => setFullName(event.target.value)} />
+                </label>
+                <label>
+                  เบอร์โทร
+                  <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} />
+                </label>
+              </>
+            )}
             <label>
               Email
               <input value={email} onChange={(event) => setEmail(event.target.value)} />
@@ -365,16 +522,34 @@ function App() {
             <label>
               Password
               <input
-                placeholder="ดูรหัสใน docs/LOCAL_DEV_NOTES.md"
+                placeholder="อย่างน้อย 8 ตัวอักษร"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
             </label>
             <button disabled={isBusy} type="submit">
-              {isBusy ? 'กำลังเข้าสู่ระบบ...' : 'Login'}
+              {isBusy ? 'กำลังดำเนินการ...' : authMode === 'login' ? 'Login' : 'Register'}
             </button>
           </form>
+
+          <div className="auth-switch">
+            {authMode === 'login' ? (
+              <>
+                <span>ยังไม่มีบัญชีลูกค้า?</span>
+                <button className="link-button" onClick={() => setAuthMode('register')} type="button">
+                  สมัครสมาชิก
+                </button>
+              </>
+            ) : (
+              <>
+                <span>มีบัญชีแล้ว?</span>
+                <button className="link-button" onClick={() => setAuthMode('login')} type="button">
+                  กลับไป Login
+                </button>
+              </>
+            )}
+          </div>
 
           {message && <p className="notice">{message}</p>}
         </section>
@@ -382,29 +557,124 @@ function App() {
     )
   }
 
+  if (auth.role === 'Customer') {
+    return (
+      <main className="dashboard-shell">
+        <Header auth={auth} eyebrow="Customer Booking" onLogout={logout} />
+        {message && <p className="notice">{message}</p>}
+
+        <section className="customer-grid">
+          <form className="booking-panel" onSubmit={checkAvailability}>
+            <div className="panel-heading">
+              <h2>จองคิว</h2>
+              <strong>{formatMoney(selectedTotal)}</strong>
+            </div>
+
+            <div className="service-choice-grid">
+              {services.map((service) => (
+                <label className="choice-card" key={service.id}>
+                  <input
+                    checked={selectedServiceIds.includes(service.id)}
+                    onChange={(event) => {
+                      setSelectedServiceIds((current) =>
+                        event.target.checked ? [...current, service.id] : current.filter((id) => id !== service.id),
+                      )
+                    }}
+                    type="checkbox"
+                  />
+                  <span>
+                    <strong>{service.name}</strong>
+                    <small>
+                      {formatMoney(service.price)} / {service.durationMinutes} นาที
+                    </small>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <label>
+              เลือกช่าง
+              <select value={selectedBarberId} onChange={(event) => setSelectedBarberId(event.target.value)}>
+                {barbers.map((barber) => (
+                  <option key={barber.id} value={barber.id}>
+                    {barber.fullName} {barber.specialty ? `- ${barber.specialty}` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              วันที่
+              <input value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} type="date" />
+            </label>
+
+            <button disabled={isBusy} type="submit">
+              เช็คเวลาว่าง
+            </button>
+
+            {availability.length > 0 && (
+              <div className="slot-grid">
+                {availability.slice(0, 18).map((slot) => (
+                  <button className="secondary" disabled={isBusy} key={slot.startAt} onClick={() => createBooking(slot)} type="button">
+                    {formatTime(slot.startAt)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </form>
+
+          <aside className="history-panel">
+            <div className="panel-heading">
+              <h2>ประวัติการจอง</h2>
+              <button className="secondary" disabled={isBusy} onClick={refreshCustomerData} type="button">
+                Refresh
+              </button>
+            </div>
+
+            <div className="queue-list">
+              {myBookings.length === 0 ? (
+                <p className="empty-state">ยังไม่มีประวัติการจอง</p>
+              ) : (
+                myBookings.map((booking) => (
+                  <article className="queue-item" key={booking.id}>
+                    <button type="button">
+                      <span className="booking-time">{formatDateTime(booking.startAt)}</span>
+                      <span>
+                        <strong>{booking.barberName}</strong>
+                        <small>{booking.bookingNumber}</small>
+                      </span>
+                      <span className={`status-pill status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
+                    </button>
+                    {booking.bookingStatus === 'Completed' && (
+                      <div className="inline-actions">
+                        <button className="secondary" disabled={isBusy} onClick={() => loadCustomerReceipt(booking)} type="button">
+                          ดูใบเสร็จ
+                        </button>
+                      </div>
+                    )}
+                  </article>
+                ))
+              )}
+            </div>
+
+            {customerReceipt && <ReceiptBox receipt={customerReceipt} />}
+          </aside>
+        </section>
+      </main>
+    )
+  }
+
   return (
     <main className="dashboard-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Staff Dashboard</p>
-          <h1>Rodeo Barber Shop</h1>
-        </div>
-        <div className="user-box">
-          <span>{auth.fullName}</span>
-          <strong>{auth.role}</strong>
-          <button onClick={() => setAuth(null)} type="button">
-            Logout
-          </button>
-        </div>
-      </header>
+      <Header auth={auth} eyebrow="Staff Dashboard" onLogout={logout} />
 
       <nav className="tabs">
-        <button className={activePanel === 'queue' ? 'active' : ''} onClick={() => setActivePanel('queue')} type="button">
+        <button className={activeStaffPanel === 'queue' ? 'active' : ''} onClick={() => setActiveStaffPanel('queue')} type="button">
           คิววันนี้
         </button>
         <button
-          className={activePanel === 'accounts' ? 'active' : ''}
-          onClick={() => setActivePanel('accounts')}
+          className={activeStaffPanel === 'accounts' ? 'active' : ''}
+          onClick={() => setActiveStaffPanel('accounts')}
           type="button"
         >
           บัญชีรับเงิน
@@ -413,7 +683,7 @@ function App() {
 
       {message && <p className="notice">{message}</p>}
 
-      {activePanel === 'queue' ? (
+      {activeStaffPanel === 'queue' ? (
         <section className="work-grid">
           <div className="queue-panel">
             <div className="panel-heading">
@@ -473,14 +743,7 @@ function App() {
                   </div>
                 </dl>
 
-                <div className="service-list">
-                  {selectedBooking.services.map((service) => (
-                    <div key={service.serviceId}>
-                      <span>{service.serviceName}</span>
-                      <strong>{formatMoney(service.lineTotal)}</strong>
-                    </div>
-                  ))}
-                </div>
+                <ServiceList services={selectedBooking.services} />
 
                 <div className="action-row">
                   {nextStatus[selectedBooking.bookingStatus] && (
@@ -511,14 +774,7 @@ function App() {
                   </section>
                 )}
 
-                {receipt && (
-                  <section className="receipt-box">
-                    <h3>ใบเสร็จ</h3>
-                    <p>{receipt.paymentNumber}</p>
-                    <p>{receipt.shopName}</p>
-                    <strong>{formatMoney(receipt.totalAmount)}</strong>
-                  </section>
-                )}
+                {staffReceipt && <ReceiptBox receipt={staffReceipt} />}
               </>
             ) : (
               <p className="empty-state">เลือกคิวเพื่อดูรายละเอียด</p>
@@ -690,6 +946,60 @@ function App() {
   )
 }
 
+function Header({
+  auth,
+  eyebrow,
+  onLogout,
+}: {
+  auth: AuthResponse
+  eyebrow: string
+  onLogout: () => void
+}) {
+  return (
+    <header className="topbar">
+      <div>
+        <p className="eyebrow">{eyebrow}</p>
+        <h1>Rodeo Barber Shop</h1>
+      </div>
+      <div className="user-box">
+        <span>{auth.fullName}</span>
+        <strong>{auth.role}</strong>
+        <button onClick={onLogout} type="button">
+          Logout
+        </button>
+      </div>
+    </header>
+  )
+}
+
+function ServiceList({ services }: { services: BookingService[] }) {
+  return (
+    <div className="service-list">
+      {services.map((service) => (
+        <div key={service.serviceId}>
+          <span>{service.serviceName}</span>
+          <strong>{formatMoney(service.lineTotal)}</strong>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ReceiptBox({ receipt }: { receipt: Receipt }) {
+  return (
+    <section className="receipt-box">
+      <h3>ใบเสร็จ</h3>
+      <p>{receipt.paymentNumber}</p>
+      <p>{receipt.shopName}</p>
+      <small>
+        {receipt.customerName} / {receipt.barberName} / {formatDateTime(receipt.paidAt)}
+      </small>
+      <ServiceList services={receipt.services} />
+      <strong>{formatMoney(receipt.totalAmount)}</strong>
+    </section>
+  )
+}
+
 function formatMoney(value: number) {
   return new Intl.NumberFormat('th-TH', {
     style: 'currency',
@@ -703,6 +1013,21 @@ function formatTime(value: string) {
     minute: '2-digit',
     timeZone: 'Asia/Bangkok',
   }).format(new Date(value))
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat('th-TH', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'Asia/Bangkok',
+  }).format(new Date(value))
+}
+
+function getTomorrowDate() {
+  const date = new Date()
+  date.setDate(date.getDate() + 1)
+
+  return date.toISOString().slice(0, 10)
 }
 
 export default App

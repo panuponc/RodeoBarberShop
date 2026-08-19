@@ -188,6 +188,31 @@ public class PaymentsController(
         return Ok(ToReceiptResponse(payment, shop));
     }
 
+    [Authorize(Roles = "Customer,FrontDeskStaff,Owner,Admin")]
+    [HttpGet("booking/{bookingId:guid}/receipt")]
+    public async Task<ActionResult<ReceiptResponse>> GetBookingReceipt(Guid bookingId, CancellationToken cancellationToken)
+    {
+        var payment = await PaymentQuery()
+            .FirstOrDefaultAsync(payment => payment.BookingId == bookingId, cancellationToken);
+
+        if (payment is null)
+        {
+            return NotFound();
+        }
+
+        if (!CanAccessPayment(payment))
+        {
+            return Forbid();
+        }
+
+        var shop = await dbContext.ShopSettings
+            .AsNoTracking()
+            .OrderBy(setting => setting.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return Ok(ToReceiptResponse(payment, shop));
+    }
+
     private IQueryable<Booking> PaymentBookingQuery()
     {
         return dbContext.Bookings
