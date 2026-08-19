@@ -273,6 +273,46 @@ function App() {
     }
   }
 
+  async function enablePaymentAccount(account: PaymentAccount) {
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await api(`/api/payment-accounts/${account.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          accountName: account.accountName,
+          accountType: account.accountType,
+          accountNumber: account.accountNumber,
+          bankName: account.bankName,
+          isActive: true,
+          isDefault: account.isDefault,
+        }),
+      })
+      await refreshPaymentAccounts()
+      setMessage('เปิดใช้งานบัญชีแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'เปิดใช้งานบัญชีไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function setDefaultPaymentAccount(account: PaymentAccount) {
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await api(`/api/payment-accounts/${account.id}/default`, { method: 'PUT' })
+      await refreshPaymentAccounts()
+      setMessage('ตั้งบัญชีหลักแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'ตั้งบัญชีหลักไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
   if (!auth) {
     return (
       <main className="login-shell">
@@ -520,6 +560,21 @@ function App() {
                   <div className="account-actions">
                     {account.isDefault && <span className="status-pill">Default</span>}
                     {!account.isActive && <span className="status-pill muted-pill">Inactive</span>}
+                    {account.isActive && !account.isDefault && (
+                      <button
+                        className="secondary"
+                        disabled={isBusy}
+                        onClick={() => setDefaultPaymentAccount(account)}
+                        type="button"
+                      >
+                        ตั้งเป็นบัญชีหลัก
+                      </button>
+                    )}
+                    {!account.isActive && (
+                      <button className="secondary" disabled={isBusy} onClick={() => enablePaymentAccount(account)} type="button">
+                        เปิดใช้งาน
+                      </button>
+                    )}
                     {account.isActive && (
                       <button className="secondary" disabled={isBusy} onClick={() => disablePaymentAccount(account)} type="button">
                         ปิดใช้งาน
