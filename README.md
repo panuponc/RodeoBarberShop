@@ -118,16 +118,18 @@ Project documentation is stored in the `docs` folder.
 - [x] Frontend project setup
 - [x] EF Core foundation
 - [x] Initial database entities
+- [x] JWT authentication foundation
+- [x] Password hashing foundation
 - [ ] Database migration
-- [ ] Authentication implementation
+- [ ] Authentication database testing
 
 ## Next Steps
 
 1. Add the real PostgreSQL or Supabase connection string.
 2. Create the first database migration.
 3. Apply the migration to the development database.
-4. Implement authentication and role foundation.
-5. Add customer registration and login APIs.
+4. Test customer registration and login APIs with the database.
+5. Add role-protected API examples.
 6. Connect the frontend to the backend health endpoint.
 
 ## Author
