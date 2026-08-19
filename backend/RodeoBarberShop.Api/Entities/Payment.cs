@@ -6,6 +6,7 @@ public class Payment
 {
     public Guid Id { get; set; }
     public Guid BookingId { get; set; }
+    public Guid? PaymentAccountId { get; set; }
     public string PaymentNumber { get; set; } = string.Empty;
     public PaymentMethod PaymentMethod { get; set; }
     public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Paid;
@@ -19,5 +20,6 @@ public class Payment
     public DateTimeOffset UpdatedAt { get; set; }
 
     public Booking Booking { get; set; } = null!;
+    public PaymentAccount? PaymentAccount { get; set; }
     public User ReceivedByUser { get; set; } = null!;
 }

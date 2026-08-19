@@ -6,6 +6,7 @@ using Microsoft.OpenApi.Models;
 using RodeoBarberShop.Api.Data;
 using RodeoBarberShop.Api.Options;
 using RodeoBarberShop.Api.Services.Auth;
+using RodeoBarberShop.Api.Services.Payments;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IThaiQrPaymentService, ThaiQrPaymentService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

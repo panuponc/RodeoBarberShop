@@ -16,6 +16,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<BarberService> BarberServices => Set<BarberService>();
     public DbSet<BarberWorkingHour> BarberWorkingHours => Set<BarberWorkingHour>();
     public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
+    public DbSet<PaymentAccount> PaymentAccounts => Set<PaymentAccount>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Promotion> Promotions => Set<Promotion>();
     public DbSet<PromotionService> PromotionServices => Set<PromotionService>();
@@ -35,6 +36,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         ConfigureBookingServices(modelBuilder);
         ConfigureShop(modelBuilder);
         ConfigureBarberSchedules(modelBuilder);
+        ConfigurePaymentAccounts(modelBuilder);
         ConfigurePayments(modelBuilder);
         ConfigurePromotions(modelBuilder);
         ConfigureNotifications(modelBuilder);
@@ -339,6 +341,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.HasKey(payment => payment.Id);
 
             entity.Property(payment => payment.BookingId).HasColumnName("booking_id").IsRequired();
+            entity.Property(payment => payment.PaymentAccountId).HasColumnName("payment_account_id");
             entity.Property(payment => payment.PaymentNumber).HasColumnName("payment_number").HasMaxLength(30).IsRequired();
             entity.Property(payment => payment.PaymentMethod).HasColumnName("payment_method").HasMaxLength(30).HasConversion<string>().IsRequired();
             entity.Property(payment => payment.PaymentStatus).HasColumnName("payment_status").HasMaxLength(30).HasConversion<string>().IsRequired();
@@ -353,16 +356,42 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
             entity.HasIndex(payment => payment.BookingId).IsUnique();
             entity.HasIndex(payment => payment.PaymentNumber).IsUnique();
+            entity.HasIndex(payment => payment.PaymentAccountId);
 
             entity.HasOne(payment => payment.Booking)
                 .WithOne(booking => booking.Payment)
                 .HasForeignKey<Payment>(payment => payment.BookingId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            entity.HasOne(payment => payment.PaymentAccount)
+                .WithMany(paymentAccount => paymentAccount.Payments)
+                .HasForeignKey(payment => payment.PaymentAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             entity.HasOne(payment => payment.ReceivedByUser)
                 .WithMany(user => user.ReceivedPayments)
                 .HasForeignKey(payment => payment.ReceivedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigurePaymentAccounts(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PaymentAccount>(entity =>
+        {
+            entity.ToTable("payment_accounts");
+            entity.HasKey(paymentAccount => paymentAccount.Id);
+
+            entity.Property(paymentAccount => paymentAccount.AccountName).HasColumnName("account_name").HasMaxLength(150).IsRequired();
+            entity.Property(paymentAccount => paymentAccount.AccountType).HasColumnName("account_type").HasMaxLength(40).HasConversion<string>().IsRequired();
+            entity.Property(paymentAccount => paymentAccount.AccountNumber).HasColumnName("account_number").HasMaxLength(50).IsRequired();
+            entity.Property(paymentAccount => paymentAccount.BankName).HasColumnName("bank_name").HasMaxLength(100);
+            entity.Property(paymentAccount => paymentAccount.IsActive).HasColumnName("is_active").IsRequired();
+            entity.Property(paymentAccount => paymentAccount.IsDefault).HasColumnName("is_default").IsRequired();
+            entity.Property(paymentAccount => paymentAccount.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(paymentAccount => paymentAccount.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            entity.HasIndex(paymentAccount => new { paymentAccount.IsActive, paymentAccount.IsDefault });
         });
     }
 
