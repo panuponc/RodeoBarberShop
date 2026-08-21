@@ -190,6 +190,33 @@ public class StaffController(ApplicationDbContext dbContext, IPasswordHasher pas
         return NoContent();
     }
 
+    [HttpPut("{id:guid}/password")]
+    public async Task<IActionResult> ResetPassword(
+        Guid id,
+        ResetStaffPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
+        {
+            return BadRequest(new { message = "Password must be at least 8 characters." });
+        }
+
+        var user = await dbContext.Users
+            .FirstOrDefaultAsync(user => user.Id == id && ManageableRoles.Contains(user.Role), cancellationToken);
+
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        user.PasswordHash = passwordHasher.HashPassword(request.Password);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
     private IQueryable<User> BaseStaffQuery()
     {
         return dbContext.Users

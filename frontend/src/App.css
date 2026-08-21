@@ -1,6 +1,6 @@
 .login-shell,
 .dashboard-shell {
-  width: min(1180px, calc(100% - 32px));
+  width: min(1360px, calc(100% - 36px));
   margin: 0 auto;
 }
 
@@ -8,58 +8,222 @@
   display: grid;
   min-height: 100vh;
   place-items: center;
-  padding: 32px 0;
+  padding: 36px 0;
 }
 
 .login-panel,
 .queue-panel,
 .detail-panel,
 .account-form,
-.account-list {
-  border: 1px solid #ddd7ce;
-  border-radius: 8px;
-  background: #fffdf8;
-  box-shadow: 0 16px 40px rgb(62 49 32 / 8%);
+.account-list,
+.booking-panel,
+.history-panel {
+  border: 1px solid rgb(201 151 61 / 18%);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 24px 80px rgb(18 14 9 / 14%);
 }
 
 .login-panel {
-  width: min(100%, 460px);
-  padding: 28px;
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 480px);
+  padding: 34px;
+}
+
+.login-panel::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 7px;
+  background: linear-gradient(90deg, #b67616, #e6b65d, #7a470b);
+  content: "";
 }
 
 .dashboard-shell {
-  padding: 28px 0 40px;
+  padding: 26px 0 42px;
+}
+
+.backoffice-shell {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 236px minmax(0, 1fr);
+  background: #f8f7f5;
+}
+
+.backoffice-sidebar {
+  position: sticky;
+  top: 0;
+  display: grid;
+  height: 100vh;
+  align-content: start;
+  gap: 26px;
+  background:
+    linear-gradient(180deg, rgb(6 8 9 / 96%), rgb(17 17 16 / 97%)),
+    radial-gradient(circle at top left, rgb(190 126 33 / 28%), transparent 16rem);
+  color: #fffaf0;
+  padding: 24px 18px;
+}
+
+.brand-block {
+  display: grid;
+  gap: 2px;
+  padding: 0 6px 16px;
+}
+
+.brand-block strong {
+  color: #fff;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.28rem;
+  font-style: italic;
+  font-weight: 900;
+  line-height: 0.92;
+}
+
+.brand-block span {
+  color: #f3eee5;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.side-nav {
+  display: grid;
+  gap: 8px;
+}
+
+.side-nav button {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 28px minmax(0, 1fr);
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  color: #eee7db;
+  padding: 12px 13px;
+  text-align: left;
+}
+
+.side-nav button span {
+  color: #d7a451;
+  font-weight: 900;
+}
+
+.side-nav button.active {
+  background: linear-gradient(135deg, #8e5b18, #c6872b);
+  box-shadow: 0 16px 30px rgb(0 0 0 / 22%);
+  color: #fff;
+}
+
+.side-nav button.active span {
+  color: #fff;
+}
+
+.shop-card {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgb(255 255 255 / 13%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 6%);
+  margin-top: auto;
+  padding: 14px;
+}
+
+.shop-card strong {
+  color: #f2c16f;
+}
+
+.shop-card small {
+  color: #d8d1c6;
+}
+
+.backoffice-main {
+  min-width: 0;
+  padding: 28px;
+}
+
+.backoffice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.backoffice-header h1 {
+  color: #15120f;
+  font-size: clamp(1.8rem, 2.5vw, 2.45rem);
+  line-height: 1.08;
+}
+
+.backoffice-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #ece4d9;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 14px 40px rgb(21 17 12 / 6%);
+  padding: 10px 12px 10px 16px;
+  text-align: right;
+}
+
+.backoffice-user strong,
+.backoffice-user small {
+  display: block;
+}
+
+.backoffice-user strong {
+  color: #1f1711;
 }
 
 .topbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 18px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgb(8 8 7 / 92%), rgb(36 28 18 / 90%)),
+    radial-gradient(circle at 10% 0%, rgb(197 130 27 / 42%), transparent 30%);
+  box-shadow: 0 24px 70px rgb(12 9 6 / 22%);
+  color: #fffaf0;
+  margin-bottom: 18px;
+  padding: 20px 22px;
 }
 
 .topbar h1,
 .login-panel h1 {
   margin: 4px 0 8px;
-  color: #17130e;
-  font-size: 2rem;
-  line-height: 1.1;
+  color: inherit;
+  font-size: clamp(1.8rem, 3vw, 2.45rem);
+  line-height: 1.05;
+}
+
+.topbar h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  letter-spacing: 0.01em;
 }
 
 .eyebrow {
-  color: #856015;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  color: #c78b2b;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.topbar .eyebrow {
+  color: #f0c06d;
 }
 
 .muted,
 .empty-state,
 .notice,
 small {
-  color: #6b6258;
+  color: #71675c;
 }
 
 .login-form,
@@ -76,31 +240,55 @@ small {
 
 label {
   display: grid;
-  gap: 6px;
-  color: #2c251d;
-  font-weight: 700;
+  gap: 7px;
+  min-width: 0;
+  color: #211913;
+  font-weight: 800;
 }
 
 input,
 select {
   width: 100%;
-  border: 1px solid #d6cec3;
-  border-radius: 8px;
+  min-width: 0;
+  border: 1px solid #ded2c1;
+  border-radius: 12px;
   background: #fff;
-  color: #211a12;
+  color: #1e1711;
   font: inherit;
-  padding: 10px 12px;
+  font-weight: 650;
+  padding: 12px 13px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #bd7a18;
+  box-shadow: 0 0 0 4px rgb(197 130 27 / 16%);
 }
 
 button {
   border: 0;
-  border-radius: 8px;
-  background: #1f1a14;
-  color: #fffdf8;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1a1510, #332418);
+  box-shadow: 0 10px 22px rgb(25 16 8 / 12%);
+  color: #fffaf2;
   cursor: pointer;
   font: inherit;
-  font-weight: 700;
-  padding: 10px 14px;
+  font-weight: 900;
+  padding: 11px 15px;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+}
+
+button:hover:not(:disabled) {
+  box-shadow: 0 14px 28px rgb(25 16 8 / 18%);
+  transform: translateY(-1px);
 }
 
 button:disabled {
@@ -109,14 +297,16 @@ button:disabled {
 }
 
 button.secondary {
-  border: 1px solid #cfc5b7;
-  background: #fff8ec;
+  border: 1px solid #d6c5aa;
+  background: #fff9ef;
+  box-shadow: none;
   color: #2b2117;
 }
 
 button.link-button {
   background: transparent;
-  color: #856015;
+  box-shadow: none;
+  color: #a56510;
   padding: 0;
 }
 
@@ -127,53 +317,94 @@ button.link-button {
   text-align: right;
 }
 
+.user-box button {
+  background: rgb(255 255 255 / 12%);
+  box-shadow: none;
+}
+
 .user-box strong,
 .status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
   border-radius: 999px;
-  background: #eee4d7;
-  color: #55402b;
+  background: #f2e5cf;
+  color: #684614;
   font-size: 0.78rem;
-  font-weight: 800;
-  padding: 4px 9px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 7px 10px;
+  white-space: nowrap;
 }
 
 .tabs {
   display: flex;
   gap: 8px;
+  overflow-x: auto;
+  border: 1px solid #e8dccb;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 72%);
   margin-bottom: 18px;
+  padding: 6px;
 }
 
 .tabs button {
-  background: #eadfce;
-  color: #3a2c1e;
+  flex: 0 0 auto;
+  background: transparent;
+  box-shadow: none;
+  color: #4a3927;
 }
 
 .tabs button.active {
-  background: #1f1a14;
-  color: #fff;
+  background: linear-gradient(135deg, #b36f11, #d99b31);
+  color: #fffaf0;
 }
 
 .notice {
-  border: 1px solid #e0d1b7;
-  border-radius: 8px;
-  background: #fff8ec;
+  border: 1px solid #e6c996;
+  border-radius: 14px;
+  background: #fff7e8;
   margin-bottom: 16px;
-  padding: 10px 12px;
+  padding: 12px 14px;
 }
 
 .work-grid,
-.accounts-grid {
+.accounts-grid,
+.customer-grid {
   display: grid;
   align-items: start;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+}
+
+.work-grid {
+  grid-template-columns: minmax(330px, 0.9fr) minmax(0, 1.1fr);
+}
+
+.accounts-grid {
+  grid-template-columns: minmax(340px, 0.78fr) minmax(0, 1.22fr);
+}
+
+.staff-management-grid {
+  grid-template-columns: minmax(360px, 0.8fr) minmax(0, 1.2fr);
+}
+
+.customer-grid {
+  grid-template-columns: minmax(340px, 0.9fr) minmax(0, 1.1fr);
 }
 
 .queue-panel,
 .detail-panel,
 .account-form,
-.account-list {
-  padding: 18px;
+.account-list,
+.booking-panel,
+.history-panel {
+  padding: 20px;
+}
+
+.account-form {
+  position: sticky;
+  top: 16px;
 }
 
 .panel-heading {
@@ -186,24 +417,38 @@ button.link-button {
 
 .panel-heading h2,
 .payment-box h3,
-.receipt-box h3 {
+.receipt-box h3,
+.account-form h2 {
   margin: 0;
-  color: #211a12;
+  color: #1d1711;
 }
 
-.queue-list {
+.queue-list,
+.account-list,
+.service-choice-grid,
+.slot-grid {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
-.queue-item {
-  border: 1px solid #ebe3d8;
-  border-radius: 8px;
+.queue-item,
+.account-card,
+.choice-card {
+  border: 1px solid #eadfce;
+  border-radius: 14px;
+  background: #fff;
   overflow: hidden;
 }
 
+.queue-item {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
 .queue-item.selected {
-  border-color: #856015;
+  border-color: #c17b18;
+  box-shadow: 0 14px 36px rgb(170 101 14 / 14%);
 }
 
 .queue-item button {
@@ -211,21 +456,25 @@ button.link-button {
   width: 100%;
   align-items: center;
   gap: 12px;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
   background: #fff;
+  box-shadow: none;
   color: #211a12;
   padding: 14px;
   text-align: left;
+  transform: none;
 }
 
 .booking-time {
-  color: #856015;
-  font-weight: 900;
+  color: #af6810;
+  font-weight: 950;
 }
 
 .queue-item strong,
 .account-card strong {
   display: block;
+  color: #1e1711;
+  font-size: 1.02rem;
 }
 
 .queue-item small,
@@ -235,24 +484,29 @@ button.link-button {
 }
 
 .status-PendingConfirmation {
-  background: #fff1cc;
+  background: #fff0c9;
+  color: #8a5c05;
 }
 
 .status-Confirmed,
 .status-WaitingService {
   background: #dcecff;
+  color: #25537a;
 }
 
 .status-InService {
-  background: #e5dcff;
+  background: #e9e1ff;
+  color: #593993;
 }
 
 .status-WaitingPayment {
   background: #ffe2d5;
+  color: #95431d;
 }
 
 .status-Completed {
-  background: #d9f4df;
+  background: #dff5df;
+  color: #226a2c;
 }
 
 .summary-list {
@@ -262,8 +516,7 @@ button.link-button {
 }
 
 .summary-list div,
-.service-list div,
-.account-card {
+.service-list div {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -271,20 +524,21 @@ button.link-button {
 }
 
 .summary-list dt {
-  color: #6b6258;
+  color: #71675c;
   font-size: 0.86rem;
 }
 
 .summary-list dd {
   margin: 0;
-  font-weight: 800;
+  color: #1d1711;
+  font-weight: 900;
 }
 
 .service-list {
   display: grid;
   gap: 8px;
-  border-top: 1px solid #ebe3d8;
-  border-bottom: 1px solid #ebe3d8;
+  border-top: 1px solid #ece1d2;
+  border-bottom: 1px solid #ece1d2;
   padding: 14px 0;
 }
 
@@ -300,21 +554,26 @@ button.link-button {
 .qr-test-box {
   display: grid;
   gap: 10px;
-  border-radius: 8px;
-  background: #f6efe5;
+  border: 1px solid #ead6b0;
+  border-radius: 16px;
+  background: #fff8ec;
   margin-top: 16px;
-  padding: 14px;
+  padding: 15px;
 }
 
-.payment-box img {
-  width: min(100%, 240px);
-  border-radius: 8px;
+.payment-box img,
+.qr-preview-result img {
+  border-radius: 12px;
   background: #fff;
   padding: 10px;
 }
 
+.payment-box img {
+  width: min(100%, 240px);
+}
+
 .qr-test-box {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .qr-test-box .panel-heading {
@@ -327,68 +586,24 @@ button.link-button {
 
 .qr-preview-result {
   display: grid;
-  align-items: start;
+  align-items: center;
   gap: 12px;
-  grid-template-columns: 160px minmax(0, 1fr);
+  grid-template-columns: 150px minmax(0, 1fr);
 }
 
 .qr-preview-result img {
-  width: 160px;
-  border-radius: 8px;
-  background: #fff;
-  padding: 10px;
-}
-
-.qr-preview-result small {
-  display: block;
-  margin-top: 4px;
-}
-
-.qr-preview-result strong,
-.qr-preview-result span {
-  display: block;
-}
-
-.account-form {
-  position: sticky;
-  top: 16px;
+  width: 150px;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
 }
 
-.checkbox-label input {
+.checkbox-label input,
+.choice-card input {
   width: auto;
-}
-
-.account-list,
-.booking-panel,
-.history-panel {
-  display: grid;
-  gap: 10px;
-}
-
-.booking-panel,
-.history-panel {
-  border: 1px solid #ddd7ce;
-  border-radius: 8px;
-  background: #fffdf8;
-  box-shadow: 0 16px 40px rgb(62 49 32 / 8%);
-  padding: 18px;
-}
-
-.customer-grid {
-  display: grid;
-  align-items: start;
-  gap: 16px;
-  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
-}
-
-.compact-tabs {
-  margin: 18px 0 0;
 }
 
 .auth-switch {
@@ -405,52 +620,83 @@ button.link-button {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-.service-choice-grid,
-.slot-grid {
-  display: grid;
-  gap: 10px;
-}
-
 .choice-card {
   display: grid;
   align-items: center;
+  gap: 12px;
   grid-template-columns: auto minmax(0, 1fr);
-  border: 1px solid #ebe3d8;
-  border-radius: 8px;
-  background: #fff;
-  padding: 12px;
-}
-
-.choice-card input {
-  width: auto;
-}
-
-.choice-card small {
-  display: block;
+  padding: 14px;
 }
 
 .slot-grid {
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(98px, 1fr));
 }
 
 .inline-actions {
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid #ebe3d8;
+  border-top: 1px solid #ece1d2;
   padding: 10px 12px;
 }
 
 .account-card {
-  border: 1px solid #ebe3d8;
-  border-radius: 8px;
-  background: #fff;
+  display: grid;
+  gap: 12px;
   padding: 14px;
+}
+
+.account-card > div:first-child:not(.staff-card-summary),
+.staff-card-summary {
+  min-width: 0;
+}
+
+.account-card strong,
+.account-card span,
+.account-card small {
+  overflow-wrap: anywhere;
 }
 
 .account-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
+}
+
+.staff-card-summary {
+  display: grid;
+  align-items: start;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
+}
+
+.staff-management-grid .account-actions {
+  align-content: start;
+  max-width: 320px;
+}
+
+.staff-management-grid .account-actions button {
+  padding: 8px 11px;
+}
+
+.inline-staff-form {
+  display: grid;
+  gap: 13px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid #ece1d2;
+  background: #fffaf3;
+  margin: 2px -2px -2px;
+  padding: 16px;
+}
+
+.inline-staff-form.compact {
+  grid-template-columns: 1fr;
+}
+
+.inline-staff-form .action-row {
+  grid-column: 1 / -1;
+  margin-top: 2px;
 }
 
 .muted-pill {
@@ -458,31 +704,79 @@ button.link-button {
   color: #756b60;
 }
 
-@media (max-width: 860px) {
-  .topbar,
-  .user-box,
-  .summary-list div,
-  .service-list div,
-  .account-card {
-    align-items: stretch;
-    flex-direction: column;
+@media (max-width: 1040px) {
+  .backoffice-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .backoffice-sidebar {
+    position: static;
+    display: grid;
+    height: auto;
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .brand-block {
+    padding-bottom: 4px;
+  }
+
+  .side-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .shop-card {
+    display: none;
+  }
+
+  .backoffice-main {
+    padding: 22px;
   }
 
   .work-grid,
   .accounts-grid,
+  .staff-management-grid,
   .customer-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .queue-item button {
-    grid-template-columns: 1fr;
-  }
-
-  .qr-preview-result {
     grid-template-columns: 1fr;
   }
 
   .account-form {
     position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .login-shell,
+  .dashboard-shell {
+    width: min(100% - 24px, 1360px);
+  }
+
+  .topbar,
+  .user-box,
+  .panel-heading,
+  .backoffice-header,
+  .backoffice-user,
+  .staff-card-summary {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .topbar {
+    padding: 18px;
+  }
+
+  .queue-item button,
+  .qr-preview-result,
+  .inline-staff-form {
+    grid-template-columns: 1fr;
+  }
+
+  .account-actions {
+    justify-content: flex-start;
+  }
+
+  .password-input-row {
+    grid-template-columns: 1fr;
   }
 }

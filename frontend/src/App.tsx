@@ -170,7 +170,25 @@ function App() {
     isAvailable: true,
     acceptsBooking: true,
   })
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null)
+  const [editStaffForm, setEditStaffForm] = useState({
+    fullName: '',
+    nickname: '',
+    phoneNumber: '',
+    role: 'Barber' as 'Barber' | 'FrontDeskStaff',
+    accountStatus: 'Active',
+    startDate: '',
+    note: '',
+    specialty: '',
+    experienceYears: '',
+    bio: '',
+    isAvailable: true,
+    acceptsBooking: true,
+  })
+  const [resetPasswordStaffId, setResetPasswordStaffId] = useState<string | null>(null)
+  const [resetPassword, setResetPassword] = useState('StaffPassword123!')
   const [isStaffPasswordVisible, setIsStaffPasswordVisible] = useState(false)
+  const [isResetPasswordVisible, setIsResetPasswordVisible] = useState(false)
 
   const [services, setServices] = useState<Service[]>([])
   const [barbers, setBarbers] = useState<Barber[]>([])
@@ -189,6 +207,14 @@ function App() {
   const selectedServices = services.filter((service) => selectedServiceIds.includes(service.id))
   const selectedTotal = selectedServices.reduce((total, service) => total + service.price, 0)
   const canManageStaff = auth?.role === 'Owner' || auth?.role === 'Admin'
+  const staffPanelTitle =
+    activeStaffPanel === 'queue' ? 'จัดการคิววันนี้' : activeStaffPanel === 'accounts' ? 'บัญชีรับเงินร้าน' : 'จัดการพนักงาน'
+  const staffPanelSubtitle =
+    activeStaffPanel === 'queue'
+      ? 'ติดตามสถานะคิว รับชำระเงิน และออกใบเสร็จ'
+      : activeStaffPanel === 'accounts'
+        ? 'ตั้งค่าบัญชีรับเงินหลักและทดสอบ QR สำหรับหน้าร้าน'
+        : 'เพิ่ม แก้ไข เปิด/ปิดใช้งาน และ reset password ให้ทีมหน้าร้าน'
 
   useEffect(() => {
     if (!auth) return
@@ -604,6 +630,80 @@ function App() {
     }
   }
 
+  function startEditingStaff(staff: StaffAccount) {
+    setEditingStaffId(staff.id)
+    setResetPasswordStaffId(null)
+    setEditStaffForm({
+      fullName: staff.fullName,
+      nickname: staff.nickname ?? '',
+      phoneNumber: staff.phoneNumber,
+      role: staff.role,
+      accountStatus: staff.accountStatus,
+      startDate: staff.startDate ?? '',
+      note: staff.note ?? '',
+      specialty: staff.specialty ?? '',
+      experienceYears: staff.experienceYears?.toString() ?? '',
+      bio: staff.bio ?? '',
+      isAvailable: staff.isAvailable,
+      acceptsBooking: staff.acceptsBooking,
+    })
+  }
+
+  async function saveStaffEdit(event: FormEvent<HTMLFormElement>, staff: StaffAccount) {
+    event.preventDefault()
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await api(`/api/staff/${staff.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          fullName: editStaffForm.fullName,
+          nickname: editStaffForm.nickname || null,
+          phoneNumber: editStaffForm.phoneNumber,
+          role: editStaffForm.role,
+          accountStatus: editStaffForm.accountStatus,
+          startDate: editStaffForm.startDate || null,
+          note: editStaffForm.note || null,
+          specialty: editStaffForm.specialty || null,
+          experienceYears: editStaffForm.experienceYears ? Number(editStaffForm.experienceYears) : null,
+          bio: editStaffForm.bio || null,
+          isAvailable: editStaffForm.role === 'Barber' ? editStaffForm.isAvailable : false,
+          acceptsBooking: editStaffForm.role === 'Barber' ? editStaffForm.acceptsBooking : false,
+        }),
+      })
+
+      setEditingStaffId(null)
+      await refreshStaffAccounts()
+      setMessage('บันทึกข้อมูลพนักงานแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'บันทึกข้อมูลพนักงานไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function saveStaffPassword(event: FormEvent<HTMLFormElement>, staff: StaffAccount) {
+    event.preventDefault()
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await api(`/api/staff/${staff.id}/password`, {
+        method: 'PUT',
+        body: JSON.stringify({ password: resetPassword }),
+      })
+
+      setResetPasswordStaffId(null)
+      setResetPassword('StaffPassword123!')
+      setMessage(`Reset password ให้ ${staff.fullName} แล้ว`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Reset password ไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
   function logout() {
     setAuth(null)
     setQueue([])
@@ -791,30 +891,62 @@ function App() {
   }
 
   return (
-    <main className="dashboard-shell">
-      <Header auth={auth} eyebrow="Staff Dashboard" onLogout={logout} />
+    <main className="backoffice-shell">
+      <aside className="backoffice-sidebar">
+        <div className="brand-block">
+          <strong>Rodeo</strong>
+          <span>Barber Shop</span>
+        </div>
 
-      <nav className="tabs">
-        <button className={activeStaffPanel === 'queue' ? 'active' : ''} onClick={() => setActiveStaffPanel('queue')} type="button">
-          คิววันนี้
-        </button>
-        <button
-          className={activeStaffPanel === 'accounts' ? 'active' : ''}
-          onClick={() => setActiveStaffPanel('accounts')}
-          type="button"
-        >
-          บัญชีรับเงิน
-        </button>
-        {canManageStaff && (
-          <button className={activeStaffPanel === 'staff' ? 'active' : ''} onClick={() => setActiveStaffPanel('staff')} type="button">
-            พนักงาน
+        <nav className="side-nav">
+          <button className={activeStaffPanel === 'queue' ? 'active' : ''} onClick={() => setActiveStaffPanel('queue')} type="button">
+            <span>⌂</span>
+            คิววันนี้
           </button>
-        )}
-      </nav>
+          <button
+            className={activeStaffPanel === 'accounts' ? 'active' : ''}
+            onClick={() => setActiveStaffPanel('accounts')}
+            type="button"
+          >
+            <span>฿</span>
+            บัญชีรับเงิน
+          </button>
+          {canManageStaff && (
+            <button className={activeStaffPanel === 'staff' ? 'active' : ''} onClick={() => setActiveStaffPanel('staff')} type="button">
+              <span>◎</span>
+              พนักงาน
+            </button>
+          )}
+        </nav>
 
-      {message && <p className="notice">{message}</p>}
+        <div className="shop-card">
+          <strong>Rodeo Barber Shop</strong>
+          <small>เปิดร้าน 10:00 - 20:00</small>
+          <small>ระบบหลังบ้าน</small>
+        </div>
+      </aside>
 
-      {activeStaffPanel === 'queue' ? (
+      <section className="backoffice-main">
+        <header className="backoffice-header">
+          <div>
+            <p className="eyebrow">Back Office</p>
+            <h1>{staffPanelTitle}</h1>
+            <p className="muted">{staffPanelSubtitle}</p>
+          </div>
+          <div className="backoffice-user">
+            <div>
+              <strong>{auth.fullName}</strong>
+              <small>{auth.role}</small>
+            </div>
+            <button className="secondary" onClick={logout} type="button">
+              Logout
+            </button>
+          </div>
+        </header>
+
+        {message && <p className="notice">{message}</p>}
+
+        {activeStaffPanel === 'queue' ? (
         <section className="work-grid">
           <div className="queue-panel">
             <div className="panel-heading">
@@ -1073,7 +1205,7 @@ function App() {
           </div>
         </section>
       ) : (
-        <section className="accounts-grid">
+        <section className="accounts-grid staff-management-grid">
           <form className="account-form" onSubmit={saveStaffAccount}>
             <h2>เพิ่มพนักงาน</h2>
             <label>
@@ -1181,47 +1313,199 @@ function App() {
             ) : (
               staffAccounts.map((staff) => (
                 <article className="account-card" key={staff.id}>
-                  <div>
-                    <strong>{staff.fullName}</strong>
-                    <span>{staff.role}</span>
-                    <small>{staff.email}</small>
-                    <small>{staff.phoneNumber}</small>
-                    {staff.role === 'Barber' && (
-                      <small>
-                        {staff.specialty ?? 'ยังไม่ระบุความถนัด'} / {staff.acceptsBooking ? 'รับจองออนไลน์' : 'ไม่รับจองออนไลน์'}
-                      </small>
-                    )}
-                  </div>
-                  <div className="account-actions">
-                    <span className={staff.accountStatus === 'Active' ? 'status-pill' : 'status-pill muted-pill'}>
-                      {staff.accountStatus}
-                    </span>
-                    {staff.accountStatus === 'Active' ? (
+                  <div className="staff-card-summary">
+                    <div>
+                      <strong>{staff.fullName}</strong>
+                      <span>{staff.role}</span>
+                      <small>{staff.email}</small>
+                      <small>{staff.phoneNumber}</small>
+                      {staff.role === 'Barber' && (
+                        <small>
+                          {staff.specialty ?? 'ยังไม่ระบุความถนัด'} / {staff.acceptsBooking ? 'รับจองออนไลน์' : 'ไม่รับจองออนไลน์'}
+                        </small>
+                      )}
+                    </div>
+                    <div className="account-actions">
+                      <span className={staff.accountStatus === 'Active' ? 'status-pill' : 'status-pill muted-pill'}>
+                        {staff.accountStatus}
+                      </span>
+                      <button className="secondary" disabled={isBusy} onClick={() => startEditingStaff(staff)} type="button">
+                        แก้ไข
+                      </button>
                       <button
                         className="secondary"
                         disabled={isBusy}
-                        onClick={() => updateStaffStatus(staff, 'Disabled')}
+                        onClick={() => {
+                          setResetPasswordStaffId(resetPasswordStaffId === staff.id ? null : staff.id)
+                          setEditingStaffId(null)
+                          setResetPassword('StaffPassword123!')
+                        }}
                         type="button"
                       >
-                        ปิดใช้งาน
+                        Reset Password
                       </button>
-                    ) : (
-                      <button
-                        className="secondary"
-                        disabled={isBusy}
-                        onClick={() => updateStaffStatus(staff, 'Active')}
-                        type="button"
-                      >
-                        เปิดใช้งาน
-                      </button>
-                    )}
+                      {staff.accountStatus === 'Active' ? (
+                        <button
+                          className="secondary"
+                          disabled={isBusy}
+                          onClick={() => updateStaffStatus(staff, 'Disabled')}
+                          type="button"
+                        >
+                          ปิดใช้งาน
+                        </button>
+                      ) : (
+                        <button
+                          className="secondary"
+                          disabled={isBusy}
+                          onClick={() => updateStaffStatus(staff, 'Active')}
+                          type="button"
+                        >
+                          เปิดใช้งาน
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {editingStaffId === staff.id && (
+                    <form className="inline-staff-form" onSubmit={(event) => saveStaffEdit(event, staff)}>
+                      <label>
+                        ชื่อ-นามสกุล
+                        <input
+                          value={editStaffForm.fullName}
+                          onChange={(event) => setEditStaffForm({ ...editStaffForm, fullName: event.target.value })}
+                        />
+                      </label>
+                      <label>
+                        ชื่อเล่น
+                        <input
+                          value={editStaffForm.nickname}
+                          onChange={(event) => setEditStaffForm({ ...editStaffForm, nickname: event.target.value })}
+                        />
+                      </label>
+                      <label>
+                        เบอร์โทร
+                        <input
+                          value={editStaffForm.phoneNumber}
+                          onChange={(event) => setEditStaffForm({ ...editStaffForm, phoneNumber: event.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Role
+                        <select
+                          value={editStaffForm.role}
+                          onChange={(event) =>
+                            setEditStaffForm({ ...editStaffForm, role: event.target.value as 'Barber' | 'FrontDeskStaff' })
+                          }
+                        >
+                          <option value="Barber">Barber</option>
+                          <option value="FrontDeskStaff">Front Desk Staff</option>
+                        </select>
+                      </label>
+                      <label>
+                        สถานะบัญชี
+                        <select
+                          value={editStaffForm.accountStatus}
+                          onChange={(event) => setEditStaffForm({ ...editStaffForm, accountStatus: event.target.value })}
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Disabled">Disabled</option>
+                          <option value="Suspended">Suspended</option>
+                          <option value="Resigned">Resigned</option>
+                        </select>
+                      </label>
+                      <label>
+                        วันเริ่มงาน
+                        <input
+                          type="date"
+                          value={editStaffForm.startDate}
+                          onChange={(event) => setEditStaffForm({ ...editStaffForm, startDate: event.target.value })}
+                        />
+                      </label>
+
+                      {editStaffForm.role === 'Barber' && (
+                        <>
+                          <label>
+                            ความถนัด
+                            <input
+                              value={editStaffForm.specialty}
+                              onChange={(event) => setEditStaffForm({ ...editStaffForm, specialty: event.target.value })}
+                            />
+                          </label>
+                          <label>
+                            ประสบการณ์ (ปี)
+                            <input
+                              min="0"
+                              type="number"
+                              value={editStaffForm.experienceYears}
+                              onChange={(event) => setEditStaffForm({ ...editStaffForm, experienceYears: event.target.value })}
+                            />
+                          </label>
+                          <label>
+                            Bio
+                            <input value={editStaffForm.bio} onChange={(event) => setEditStaffForm({ ...editStaffForm, bio: event.target.value })} />
+                          </label>
+                          <label className="checkbox-label">
+                            <input
+                              checked={editStaffForm.isAvailable}
+                              onChange={(event) => setEditStaffForm({ ...editStaffForm, isAvailable: event.target.checked })}
+                              type="checkbox"
+                            />
+                            พร้อมให้บริการ
+                          </label>
+                          <label className="checkbox-label">
+                            <input
+                              checked={editStaffForm.acceptsBooking}
+                              onChange={(event) => setEditStaffForm({ ...editStaffForm, acceptsBooking: event.target.checked })}
+                              type="checkbox"
+                            />
+                            รับจองออนไลน์
+                          </label>
+                        </>
+                      )}
+
+                      <label>
+                        หมายเหตุ
+                        <input value={editStaffForm.note} onChange={(event) => setEditStaffForm({ ...editStaffForm, note: event.target.value })} />
+                      </label>
+                      <div className="action-row">
+                        <button disabled={isBusy} type="submit">
+                          บันทึก
+                        </button>
+                        <button className="secondary" onClick={() => setEditingStaffId(null)} type="button">
+                          ยกเลิก
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {resetPasswordStaffId === staff.id && (
+                    <form className="inline-staff-form compact" onSubmit={(event) => saveStaffPassword(event, staff)}>
+                      <label>
+                        Password ใหม่
+                        <PasswordInput
+                          isVisible={isResetPasswordVisible}
+                          onChange={setResetPassword}
+                          onToggleVisibility={() => setIsResetPasswordVisible((current) => !current)}
+                          value={resetPassword}
+                        />
+                      </label>
+                      <div className="action-row">
+                        <button disabled={isBusy} type="submit">
+                          บันทึก Password ใหม่
+                        </button>
+                        <button className="secondary" onClick={() => setResetPasswordStaffId(null)} type="button">
+                          ยกเลิก
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </article>
               ))
             )}
           </div>
         </section>
-      )}
+        )}
+      </section>
     </main>
   )
 }
