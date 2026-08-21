@@ -137,6 +137,127 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         return CreatedAtAction(nameof(GetBooking), new { id = booking.Id }, response);
     }
 
+    [Authorize(Roles = "FrontDeskStaff,Owner,Admin")]
+    [HttpPost("staff")]
+    public async Task<ActionResult<BookingResponse>> CreateStaffBooking(
+        CreateStaffBookingRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.GuestName))
+        {
+            return BadRequest(new { message = "Guest name is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.GuestPhoneNumber))
+        {
+            return BadRequest(new { message = "Guest phone number is required." });
+        }
+
+        var validationError = ValidateCreateBookingRequest(request.BarberId, request.ServiceIds);
+        if (validationError is not null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        var selectedServices = await dbContext.Services
+            .Where(service => request.ServiceIds.Contains(service.Id) && service.IsActive)
+            .ToListAsync(cancellationToken);
+
+        if (selectedServices.Count != request.ServiceIds.Distinct().Count())
+        {
+            return BadRequest(new { message = "Every service id must refer to an active service." });
+        }
+
+        var barber = await dbContext.BarberProfiles
+            .Include(barber => barber.User)
+            .Include(barber => barber.BarberServices)
+            .FirstOrDefaultAsync(
+                barber => barber.Id == request.BarberId
+                    && barber.User.AccountStatus == AccountStatus.Active
+                    && barber.IsAvailable
+                    && barber.AcceptsBooking,
+                cancellationToken);
+
+        if (barber is null)
+        {
+            return BadRequest(new { message = "Selected barber is not available for booking." });
+        }
+
+        var barberServiceIds = barber.BarberServices.Select(barberService => barberService.ServiceId).ToHashSet();
+        if (barberServiceIds.Count > 0 && selectedServices.Any(service => !barberServiceIds.Contains(service.Id)))
+        {
+            return BadRequest(new { message = "Selected barber cannot perform one or more selected services." });
+        }
+
+        var durationMinutes = selectedServices.Sum(service => service.DurationMinutes);
+        var startAtUtc = request.StartAt.ToUniversalTime();
+        var endAtUtc = startAtUtc.AddMinutes(durationMinutes);
+
+        var availabilityError = await ValidateBookingAvailability(
+            barber.Id,
+            request.StartAt,
+            startAtUtc,
+            endAtUtc,
+            cancellationToken);
+
+        if (availabilityError is not null)
+        {
+            return BadRequest(new { message = availabilityError });
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var subtotalAmount = selectedServices.Sum(service => service.Price);
+        var booking = new Booking
+        {
+            Id = Guid.NewGuid(),
+            BookingNumber = GenerateBookingNumber(now),
+            BookingSource = BookingSource.StaffCreated,
+            GuestName = request.GuestName.Trim(),
+            GuestPhoneNumber = request.GuestPhoneNumber.Trim(),
+            GuestEmail = NormalizeOptionalText(request.GuestEmail),
+            BarberId = barber.Id,
+            StartAt = startAtUtc,
+            EndAt = endAtUtc,
+            EstimatedDurationMinutes = durationMinutes,
+            SubtotalAmount = subtotalAmount,
+            DiscountAmount = 0,
+            TotalAmount = subtotalAmount,
+            BookingStatus = BookingStatus.Confirmed,
+            PaymentStatus = PaymentStatus.Unpaid,
+            CustomerNote = NormalizeOptionalText(request.CustomerNote),
+            CreatedByUserId = GetCurrentUserId(),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        foreach (var service in selectedServices.OrderBy(service => service.Name))
+        {
+            booking.BookingServices.Add(new BookingService
+            {
+                Id = Guid.NewGuid(),
+                ServiceId = service.Id,
+                ServiceName = service.Name,
+                UnitPrice = service.Price,
+                DurationMinutes = service.DurationMinutes,
+                Quantity = 1,
+                LineTotal = service.Price,
+                AddedDuringService = false,
+                AddedByUserId = booking.CreatedByUserId,
+                CreatedAt = now
+            });
+        }
+
+        dbContext.Bookings.Add(booking);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = await BookingResponseQuery()
+            .Where(existingBooking => existingBooking.Id == booking.Id)
+            .Select(existingBooking => ToResponse(existingBooking))
+            .FirstAsync(cancellationToken);
+
+        return CreatedAtAction(nameof(GetBooking), new { id = booking.Id }, response);
+    }
+
     [Authorize(Roles = "Customer")]
     [HttpGet("my")]
     public async Task<ActionResult<IReadOnlyList<BookingResponse>>> GetMyBookings(CancellationToken cancellationToken)
@@ -383,7 +504,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             booking.BookingNumber,
             booking.BookingSource.ToString(),
             booking.CustomerId,
-            booking.Customer?.FullName,
+            booking.Customer?.FullName ?? booking.GuestName,
             booking.BarberId,
             booking.Barber?.User.FullName,
             booking.StartAt,
@@ -412,17 +533,22 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
 
     private static string? ValidateCreateBookingRequest(CreateBookingRequest request)
     {
-        if (request.BarberId == Guid.Empty)
+        return ValidateCreateBookingRequest(request.BarberId, request.ServiceIds);
+    }
+
+    private static string? ValidateCreateBookingRequest(Guid barberId, IReadOnlyList<Guid> serviceIds)
+    {
+        if (barberId == Guid.Empty)
         {
             return "Barber id is required.";
         }
 
-        if (request.ServiceIds.Count == 0)
+        if (serviceIds.Count == 0)
         {
             return "At least one service is required.";
         }
 
-        if (request.ServiceIds.Any(serviceId => serviceId == Guid.Empty))
+        if (serviceIds.Any(serviceId => serviceId == Guid.Empty))
         {
             return "Service id is required.";
         }

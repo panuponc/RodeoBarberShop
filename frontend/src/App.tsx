@@ -198,6 +198,16 @@ function App() {
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([])
   const [myBookings, setMyBookings] = useState<Booking[]>([])
   const [customerReceipt, setCustomerReceipt] = useState<Receipt | null>(null)
+  const [isStaffBookingFormOpen, setIsStaffBookingFormOpen] = useState(false)
+  const [staffBookingForm, setStaffBookingForm] = useState({
+    guestName: '',
+    guestPhoneNumber: '',
+    guestEmail: '',
+    barberId: '',
+    startAt: getTodayLocalDateTime(),
+    serviceIds: [] as string[],
+    customerNote: '',
+  })
 
   const defaultPaymentAccount = useMemo(
     () => paymentAccounts.find((account) => account.isActive && account.isDefault),
@@ -234,6 +244,7 @@ function App() {
     } else {
       void refreshQueue()
       void refreshBarbers()
+      void refreshServices()
       void refreshPaymentAccounts()
       if (auth.role === 'Owner' || auth.role === 'Admin') {
         void refreshStaffAccounts()
@@ -383,6 +394,15 @@ function App() {
       setBarbers(result)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'โหลดรายชื่อช่างไม่สำเร็จ')
+    }
+  }
+
+  async function refreshServices() {
+    try {
+      const result = await api<Service[]>('/api/services')
+      setServices(result)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'โหลดบริการไม่สำเร็จ')
     }
   }
 
@@ -724,6 +744,49 @@ function App() {
     }
   }
 
+  async function createStaffBooking(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      if (!staffBookingForm.barberId || staffBookingForm.serviceIds.length === 0) {
+        throw new Error('กรุณาเลือกช่างและบริการ')
+      }
+
+      const result = await api<Booking>('/api/bookings/staff', {
+        method: 'POST',
+        body: JSON.stringify({
+          guestName: staffBookingForm.guestName,
+          guestPhoneNumber: staffBookingForm.guestPhoneNumber,
+          guestEmail: staffBookingForm.guestEmail || null,
+          barberId: staffBookingForm.barberId,
+          startAt: new Date(staffBookingForm.startAt).toISOString(),
+          serviceIds: staffBookingForm.serviceIds,
+          customerNote: staffBookingForm.customerNote || null,
+        }),
+      })
+
+      setIsStaffBookingFormOpen(false)
+      setStaffBookingForm({
+        guestName: '',
+        guestPhoneNumber: '',
+        guestEmail: '',
+        barberId: staffBookingForm.barberId,
+        startAt: getTodayLocalDateTime(),
+        serviceIds: [],
+        customerNote: '',
+      })
+      await refreshQueue()
+      setSelectedBooking(result)
+      setMessage('เพิ่มการนัดหมายแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'เพิ่มการนัดหมายไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
   function logout() {
     setAuth(null)
     setQueue([])
@@ -981,13 +1044,108 @@ function App() {
                 <h2>ตารางงานช่าง</h2>
                 <p className="muted">{formatScheduleDate(new Date())} / {queue.length} คิว</p>
               </div>
-              <button disabled={isBusy} onClick={() => {
-                void refreshQueue()
-                void refreshBarbers()
-              }} type="button">
-                Refresh
-              </button>
+              <div className="schedule-toolbar-actions">
+                <button onClick={() => setIsStaffBookingFormOpen((current) => !current)} type="button">
+                  {isStaffBookingFormOpen ? 'ปิดฟอร์ม' : '+ เพิ่มการนัดหมาย'}
+                </button>
+                <button className="secondary" disabled={isBusy} onClick={() => {
+                  void refreshQueue()
+                  void refreshBarbers()
+                  void refreshServices()
+                }} type="button">
+                  Refresh
+                </button>
+              </div>
             </div>
+
+            {isStaffBookingFormOpen && (
+              <form className="staff-booking-form" onSubmit={createStaffBooking}>
+                <label>
+                  ชื่อลูกค้า
+                  <input
+                    value={staffBookingForm.guestName}
+                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestName: event.target.value })}
+                  />
+                </label>
+                <label>
+                  เบอร์โทร
+                  <input
+                    value={staffBookingForm.guestPhoneNumber}
+                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestPhoneNumber: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Email
+                  <input
+                    value={staffBookingForm.guestEmail}
+                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestEmail: event.target.value })}
+                  />
+                </label>
+                <label>
+                  ช่าง
+                  <select
+                    value={staffBookingForm.barberId}
+                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, barberId: event.target.value })}
+                  >
+                    <option value="">เลือกช่าง</option>
+                    {barbers.map((barber) => (
+                      <option key={barber.id} value={barber.id}>
+                        {barber.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  วันเวลา
+                  <input
+                    type="datetime-local"
+                    value={staffBookingForm.startAt}
+                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, startAt: event.target.value })}
+                  />
+                </label>
+                <label>
+                  หมายเหตุ
+                  <input
+                    value={staffBookingForm.customerNote}
+                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, customerNote: event.target.value })}
+                  />
+                </label>
+
+                <div className="staff-booking-services">
+                  <strong>บริการ</strong>
+                  {services.length === 0 ? (
+                    <small>ยังไม่มีบริการ active</small>
+                  ) : (
+                    services.map((service) => (
+                      <label className="checkbox-label" key={service.id}>
+                        <input
+                          checked={staffBookingForm.serviceIds.includes(service.id)}
+                          onChange={(event) => {
+                            setStaffBookingForm((current) => ({
+                              ...current,
+                              serviceIds: event.target.checked
+                                ? [...current.serviceIds, service.id]
+                                : current.serviceIds.filter((serviceId) => serviceId !== service.id),
+                            }))
+                          }}
+                          type="checkbox"
+                        />
+                        {service.name} / {service.durationMinutes} นาที / {formatMoney(service.price)}
+                      </label>
+                    ))
+                  )}
+                </div>
+
+                <div className="action-row">
+                  <button disabled={isBusy} type="submit">
+                    บันทึกการนัดหมาย
+                  </button>
+                  <button className="secondary" onClick={() => setIsStaffBookingFormOpen(false)} type="button">
+                    ยกเลิก
+                  </button>
+                </div>
+              </form>
+            )}
 
             <div className="schedule-board">
               {barbers.length === 0 ? (
@@ -1751,6 +1909,13 @@ function getTomorrowDate() {
   date.setDate(date.getDate() + 1)
 
   return date.toISOString().slice(0, 10)
+}
+
+function getTodayLocalDateTime() {
+  const date = new Date()
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+
+  return date.toISOString().slice(0, 16)
 }
 
 export default App

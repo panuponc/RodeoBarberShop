@@ -128,7 +128,7 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
             booking.Id,
             booking.BookingNumber,
             booking.CustomerId,
-            booking.Customer?.FullName,
+            booking.Customer?.FullName ?? booking.GuestName,
             booking.BarberId,
             booking.Barber?.User.FullName,
             booking.StartAt,

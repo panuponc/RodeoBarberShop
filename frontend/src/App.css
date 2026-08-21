@@ -445,8 +445,39 @@ button.link-button {
   margin-bottom: 16px;
 }
 
+.schedule-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .schedule-toolbar h2 {
   margin: 0 0 4px;
+}
+
+.staff-booking-form {
+  display: grid;
+  gap: 13px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid #e6d5ba;
+  border-radius: 16px;
+  background: #fffaf2;
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.staff-booking-services {
+  display: grid;
+  gap: 9px;
+  grid-column: 1 / -1;
+  border-top: 1px solid #ece1d2;
+  padding-top: 12px;
+}
+
+.staff-booking-form .action-row {
+  grid-column: 1 / -1;
+  margin-top: 0;
 }
 
 .schedule-board {
@@ -1047,6 +1078,7 @@ button.link-button {
   .queue-item button,
   .schedule-toolbar,
   .schedule-summary-grid,
+  .staff-booking-form,
   .qr-preview-result,
   .inline-staff-form {
     grid-template-columns: 1fr;
