@@ -91,6 +91,24 @@ type QrPreview = {
   qrImageDataUrl: string
 }
 
+type StaffAccount = {
+  id: string
+  barberProfileId: string | null
+  fullName: string
+  nickname: string | null
+  email: string
+  phoneNumber: string
+  role: 'Barber' | 'FrontDeskStaff'
+  accountStatus: string
+  startDate: string | null
+  note: string | null
+  specialty: string | null
+  experienceYears: number | null
+  bio: string | null
+  isAvailable: boolean
+  acceptsBooking: boolean
+}
+
 const nextStatus: Record<string, string> = {
   PendingConfirmation: 'Confirmed',
   Confirmed: 'WaitingService',
@@ -113,6 +131,7 @@ function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [isAuthPasswordVisible, setIsAuthPasswordVisible] = useState(false)
   const [fullName, setFullName] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [message, setMessage] = useState('')
@@ -127,7 +146,7 @@ function App() {
   const [qrTestAmount, setQrTestAmount] = useState('100')
   const [qrTestAccountId, setQrTestAccountId] = useState('')
   const [isQrTestOpen, setIsQrTestOpen] = useState(false)
-  const [activeStaffPanel, setActiveStaffPanel] = useState<'queue' | 'accounts'>('queue')
+  const [activeStaffPanel, setActiveStaffPanel] = useState<'queue' | 'accounts' | 'staff'>('queue')
   const [accountForm, setAccountForm] = useState({
     accountName: 'Rodeo PromptPay',
     accountType: 'PromptPayPhone',
@@ -135,6 +154,23 @@ function App() {
     bankName: 'PromptPay',
     isDefault: true,
   })
+  const [staffAccounts, setStaffAccounts] = useState<StaffAccount[]>([])
+  const [staffForm, setStaffForm] = useState({
+    fullName: '',
+    nickname: '',
+    phoneNumber: '',
+    email: '',
+    password: 'StaffPassword123!',
+    role: 'Barber' as 'Barber' | 'FrontDeskStaff',
+    startDate: '',
+    note: '',
+    specialty: '',
+    experienceYears: '',
+    bio: '',
+    isAvailable: true,
+    acceptsBooking: true,
+  })
+  const [isStaffPasswordVisible, setIsStaffPasswordVisible] = useState(false)
 
   const [services, setServices] = useState<Service[]>([])
   const [barbers, setBarbers] = useState<Barber[]>([])
@@ -152,6 +188,7 @@ function App() {
 
   const selectedServices = services.filter((service) => selectedServiceIds.includes(service.id))
   const selectedTotal = selectedServices.reduce((total, service) => total + service.price, 0)
+  const canManageStaff = auth?.role === 'Owner' || auth?.role === 'Admin'
 
   useEffect(() => {
     if (!auth) return
@@ -161,6 +198,9 @@ function App() {
     } else {
       void refreshQueue()
       void refreshPaymentAccounts()
+      if (auth.role === 'Owner' || auth.role === 'Admin') {
+        void refreshStaffAccounts()
+      }
     }
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [auth])
@@ -307,6 +347,15 @@ function App() {
       setQrTestAccountId((current) => current || result.find((account) => account.isDefault && account.isActive)?.id || '')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'โหลดบัญชีร้านไม่สำเร็จ')
+    }
+  }
+
+  async function refreshStaffAccounts() {
+    try {
+      const result = await api<StaffAccount[]>('/api/staff')
+      setStaffAccounts(result)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'โหลดรายชื่อพนักงานไม่สำเร็จ')
     }
   }
 
@@ -479,6 +528,82 @@ function App() {
     }
   }
 
+  async function saveStaffAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await api('/api/staff', {
+        method: 'POST',
+        body: JSON.stringify({
+          fullName: staffForm.fullName,
+          nickname: staffForm.nickname || null,
+          phoneNumber: staffForm.phoneNumber,
+          email: staffForm.email,
+          password: staffForm.password,
+          role: staffForm.role,
+          startDate: staffForm.startDate || null,
+          note: staffForm.note || null,
+          specialty: staffForm.specialty || null,
+          experienceYears: staffForm.experienceYears ? Number(staffForm.experienceYears) : null,
+          bio: staffForm.bio || null,
+          isAvailable: staffForm.role === 'Barber' ? staffForm.isAvailable : false,
+          acceptsBooking: staffForm.role === 'Barber' ? staffForm.acceptsBooking : false,
+        }),
+      })
+
+      setStaffForm((current) => ({
+        ...current,
+        fullName: '',
+        nickname: '',
+        phoneNumber: '',
+        email: '',
+        specialty: '',
+        experienceYears: '',
+        bio: '',
+        note: '',
+      }))
+      await refreshStaffAccounts()
+      setMessage('เพิ่มบัญชีพนักงานแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'เพิ่มบัญชีพนักงานไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function updateStaffStatus(staff: StaffAccount, accountStatus: string) {
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await api(`/api/staff/${staff.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          fullName: staff.fullName,
+          nickname: staff.nickname,
+          phoneNumber: staff.phoneNumber,
+          role: staff.role,
+          accountStatus,
+          startDate: staff.startDate,
+          note: staff.note,
+          specialty: staff.specialty,
+          experienceYears: staff.experienceYears,
+          bio: staff.bio,
+          isAvailable: accountStatus === 'Active' && staff.role === 'Barber' ? staff.isAvailable : false,
+          acceptsBooking: accountStatus === 'Active' && staff.role === 'Barber' ? staff.acceptsBooking : false,
+        }),
+      })
+      await refreshStaffAccounts()
+      setMessage(accountStatus === 'Active' ? 'เปิดใช้งานพนักงานแล้ว' : 'ปิดใช้งานพนักงานแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'อัปเดตสถานะพนักงานไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
   function logout() {
     setAuth(null)
     setQueue([])
@@ -521,11 +646,12 @@ function App() {
             </label>
             <label>
               Password
-              <input
+              <PasswordInput
+                isVisible={isAuthPasswordVisible}
+                onChange={setPassword}
+                onToggleVisibility={() => setIsAuthPasswordVisible((current) => !current)}
                 placeholder="อย่างน้อย 8 ตัวอักษร"
-                type="password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
               />
             </label>
             <button disabled={isBusy} type="submit">
@@ -679,6 +805,11 @@ function App() {
         >
           บัญชีรับเงิน
         </button>
+        {canManageStaff && (
+          <button className={activeStaffPanel === 'staff' ? 'active' : ''} onClick={() => setActiveStaffPanel('staff')} type="button">
+            พนักงาน
+          </button>
+        )}
       </nav>
 
       {message && <p className="notice">{message}</p>}
@@ -781,7 +912,7 @@ function App() {
             )}
           </aside>
         </section>
-      ) : (
+      ) : activeStaffPanel === 'accounts' ? (
         <section className="accounts-grid">
           <form className="account-form" onSubmit={savePaymentAccount}>
             <h2>เพิ่มบัญชีรับเงิน</h2>
@@ -941,8 +1072,185 @@ function App() {
             </section>
           </div>
         </section>
+      ) : (
+        <section className="accounts-grid">
+          <form className="account-form" onSubmit={saveStaffAccount}>
+            <h2>เพิ่มพนักงาน</h2>
+            <label>
+              ชื่อ-นามสกุล
+              <input value={staffForm.fullName} onChange={(event) => setStaffForm({ ...staffForm, fullName: event.target.value })} />
+            </label>
+            <label>
+              ชื่อเล่น
+              <input value={staffForm.nickname} onChange={(event) => setStaffForm({ ...staffForm, nickname: event.target.value })} />
+            </label>
+            <label>
+              เบอร์โทร
+              <input value={staffForm.phoneNumber} onChange={(event) => setStaffForm({ ...staffForm, phoneNumber: event.target.value })} />
+            </label>
+            <label>
+              Email
+              <input value={staffForm.email} onChange={(event) => setStaffForm({ ...staffForm, email: event.target.value })} />
+            </label>
+            <label>
+              Password เริ่มต้น
+              <PasswordInput
+                isVisible={isStaffPasswordVisible}
+                onChange={(value) => setStaffForm({ ...staffForm, password: value })}
+                onToggleVisibility={() => setIsStaffPasswordVisible((current) => !current)}
+                value={staffForm.password}
+              />
+              <small>รหัสนี้ใช้ให้พนักงาน login ครั้งแรก เจ้าของร้านแก้ก่อนสร้างบัญชีได้</small>
+            </label>
+            <label>
+              Role
+              <select
+                value={staffForm.role}
+                onChange={(event) => setStaffForm({ ...staffForm, role: event.target.value as 'Barber' | 'FrontDeskStaff' })}
+              >
+                <option value="Barber">Barber</option>
+                <option value="FrontDeskStaff">Front Desk Staff</option>
+              </select>
+            </label>
+            <label>
+              วันเริ่มงาน
+              <input
+                type="date"
+                value={staffForm.startDate}
+                onChange={(event) => setStaffForm({ ...staffForm, startDate: event.target.value })}
+              />
+            </label>
+
+            {staffForm.role === 'Barber' && (
+              <>
+                <label>
+                  ความถนัด
+                  <input value={staffForm.specialty} onChange={(event) => setStaffForm({ ...staffForm, specialty: event.target.value })} />
+                </label>
+                <label>
+                  ประสบการณ์ (ปี)
+                  <input
+                    min="0"
+                    type="number"
+                    value={staffForm.experienceYears}
+                    onChange={(event) => setStaffForm({ ...staffForm, experienceYears: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Bio
+                  <input value={staffForm.bio} onChange={(event) => setStaffForm({ ...staffForm, bio: event.target.value })} />
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    checked={staffForm.isAvailable}
+                    onChange={(event) => setStaffForm({ ...staffForm, isAvailable: event.target.checked })}
+                    type="checkbox"
+                  />
+                  พร้อมให้บริการ
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    checked={staffForm.acceptsBooking}
+                    onChange={(event) => setStaffForm({ ...staffForm, acceptsBooking: event.target.checked })}
+                    type="checkbox"
+                  />
+                  รับจองออนไลน์
+                </label>
+              </>
+            )}
+
+            <label>
+              หมายเหตุ
+              <input value={staffForm.note} onChange={(event) => setStaffForm({ ...staffForm, note: event.target.value })} />
+            </label>
+            <button disabled={isBusy} type="submit">
+              สร้างบัญชีพนักงาน
+            </button>
+          </form>
+
+          <div className="account-list">
+            <div className="panel-heading">
+              <h2>รายชื่อพนักงาน</h2>
+              <button disabled={isBusy} onClick={refreshStaffAccounts} type="button">
+                Refresh
+              </button>
+            </div>
+
+            {staffAccounts.length === 0 ? (
+              <p className="empty-state">ยังไม่มีบัญชีพนักงาน</p>
+            ) : (
+              staffAccounts.map((staff) => (
+                <article className="account-card" key={staff.id}>
+                  <div>
+                    <strong>{staff.fullName}</strong>
+                    <span>{staff.role}</span>
+                    <small>{staff.email}</small>
+                    <small>{staff.phoneNumber}</small>
+                    {staff.role === 'Barber' && (
+                      <small>
+                        {staff.specialty ?? 'ยังไม่ระบุความถนัด'} / {staff.acceptsBooking ? 'รับจองออนไลน์' : 'ไม่รับจองออนไลน์'}
+                      </small>
+                    )}
+                  </div>
+                  <div className="account-actions">
+                    <span className={staff.accountStatus === 'Active' ? 'status-pill' : 'status-pill muted-pill'}>
+                      {staff.accountStatus}
+                    </span>
+                    {staff.accountStatus === 'Active' ? (
+                      <button
+                        className="secondary"
+                        disabled={isBusy}
+                        onClick={() => updateStaffStatus(staff, 'Disabled')}
+                        type="button"
+                      >
+                        ปิดใช้งาน
+                      </button>
+                    ) : (
+                      <button
+                        className="secondary"
+                        disabled={isBusy}
+                        onClick={() => updateStaffStatus(staff, 'Active')}
+                        type="button"
+                      >
+                        เปิดใช้งาน
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
       )}
     </main>
+  )
+}
+
+function PasswordInput({
+  isVisible,
+  onChange,
+  onToggleVisibility,
+  placeholder,
+  value,
+}: {
+  isVisible: boolean
+  onChange: (value: string) => void
+  onToggleVisibility: () => void
+  placeholder?: string
+  value: string
+}) {
+  return (
+    <div className="password-input-row">
+      <input
+        placeholder={placeholder}
+        type={isVisible ? 'text' : 'password'}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <button className="secondary" onClick={onToggleVisibility} type="button">
+        {isVisible ? 'ซ่อน' : 'ดู'}
+      </button>
+    </div>
   )
 }
 

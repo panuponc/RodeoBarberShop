@@ -399,6 +399,12 @@ button.link-button {
   margin-top: 18px;
 }
 
+.password-input-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .service-choice-grid,
 .slot-grid {
   display: grid;
