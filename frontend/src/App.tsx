@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 import './App.css'
 
 type AuthResponse = {
@@ -26,6 +26,19 @@ type Barber = {
   acceptsBooking: boolean
 }
 
+type BarberWorkingHour = {
+  dayOfWeek: number
+  startTime: string
+  endTime: string
+  isWorkingDay: boolean
+}
+
+type BarberSchedule = {
+  barberId: string
+  fullName: string
+  workingHours: BarberWorkingHour[]
+}
+
 type AvailabilitySlot = {
   startAt: string
   endAt: string
@@ -45,6 +58,7 @@ type Booking = {
   id: string
   bookingNumber: string
   customerName: string | null
+  barberId: string | null
   barberName: string | null
   startAt: string
   endAt: string
@@ -192,6 +206,7 @@ function App() {
 
   const [services, setServices] = useState<Service[]>([])
   const [barbers, setBarbers] = useState<Barber[]>([])
+  const [barberSchedules, setBarberSchedules] = useState<Record<string, BarberSchedule>>({})
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
   const [selectedBarberId, setSelectedBarberId] = useState('')
   const [bookingDate, setBookingDate] = useState(getTomorrowDate())
@@ -199,12 +214,13 @@ function App() {
   const [myBookings, setMyBookings] = useState<Booking[]>([])
   const [customerReceipt, setCustomerReceipt] = useState<Receipt | null>(null)
   const [isStaffBookingFormOpen, setIsStaffBookingFormOpen] = useState(false)
+  const [scheduleDate, setScheduleDate] = useState(getTodayDate())
   const [staffBookingForm, setStaffBookingForm] = useState({
     guestName: '',
     guestPhoneNumber: '',
     guestEmail: '',
     barberId: '',
-    startAt: getTodayLocalDateTime(),
+    startAt: getDefaultBookingDateTime(getTodayDate()),
     serviceIds: [] as string[],
     customerNote: '',
   })
@@ -217,6 +233,10 @@ function App() {
   const selectedServices = services.filter((service) => selectedServiceIds.includes(service.id))
   const selectedTotal = selectedServices.reduce((total, service) => total + service.price, 0)
   const canManageStaff = auth?.role === 'Owner' || auth?.role === 'Admin'
+  const scheduleBarbers = useMemo(
+    () => getScheduleBarbersForDate(barbers, barberSchedules, scheduleDate),
+    [barberSchedules, barbers, scheduleDate],
+  )
   const staffPanelTitle =
     activeStaffPanel === 'queue' ? 'จัดการคิววันนี้' : activeStaffPanel === 'accounts' ? 'บัญชีรับเงินร้าน' : 'จัดการพนักงาน'
   const staffPanelSubtitle =
@@ -242,7 +262,7 @@ function App() {
     if (auth.role === 'Customer') {
       void refreshCustomerData()
     } else {
-      void refreshQueue()
+      void refreshQueue(scheduleDate)
       void refreshBarbers()
       void refreshServices()
       void refreshPaymentAccounts()
@@ -252,6 +272,13 @@ function App() {
     }
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [auth])
+
+  useEffect(() => {
+    if (!auth || auth.role === 'Customer') return
+
+    void refreshQueue(scheduleDate)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduleDate])
 
   async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(path, {
@@ -307,9 +334,11 @@ function App() {
       ])
 
       setServices(serviceResult)
-      setBarbers(barberResult)
+      const sortedBarbers = sortBarbersByChair(barberResult)
+      setBarbers(sortedBarbers)
+      await refreshBarberSchedules(sortedBarbers)
       setMyBookings(bookingResult)
-      setSelectedBarberId((current) => current || barberResult[0]?.id || '')
+      setSelectedBarberId((current) => current || sortedBarbers[0]?.id || '')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'โหลดข้อมูลลูกค้าไม่สำเร็จ')
     }
@@ -379,10 +408,11 @@ function App() {
     }
   }
 
-  async function refreshQueue() {
+  async function refreshQueue(targetDate = scheduleDate) {
     try {
-      const result = await api<Booking[]>('/api/queue/today')
+      const result = await api<Booking[]>(`/api/queue?date=${targetDate}`)
       setQueue(result)
+      setSelectedBooking((current) => current && result.some((booking) => booking.id === current.id) ? current : null)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'โหลดคิวไม่สำเร็จ')
     }
@@ -391,10 +421,20 @@ function App() {
   async function refreshBarbers() {
     try {
       const result = await api<Barber[]>('/api/barbers')
-      setBarbers(result)
+      const sortedBarbers = sortBarbersByChair(result)
+      setBarbers(sortedBarbers)
+      await refreshBarberSchedules(sortedBarbers)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'โหลดรายชื่อช่างไม่สำเร็จ')
     }
+  }
+
+  async function refreshBarberSchedules(targetBarbers: Barber[]) {
+    const schedules = await Promise.all(
+      targetBarbers.map((barber) => api<BarberSchedule>(`/api/barbers/${barber.id}/schedule`)),
+    )
+
+    setBarberSchedules(Object.fromEntries(schedules.map((schedule) => [schedule.barberId, schedule])))
   }
 
   async function refreshServices() {
@@ -754,6 +794,10 @@ function App() {
         throw new Error('กรุณาเลือกช่างและบริการ')
       }
 
+      if (new Date(staffBookingForm.startAt) <= new Date()) {
+        throw new Error('กรุณาเลือกวันเวลาในอนาคต')
+      }
+
       const result = await api<Booking>('/api/bookings/staff', {
         method: 'POST',
         body: JSON.stringify({
@@ -767,17 +811,19 @@ function App() {
         }),
       })
 
+      const createdBookingDate = staffBookingForm.startAt.slice(0, 10)
       setIsStaffBookingFormOpen(false)
       setStaffBookingForm({
         guestName: '',
         guestPhoneNumber: '',
         guestEmail: '',
         barberId: staffBookingForm.barberId,
-        startAt: getTodayLocalDateTime(),
+        startAt: getDefaultBookingDateTime(createdBookingDate),
         serviceIds: [],
         customerNote: '',
       })
-      await refreshQueue()
+      setScheduleDate(createdBookingDate)
+      await refreshQueue(createdBookingDate)
       setSelectedBooking(result)
       setMessage('เพิ่มการนัดหมายแล้ว')
     } catch (error) {
@@ -914,7 +960,12 @@ function App() {
 
             <label>
               วันที่
-              <input value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} type="date" />
+              <input
+                min={getTodayDate()}
+                value={bookingDate}
+                onChange={(event) => setBookingDate(clampDateToToday(event.target.value))}
+                type="date"
+              />
             </label>
 
             <button disabled={isBusy} type="submit">
@@ -1042,14 +1093,40 @@ function App() {
             <div className="schedule-toolbar">
               <div>
                 <h2>ตารางงานช่าง</h2>
-                <p className="muted">{formatScheduleDate(new Date())} / {queue.length} คิว</p>
+                <p className="muted">{formatScheduleDate(parseLocalDate(scheduleDate))} / {queue.length} คิว</p>
               </div>
               <div className="schedule-toolbar-actions">
-                <button onClick={() => setIsStaffBookingFormOpen((current) => !current)} type="button">
+                <div className="schedule-date-controls">
+                  <button className="secondary" onClick={() => setScheduleDate(addDays(scheduleDate, -1))} type="button">
+                    ก่อนหน้า
+                  </button>
+                  <input
+                    aria-label="เลือกวันที่ตารางงาน"
+                    type="date"
+                    value={scheduleDate}
+                    onChange={(event) => setScheduleDate(event.target.value)}
+                  />
+                  <button className="secondary" onClick={() => setScheduleDate(addDays(scheduleDate, 1))} type="button">
+                    ถัดไป
+                  </button>
+                  <button className="secondary" onClick={() => setScheduleDate(getTodayDate())} type="button">
+                    วันนี้
+                  </button>
+                </div>
+                <button onClick={() => {
+                  const defaultBookingDate = clampDateToToday(scheduleDate)
+                  setStaffBookingForm((current) => ({
+                    ...current,
+                    startAt: current.startAt.slice(0, 10) === defaultBookingDate
+                      ? current.startAt
+                      : getDefaultBookingDateTime(defaultBookingDate),
+                  }))
+                  setIsStaffBookingFormOpen((current) => !current)
+                }} type="button">
                   {isStaffBookingFormOpen ? 'ปิดฟอร์ม' : '+ เพิ่มการนัดหมาย'}
                 </button>
                 <button className="secondary" disabled={isBusy} onClick={() => {
-                  void refreshQueue()
+                  void refreshQueue(scheduleDate)
                   void refreshBarbers()
                   void refreshServices()
                 }} type="button">
@@ -1098,9 +1175,13 @@ function App() {
                 <label>
                   วันเวลา
                   <input
+                    min={getMinimumStaffBookingDateTime(staffBookingForm.startAt.slice(0, 10))}
                     type="datetime-local"
                     value={staffBookingForm.startAt}
-                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, startAt: event.target.value })}
+                    onChange={(event) => setStaffBookingForm({
+                      ...staffBookingForm,
+                      startAt: clampDateTimeToMinimum(event.target.value),
+                    })}
                   />
                 </label>
                 <label>
@@ -1147,17 +1228,22 @@ function App() {
               </form>
             )}
 
-            <div className="schedule-board">
+            <div
+              className="schedule-board"
+              style={getScheduleBoardGridStyle(scheduleBarbers)}
+            >
               {barbers.length === 0 ? (
                 <p className="empty-state">ยังไม่มีช่างที่เปิดรับจองออนไลน์</p>
               ) : (
-                barbers.map((barber) => (
+                scheduleBarbers.map(({ barber, isWorkingToday, workingHour }) => (
                   <BarberScheduleColumn
                     barber={barber}
-                    bookings={queue.filter((booking) => booking.barberName === barber.fullName)}
+                    bookings={queue.filter((booking) => booking.barberId === barber.id)}
+                    isWorkingToday={isWorkingToday}
                     key={barber.id}
                     onSelectBooking={setSelectedBooking}
                     selectedBookingId={selectedBooking?.id}
+                    workingHour={workingHour}
                   />
                 ))
               )}
@@ -1166,7 +1252,7 @@ function App() {
 
           <aside className="detail-panel schedule-detail-panel">
             <section className="schedule-side-summary">
-              <h3>สรุปวันนี้</h3>
+              <h3>สรุปวันที่เลือก</h3>
               <div>
                 <span>รอยืนยัน</span>
                 <strong>{queueSummary.pending}</strong>
@@ -1751,33 +1837,37 @@ function PasswordInput({
 function BarberScheduleColumn({
   barber,
   bookings,
+  isWorkingToday,
   onSelectBooking,
   selectedBookingId,
+  workingHour,
 }: {
   barber: Barber
   bookings: Booking[]
+  isWorkingToday: boolean
   onSelectBooking: (booking: Booking) => void
   selectedBookingId?: string
+  workingHour?: BarberWorkingHour
 }) {
   const sortedBookings = [...bookings].sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())
 
   return (
-    <article className="barber-column">
+    <article className={isWorkingToday ? 'barber-column' : 'barber-column off-day'}>
       <header className="barber-column-header">
         <div className="barber-avatar">{getInitials(barber.fullName)}</div>
         <div>
           <strong>{barber.fullName}</strong>
-          <small>{barber.specialty ?? 'Barber'}</small>
+          <small>{isWorkingToday && workingHour ? `${formatWorkingTime(workingHour)} / ${barber.specialty ?? 'Barber'}` : 'ไม่อยู่ร้านวันนี้'}</small>
         </div>
-        <span className={barber.isAvailable ? 'availability-dot available' : 'availability-dot'} />
+        <span className={isWorkingToday ? 'availability-dot available' : 'availability-dot'} />
       </header>
 
       <div className="barber-column-body">
         {sortedBookings.length === 0 ? (
           <div className="empty-schedule-slot">
             <span>✂</span>
-            <strong>ว่าง</strong>
-            <small>พร้อมรับลูกค้าคิวถัดไป</small>
+            <strong>{isWorkingToday ? 'ว่าง' : 'ไม่อยู่ร้าน'}</strong>
+            <small>{isWorkingToday ? 'พร้อมรับลูกค้าคิวถัดไป' : 'ไม่มีรอบรับคิววันนี้'}</small>
           </div>
         ) : (
           sortedBookings.map((booking) => (
@@ -1894,6 +1984,78 @@ function formatScheduleDate(value: Date) {
   }).format(value)
 }
 
+function getWorkingHourForDate(schedule: BarberSchedule | undefined, dateValue: string) {
+  const dayOfWeek = parseLocalDate(dateValue).getDay()
+
+  return schedule?.workingHours.find((workingHour) => workingHour.dayOfWeek === dayOfWeek)
+}
+
+function formatWorkingTime(workingHour: BarberWorkingHour) {
+  return `${workingHour.startTime.slice(0, 5)}-${workingHour.endTime.slice(0, 5)}`
+}
+
+function getScheduleBarbersForDate(
+  barbers: Barber[],
+  schedules: Record<string, BarberSchedule>,
+  dateValue: string,
+) {
+  return barbers
+    .map((barber) => {
+      const workingHour = getWorkingHourForDate(schedules[barber.id], dateValue)
+
+      return {
+        barber,
+        isWorkingToday: Boolean(workingHour?.isWorkingDay && barber.isAvailable),
+        workingHour,
+      }
+    })
+    .sort((left, right) => {
+      if (left.isWorkingToday !== right.isWorkingToday) {
+        return left.isWorkingToday ? -1 : 1
+      }
+
+      return getBarberChairOrder(left.barber.fullName) - getBarberChairOrder(right.barber.fullName)
+    })
+}
+
+function getScheduleBoardGridStyle(scheduleBarbers: ReturnType<typeof getScheduleBarbersForDate>): CSSProperties {
+  const workingCount = scheduleBarbers.filter((item) => item.isWorkingToday).length
+  const offDayCount = scheduleBarbers.length - workingCount
+  const workingColumns = Array.from({ length: workingCount }, () => 'minmax(150px, 1fr)')
+  const offDayColumns = Array.from({ length: offDayCount }, () => '76px')
+
+  return {
+    gridTemplateColumns: [...workingColumns, ...offDayColumns].join(' '),
+  }
+}
+
+function sortBarbersByChair(barbers: Barber[]) {
+  return [...barbers].sort((left, right) => {
+    const leftOrder = getBarberChairOrder(left.fullName)
+    const rightOrder = getBarberChairOrder(right.fullName)
+
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder
+    }
+
+    return left.fullName.localeCompare(right.fullName, 'th')
+  })
+}
+
+function getBarberChairOrder(fullName: string) {
+  const chairOrder: Record<string, number> = {
+    'ช่างเค๊ก': 1,
+    'ช่างบั้ม': 2,
+    'ช่างนุค': 3,
+    'ช่างนุ้ย': 4,
+    'ช่างเดียว': 5,
+    'ช่างเปิ้ล': 6,
+    'ช่างเหน่ง': 99,
+  }
+
+  return chairOrder[fullName] ?? 50
+}
+
 function getInitials(value: string) {
   return value
     .split(' ')
@@ -1908,11 +2070,78 @@ function getTomorrowDate() {
   const date = new Date()
   date.setDate(date.getDate() + 1)
 
+  return formatLocalDateInputValue(date)
+}
+
+function getTodayDate() {
+  return formatLocalDateInputValue(new Date())
+}
+
+function addDays(dateValue: string, days: number) {
+  const date = parseLocalDate(dateValue)
+  date.setDate(date.getDate() + days)
+
+  return formatLocalDateInputValue(date)
+}
+
+function clampDateToToday(dateValue: string) {
+  const today = getTodayDate()
+
+  return dateValue < today ? today : dateValue
+}
+
+function parseLocalDate(dateValue: string) {
+  return new Date(`${dateValue}T00:00:00`)
+}
+
+function getDefaultBookingDateTime(dateValue: string) {
+  if (dateValue === getTodayDate()) {
+    return getMinimumStaffBookingDateTime()
+  }
+
+  return `${dateValue}T10:00`
+}
+
+function getMinimumStaffBookingDateTime(dateValue = getTodayDate()) {
+  const today = getTodayDate()
+
+  return dateValue <= today ? formatLocalDateTimeInputValue(roundUpToNextSlot(new Date(), 30)) : `${dateValue}T10:00`
+}
+
+function clampDateTimeToMinimum(dateTimeValue: string) {
+  const dateValue = clampDateToToday(dateTimeValue.slice(0, 10))
+  const normalizedValue = dateTimeValue.slice(0, 10) < dateValue
+    ? getDefaultBookingDateTime(dateValue)
+    : dateTimeValue
+  const minimumValue = getMinimumStaffBookingDateTime(dateValue)
+
+  return normalizedValue < minimumValue ? minimumValue : normalizedValue
+}
+
+function roundUpToNextSlot(value: Date, intervalMinutes: number) {
+  const date = new Date(value)
+  const remainder = date.getMinutes() % intervalMinutes
+
+  if (remainder > 0) {
+    date.setMinutes(date.getMinutes() + intervalMinutes - remainder)
+  }
+
+  date.setSeconds(0, 0)
+
+  return date
+}
+
+function formatLocalDateInputValue(value: Date) {
+  const date = new Date()
+  date.setTime(value.getTime())
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+
   return date.toISOString().slice(0, 10)
 }
 
-function getTodayLocalDateTime() {
+function formatLocalDateTimeInputValue(value: Date) {
   const date = new Date()
+  date.setTime(value.getTime())
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
 
   return date.toISOString().slice(0, 16)

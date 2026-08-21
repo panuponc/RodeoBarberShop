@@ -16,15 +16,22 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
 {
     private static readonly TimeSpan ShopUtcOffset = TimeSpan.FromHours(7);
 
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<QueueBookingResponse>>> GetQueue(
+        [FromQuery] DateOnly? date,
+        CancellationToken cancellationToken)
+    {
+        var targetDate = date ?? DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(ShopUtcOffset).Date);
+        var bookings = await GetQueueForDate(targetDate)
+            .ToListAsync(cancellationToken);
+
+        return Ok(bookings);
+    }
+
     [HttpGet("today")]
     public async Task<ActionResult<IReadOnlyList<QueueBookingResponse>>> GetTodayQueue(CancellationToken cancellationToken)
     {
-        var (dayStartUtc, dayEndUtc) = GetShopDayRangeUtc(DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(ShopUtcOffset).Date));
-
-        var bookings = await QueueBookingQuery()
-            .Where(booking => booking.StartAt >= dayStartUtc && booking.StartAt < dayEndUtc)
-            .OrderBy(booking => booking.StartAt)
-            .Select(booking => ToResponse(booking))
+        var bookings = await GetQueueForDate(DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(ShopUtcOffset).Date))
             .ToListAsync(cancellationToken);
 
         return Ok(bookings);
@@ -120,6 +127,16 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
             .Include(booking => booking.Barber)
             .ThenInclude(barber => barber!.User)
             .Include(booking => booking.BookingServices);
+    }
+
+    private IQueryable<QueueBookingResponse> GetQueueForDate(DateOnly date)
+    {
+        var (dayStartUtc, dayEndUtc) = GetShopDayRangeUtc(date);
+
+        return QueueBookingQuery()
+            .Where(booking => booking.StartAt >= dayStartUtc && booking.StartAt < dayEndUtc)
+            .OrderBy(booking => booking.StartAt)
+            .Select(booking => ToResponse(booking));
     }
 
     private static QueueBookingResponse ToResponse(Booking booking)
