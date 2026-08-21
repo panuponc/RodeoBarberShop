@@ -215,6 +215,16 @@ function App() {
       : activeStaffPanel === 'accounts'
         ? 'ตั้งค่าบัญชีรับเงินหลักและทดสอบ QR สำหรับหน้าร้าน'
         : 'เพิ่ม แก้ไข เปิด/ปิดใช้งาน และ reset password ให้ทีมหน้าร้าน'
+  const queueSummary = {
+    total: queue.length,
+    confirmed: queue.filter((booking) => booking.bookingStatus === 'Confirmed' || booking.bookingStatus === 'WaitingService').length,
+    inProgress: queue.filter((booking) => booking.bookingStatus === 'InService' || booking.bookingStatus === 'WaitingPayment').length,
+    completed: queue.filter((booking) => booking.bookingStatus === 'Completed').length,
+    pending: queue.filter((booking) => booking.bookingStatus === 'PendingConfirmation').length,
+    revenue: queue
+      .filter((booking) => booking.paymentStatus === 'Paid' || booking.bookingStatus === 'Completed')
+      .reduce((total, booking) => total + booking.totalAmount, 0),
+  }
 
   useEffect(() => {
     if (!auth) return
@@ -223,6 +233,7 @@ function App() {
       void refreshCustomerData()
     } else {
       void refreshQueue()
+      void refreshBarbers()
       void refreshPaymentAccounts()
       if (auth.role === 'Owner' || auth.role === 'Admin') {
         void refreshStaffAccounts()
@@ -363,6 +374,15 @@ function App() {
       setQueue(result)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'โหลดคิวไม่สำเร็จ')
+    }
+  }
+
+  async function refreshBarbers() {
+    try {
+      const result = await api<Barber[]>('/api/barbers')
+      setBarbers(result)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'โหลดรายชื่อช่างไม่สำเร็จ')
     }
   }
 
@@ -947,39 +967,71 @@ function App() {
         {message && <p className="notice">{message}</p>}
 
         {activeStaffPanel === 'queue' ? (
-        <section className="work-grid">
-          <div className="queue-panel">
-            <div className="panel-heading">
-              <h2>คิววันนี้</h2>
-              <button disabled={isBusy} onClick={refreshQueue} type="button">
+        <section className="schedule-layout">
+          <div className="schedule-board-panel">
+            <div className="schedule-summary-grid">
+              <SummaryCard label="คิวทั้งหมด" value={`${queueSummary.total}`} />
+              <SummaryCard label="ยืนยันแล้ว" value={`${queueSummary.confirmed}`} tone="blue" />
+              <SummaryCard label="กำลังให้บริการ" value={`${queueSummary.inProgress}`} tone="amber" />
+              <SummaryCard label="เสร็จแล้ว" value={`${queueSummary.completed}`} tone="green" />
+            </div>
+
+            <div className="schedule-toolbar">
+              <div>
+                <h2>ตารางงานช่าง</h2>
+                <p className="muted">{formatScheduleDate(new Date())} / {queue.length} คิว</p>
+              </div>
+              <button disabled={isBusy} onClick={() => {
+                void refreshQueue()
+                void refreshBarbers()
+              }} type="button">
                 Refresh
               </button>
             </div>
 
-            <div className="queue-list">
-              {queue.length === 0 ? (
-                <p className="empty-state">ยังไม่มีคิววันนี้</p>
+            <div className="schedule-board">
+              {barbers.length === 0 ? (
+                <p className="empty-state">ยังไม่มีช่างที่เปิดรับจองออนไลน์</p>
               ) : (
-                queue.map((booking) => (
-                  <article
-                    className={selectedBooking?.id === booking.id ? 'queue-item selected' : 'queue-item'}
-                    key={booking.id}
-                  >
-                    <button onClick={() => setSelectedBooking(booking)} type="button">
-                      <span className="booking-time">{formatTime(booking.startAt)}</span>
-                      <span>
-                        <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
-                        <small>{booking.bookingNumber}</small>
-                      </span>
-                      <span className={`status-pill status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
-                    </button>
-                  </article>
+                barbers.map((barber) => (
+                  <BarberScheduleColumn
+                    barber={barber}
+                    bookings={queue.filter((booking) => booking.barberName === barber.fullName)}
+                    key={barber.id}
+                    onSelectBooking={setSelectedBooking}
+                    selectedBookingId={selectedBooking?.id}
+                  />
                 ))
               )}
             </div>
           </div>
 
-          <aside className="detail-panel">
+          <aside className="detail-panel schedule-detail-panel">
+            <section className="schedule-side-summary">
+              <h3>สรุปวันนี้</h3>
+              <div>
+                <span>รอยืนยัน</span>
+                <strong>{queueSummary.pending}</strong>
+              </div>
+              <div>
+                <span>กำลังให้บริการ/รอชำระ</span>
+                <strong>{queueSummary.inProgress}</strong>
+              </div>
+              <div>
+                <span>รายได้ที่รับแล้ว</span>
+                <strong>{formatMoney(queueSummary.revenue)}</strong>
+              </div>
+            </section>
+
+            <section className="status-legend">
+              <h3>สถานะคิว</h3>
+              <span><i className="legend-dot pending" /> รอยืนยัน</span>
+              <span><i className="legend-dot confirmed" /> ยืนยัน/มาถึงร้าน</span>
+              <span><i className="legend-dot progress" /> กำลังให้บริการ</span>
+              <span><i className="legend-dot payment" /> รอชำระเงิน</span>
+              <span><i className="legend-dot done" /> เสร็จสิ้น</span>
+            </section>
+
             {selectedBooking ? (
               <>
                 <div className="panel-heading">
@@ -1538,6 +1590,68 @@ function PasswordInput({
   )
 }
 
+function BarberScheduleColumn({
+  barber,
+  bookings,
+  onSelectBooking,
+  selectedBookingId,
+}: {
+  barber: Barber
+  bookings: Booking[]
+  onSelectBooking: (booking: Booking) => void
+  selectedBookingId?: string
+}) {
+  const sortedBookings = [...bookings].sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())
+
+  return (
+    <article className="barber-column">
+      <header className="barber-column-header">
+        <div className="barber-avatar">{getInitials(barber.fullName)}</div>
+        <div>
+          <strong>{barber.fullName}</strong>
+          <small>{barber.specialty ?? 'Barber'}</small>
+        </div>
+        <span className={barber.isAvailable ? 'availability-dot available' : 'availability-dot'} />
+      </header>
+
+      <div className="barber-column-body">
+        {sortedBookings.length === 0 ? (
+          <div className="empty-schedule-slot">
+            <span>✂</span>
+            <strong>ว่าง</strong>
+            <small>พร้อมรับลูกค้าคิวถัดไป</small>
+          </div>
+        ) : (
+          sortedBookings.map((booking) => (
+            <button
+              className={selectedBookingId === booking.id ? 'schedule-card selected' : `schedule-card status-border-${booking.bookingStatus}`}
+              key={booking.id}
+              onClick={() => onSelectBooking(booking)}
+              type="button"
+            >
+              <span className="schedule-time">
+                {formatTime(booking.startAt)} - {formatTime(booking.endAt)}
+              </span>
+              <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
+              <small>{booking.services.map((service) => service.serviceName).join(' + ')}</small>
+              <span className={`status-pill status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
+            </button>
+          ))
+        )}
+      </div>
+    </article>
+  )
+}
+
+function SummaryCard({ label, tone, value }: { label: string; tone?: 'amber' | 'blue' | 'green'; value: string }) {
+  return (
+    <article className={tone ? `summary-card ${tone}` : 'summary-card'}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  )
+}
+
 function Header({
   auth,
   eyebrow,
@@ -1613,6 +1727,23 @@ function formatDateTime(value: string) {
     timeStyle: 'short',
     timeZone: 'Asia/Bangkok',
   }).format(new Date(value))
+}
+
+function formatScheduleDate(value: Date) {
+  return new Intl.DateTimeFormat('th-TH', {
+    dateStyle: 'full',
+    timeZone: 'Asia/Bangkok',
+  }).format(value)
+}
+
+function getInitials(value: string) {
+  return value
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
 }
 
 function getTomorrowDate() {
