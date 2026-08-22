@@ -532,6 +532,10 @@ button.link-button {
   background: linear-gradient(180deg, #f6f2eb, #eee8df);
 }
 
+.barber-column.off-day.shared-chair {
+  width: 104px;
+}
+
 .barber-column.off-day .barber-column-header,
 .barber-column.off-day .empty-schedule-slot {
   background: #f7f2ea;
@@ -550,7 +554,6 @@ button.link-button {
 }
 
 .barber-column.off-day .barber-column-header small,
-.barber-column.off-day .availability-dot,
 .barber-column.off-day .empty-schedule-slot small {
   display: none;
 }
@@ -558,6 +561,13 @@ button.link-button {
 .barber-column.off-day .barber-column-header strong {
   max-width: 58px;
   font-size: 0.78rem;
+}
+
+.barber-column.off-day.shared-chair .barber-column-header strong {
+  max-width: 86px;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .barber-column.off-day .barber-column-body {
@@ -580,11 +590,17 @@ button.link-button {
 .barber-column-header {
   display: grid;
   align-items: center;
-  gap: 8px;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 7px;
+  grid-template-columns: 34px minmax(0, 1fr);
   border-bottom: 1px solid #eee3d5;
   background: #fff;
   padding: 10px;
+}
+
+.barber-avatar-wrap {
+  position: relative;
+  width: 34px;
+  height: 34px;
 }
 
 .barber-avatar {
@@ -599,33 +615,66 @@ button.link-button {
   font-weight: 950;
 }
 
+.schedule-card em {
+  color: #94631e;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
 .barber-column-header strong,
 .barber-column-header small {
   display: block;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .barber-column-header strong {
   font-size: 0.92rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .barber-column-header small {
-  font-size: 0.74rem;
+  display: grid;
+  gap: 1px;
+  font-size: 0.7rem;
+  line-height: 1.25;
+}
+
+.barber-column-header small span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.barber-column-header small span:first-child {
+  white-space: nowrap;
+}
+
+.barber-column-header .chair-note {
+  display: block;
+}
+
+.barber-column-header .chair-note span {
+  display: inline-block;
+  min-width: 0;
 }
 
 .availability-dot {
-  width: 8px;
-  height: 8px;
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
   border-radius: 999px;
   background: #d24b4b;
-  box-shadow: 0 0 0 4px rgb(210 75 75 / 12%);
+  box-shadow: 0 0 0 2px rgb(210 75 75 / 12%);
 }
 
 .availability-dot.available {
   background: #21a65a;
-  box-shadow: 0 0 0 4px rgb(33 166 90 / 12%);
+  box-shadow: 0 0 0 2px rgb(33 166 90 / 12%);
 }
 
 .barber-column-body {

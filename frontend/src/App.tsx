@@ -39,6 +39,41 @@ type BarberSchedule = {
   workingHours: BarberWorkingHour[]
 }
 
+type ScheduleBarber = {
+  barber: Barber
+  isWorkingToday: boolean
+  workingHour?: BarberWorkingHour
+}
+
+type ScheduleChair = {
+  id: string
+  title: string
+  meta: string
+  subtitle: string
+  order: number
+  isShared: boolean
+  hasSubstitute: boolean
+  isWorkingToday: boolean
+  workingHours: BarberWorkingHour[]
+  barbers: ScheduleBarber[]
+}
+
+type ChairConfig = {
+  id: string
+  label: string
+  note: string
+  order: number
+  barberNames: string[]
+}
+
+const chairConfigs: ChairConfig[] = [
+  { id: 'chair-1', label: 'เก้าอี้ 1', note: 'ติดกระจก', order: 1, barberNames: ['ช่างเค๊ก'] },
+  { id: 'chair-2', label: 'เก้าอี้ 2', note: 'เก้าอี้ประจำ', order: 2, barberNames: ['ช่างบั้ม'] },
+  { id: 'chair-3', label: 'เก้าอี้ 3', note: 'ช่างนุ้ยจองล่วงหน้า 1 วัน', order: 3, barberNames: ['ช่างนุค', 'ช่างนุ้ย'] },
+  { id: 'chair-4', label: 'เก้าอี้ 4', note: 'เก้าอี้ประจำ', order: 4, barberNames: ['ช่างเปิ้ล'] },
+  { id: 'chair-5', label: 'เก้าอี้ 5', note: 'หน้าทีวี', order: 5, barberNames: ['ช่างเดียว'] },
+]
+
 type AvailabilitySlot = {
   startAt: string
   endAt: string
@@ -233,8 +268,8 @@ function App() {
   const selectedServices = services.filter((service) => selectedServiceIds.includes(service.id))
   const selectedTotal = selectedServices.reduce((total, service) => total + service.price, 0)
   const canManageStaff = auth?.role === 'Owner' || auth?.role === 'Admin'
-  const scheduleBarbers = useMemo(
-    () => getScheduleBarbersForDate(barbers, barberSchedules, scheduleDate),
+  const scheduleChairs = useMemo(
+    () => getScheduleChairsForDate(barbers, barberSchedules, scheduleDate),
     [barberSchedules, barbers, scheduleDate],
   )
   const staffPanelTitle =
@@ -1167,7 +1202,7 @@ function App() {
                     <option value="">เลือกช่าง</option>
                     {barbers.map((barber) => (
                       <option key={barber.id} value={barber.id}>
-                        {barber.fullName}
+                        {getBarberBookingLabel(barber)}
                       </option>
                     ))}
                   </select>
@@ -1230,20 +1265,18 @@ function App() {
 
             <div
               className="schedule-board"
-              style={getScheduleBoardGridStyle(scheduleBarbers)}
+              style={getScheduleBoardGridStyle(scheduleChairs)}
             >
               {barbers.length === 0 ? (
                 <p className="empty-state">ยังไม่มีช่างที่เปิดรับจองออนไลน์</p>
               ) : (
-                scheduleBarbers.map(({ barber, isWorkingToday, workingHour }) => (
-                  <BarberScheduleColumn
-                    barber={barber}
-                    bookings={queue.filter((booking) => booking.barberId === barber.id)}
-                    isWorkingToday={isWorkingToday}
-                    key={barber.id}
+                scheduleChairs.map((chair) => (
+                  <ChairScheduleColumn
+                    bookings={queue.filter((booking) => chair.barbers.some(({ barber }) => booking.barberId === barber.id))}
+                    chair={chair}
+                    key={chair.id}
                     onSelectBooking={setSelectedBooking}
                     selectedBookingId={selectedBooking?.id}
-                    workingHour={workingHour}
                   />
                 ))
               )}
@@ -1834,40 +1867,54 @@ function PasswordInput({
   )
 }
 
-function BarberScheduleColumn({
-  barber,
+function ChairScheduleColumn({
   bookings,
-  isWorkingToday,
+  chair,
   onSelectBooking,
   selectedBookingId,
-  workingHour,
 }: {
-  barber: Barber
+  chair: ScheduleChair
   bookings: Booking[]
-  isWorkingToday: boolean
   onSelectBooking: (booking: Booking) => void
   selectedBookingId?: string
-  workingHour?: BarberWorkingHour
 }) {
   const sortedBookings = [...bookings].sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())
+  const columnClassName = [
+    'barber-column',
+    chair.isWorkingToday ? '' : 'off-day',
+    chair.isShared ? 'shared-chair' : '',
+  ].filter(Boolean).join(' ')
 
   return (
-    <article className={isWorkingToday ? 'barber-column' : 'barber-column off-day'}>
+    <article className={columnClassName}>
       <header className="barber-column-header">
-        <div className="barber-avatar">{getInitials(barber.fullName)}</div>
-        <div>
-          <strong>{barber.fullName}</strong>
-          <small>{isWorkingToday && workingHour ? `${formatWorkingTime(workingHour)} / ${barber.specialty ?? 'Barber'}` : 'ไม่อยู่ร้านวันนี้'}</small>
+        <div className="barber-avatar-wrap">
+          <div className="barber-avatar">{getInitials(chair.title)}</div>
+          <span className={chair.isWorkingToday ? 'availability-dot available' : 'availability-dot'} />
         </div>
-        <span className={isWorkingToday ? 'availability-dot available' : 'availability-dot'} />
+        <div>
+          <strong>{chair.title}</strong>
+          <small>
+            {chair.isWorkingToday ? (
+              <>
+                <span>{chair.meta}</span>
+                <span className="chair-note">
+                  <span>{chair.subtitle}</span>
+                </span>
+              </>
+            ) : (
+              'ไม่อยู่ร้านวันนี้'
+            )}
+          </small>
+        </div>
       </header>
 
       <div className="barber-column-body">
         {sortedBookings.length === 0 ? (
           <div className="empty-schedule-slot">
             <span>✂</span>
-            <strong>{isWorkingToday ? 'ว่าง' : 'ไม่อยู่ร้าน'}</strong>
-            <small>{isWorkingToday ? 'พร้อมรับลูกค้าคิวถัดไป' : 'ไม่มีรอบรับคิววันนี้'}</small>
+            <strong>{chair.isWorkingToday ? 'ว่าง' : 'ไม่อยู่ร้าน'}</strong>
+            <small>{chair.isWorkingToday ? 'พร้อมรับลูกค้าคิวถัดไป' : 'ไม่มีรอบรับคิววันนี้'}</small>
           </div>
         ) : (
           sortedBookings.map((booking) => (
@@ -1881,6 +1928,7 @@ function BarberScheduleColumn({
                 {formatTime(booking.startAt)} - {formatTime(booking.endAt)}
               </span>
               <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
+              {(chair.isShared || chair.hasSubstitute) && <em>{booking.barberName}</em>}
               <small>{booking.services.map((service) => service.serviceName).join(' + ')}</small>
               <span className={`status-pill status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
             </button>
@@ -1990,16 +2038,12 @@ function getWorkingHourForDate(schedule: BarberSchedule | undefined, dateValue: 
   return schedule?.workingHours.find((workingHour) => workingHour.dayOfWeek === dayOfWeek)
 }
 
-function formatWorkingTime(workingHour: BarberWorkingHour) {
-  return `${workingHour.startTime.slice(0, 5)}-${workingHour.endTime.slice(0, 5)}`
-}
-
-function getScheduleBarbersForDate(
+function getScheduleChairsForDate(
   barbers: Barber[],
   schedules: Record<string, BarberSchedule>,
   dateValue: string,
 ) {
-  return barbers
+  const scheduleBarbers: ScheduleBarber[] = barbers
     .map((barber) => {
       const workingHour = getWorkingHourForDate(schedules[barber.id], dateValue)
 
@@ -2009,23 +2053,98 @@ function getScheduleBarbersForDate(
         workingHour,
       }
     })
-    .sort((left, right) => {
-      if (left.isWorkingToday !== right.isWorkingToday) {
-        return left.isWorkingToday ? -1 : 1
-      }
+  const scheduleBarberByName = new Map(scheduleBarbers.map((item) => [item.barber.fullName, item]))
+  const substituteBarber = scheduleBarberByName.get('ช่างเหน่ง')
+  let isSubstituteAssigned = false
 
-      return getBarberChairOrder(left.barber.fullName) - getBarberChairOrder(right.barber.fullName)
-    })
+  const activeChairs = chairConfigs.flatMap((chair) => {
+    const regularBarbers = chair.barberNames
+      .map((barberName) => scheduleBarberByName.get(barberName))
+      .filter((barber): barber is ScheduleBarber => Boolean(barber))
+    const workingRegularBarbers = regularBarbers.filter((item) => item.isWorkingToday)
+    const canUseSubstitute = workingRegularBarbers.length === 0
+      && Boolean(substituteBarber?.isWorkingToday)
+      && !isSubstituteAssigned
+    const assignedBarbers: ScheduleBarber[] = canUseSubstitute && substituteBarber ? [substituteBarber] : workingRegularBarbers
+    const visibleWorkingHours = assignedBarbers
+      .map((item) => item.workingHour)
+      .filter((workingHour): workingHour is BarberWorkingHour => Boolean(workingHour))
+
+    if (assignedBarbers.length === 0) {
+      return []
+    }
+
+    if (canUseSubstitute) {
+      isSubstituteAssigned = true
+    }
+
+    return {
+      id: chair.id,
+      title: getChairDisplayTitle(chair, assignedBarbers),
+      meta: chair.label,
+      subtitle: getChairSubtitle(chair, assignedBarbers),
+      order: chair.order,
+      isShared: chair.barberNames.length > 1,
+      hasSubstitute: canUseSubstitute,
+      isWorkingToday: assignedBarbers.length > 0,
+      workingHours: visibleWorkingHours,
+      barbers: assignedBarbers,
+    }
+  })
+
+  const offDayBarbers = scheduleBarbers.filter((scheduleBarber) => !scheduleBarber.isWorkingToday)
+  const offDayStatusChairs = chairConfigs.flatMap((chair) => {
+    const chairOffDayBarbers = chair.barberNames
+      .map((barberName) => offDayBarbers.find((scheduleBarber) => scheduleBarber.barber.fullName === barberName))
+      .filter((scheduleBarber): scheduleBarber is ScheduleBarber => Boolean(scheduleBarber))
+
+    if (chairOffDayBarbers.length === 0) {
+      return []
+    }
+
+    return [{
+      id: `off-${chair.id}`,
+      title: getChairDisplayTitle(chair, chairOffDayBarbers),
+      meta: 'หยุด',
+      subtitle: 'ไม่อยู่ร้านวันนี้',
+      order: 100 + chair.order,
+      isShared: chairOffDayBarbers.length > 1,
+      hasSubstitute: false,
+      isWorkingToday: false,
+      workingHours: [],
+      barbers: chairOffDayBarbers,
+    }]
+  })
+
+  const substituteOffDayChair = substituteBarber && !substituteBarber.isWorkingToday
+    ? [{
+      id: `off-${substituteBarber.barber.id}`,
+      title: substituteBarber.barber.fullName,
+      meta: 'หยุด',
+      subtitle: 'ไม่อยู่ร้านวันนี้',
+      order: 199,
+      isShared: false,
+      hasSubstitute: false,
+      isWorkingToday: false,
+      workingHours: [],
+      barbers: [substituteBarber],
+    }]
+    : []
+
+  return [...activeChairs, ...offDayStatusChairs, ...substituteOffDayChair]
 }
 
-function getScheduleBoardGridStyle(scheduleBarbers: ReturnType<typeof getScheduleBarbersForDate>): CSSProperties {
-  const workingCount = scheduleBarbers.filter((item) => item.isWorkingToday).length
-  const offDayCount = scheduleBarbers.length - workingCount
-  const workingColumns = Array.from({ length: workingCount }, () => 'minmax(150px, 1fr)')
-  const offDayColumns = Array.from({ length: offDayCount }, () => '76px')
+function getScheduleBoardGridStyle(scheduleChairs: ScheduleChair[]): CSSProperties {
+  const columns = scheduleChairs.map((chair) => {
+    if (chair.isWorkingToday) {
+      return 'minmax(150px, 1fr)'
+    }
+
+    return chair.isShared ? '104px' : '76px'
+  })
 
   return {
-    gridTemplateColumns: [...workingColumns, ...offDayColumns].join(' '),
+    gridTemplateColumns: columns.join(' '),
   }
 }
 
@@ -2047,13 +2166,49 @@ function getBarberChairOrder(fullName: string) {
     'ช่างเค๊ก': 1,
     'ช่างบั้ม': 2,
     'ช่างนุค': 3,
-    'ช่างนุ้ย': 4,
+    'ช่างนุ้ย': 3,
+    'ช่างเปิ้ล': 4,
     'ช่างเดียว': 5,
-    'ช่างเปิ้ล': 6,
     'ช่างเหน่ง': 99,
   }
 
   return chairOrder[fullName] ?? 50
+}
+
+function getChairSubtitle(chair: ChairConfig, assignedBarbers: ScheduleBarber[]) {
+  const assignedBarberNames = assignedBarbers.map((item) => item.barber.fullName)
+
+  if (assignedBarberNames.includes('ช่างเหน่ง')) {
+    return `แทน ${chair.barberNames.join(' / ')}`
+  }
+
+  if (assignedBarberNames.includes('ช่างบั้ม')) {
+    return 'ผมยาว'
+  }
+
+  return chair.note
+}
+
+function getChairDisplayTitle(chair: ChairConfig, assignedBarbers: ScheduleBarber[]) {
+  if (chair.id === 'chair-3') {
+    return 'ช่างนุค / นุ้ย'
+  }
+
+  return assignedBarbers.length > 0
+    ? assignedBarbers.map((item) => item.barber.fullName).join(' / ')
+    : chair.barberNames.join(' / ')
+}
+
+function getBarberBookingLabel(barber: Barber) {
+  if (barber.fullName === 'ช่างนุ้ย') {
+    return `${barber.fullName} (เก้าอี้ 3 / จองล่วงหน้า)`
+  }
+
+  if (barber.fullName === 'ช่างนุค') {
+    return `${barber.fullName} (เก้าอี้ 3 / ใช้ร่วมกับช่างนุ้ย)`
+  }
+
+  return barber.fullName
 }
 
 function getInitials(value: string) {

@@ -387,9 +387,11 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         var dayEnd = new DateTimeOffset(date.ToDateTime(workingHour.EndTime), ShopUtcOffset);
         var dayStartUtc = dayStart.ToUniversalTime();
         var dayEndUtc = dayEnd.ToUniversalTime();
+        var resourceBarberIds = await GetBookingResourceBarberIds(barberId, cancellationToken);
         var existingBookings = await dbContext.Bookings
             .AsNoTracking()
-            .Where(booking => booking.BarberId == barberId
+            .Where(booking => booking.BarberId.HasValue
+                && resourceBarberIds.Contains(booking.BarberId.Value)
                 && ActiveBookingStatuses.Contains(booking.BookingStatus)
                 && booking.StartAt < dayEndUtc
                 && booking.EndAt > dayStartUtc)
@@ -455,15 +457,37 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             return "Selected time is outside barber working hours.";
         }
 
+        var resourceBarberIds = await GetBookingResourceBarberIds(barberId, cancellationToken);
         var overlaps = await dbContext.Bookings
             .AnyAsync(
-                booking => booking.BarberId == barberId
+                booking => booking.BarberId.HasValue
+                    && resourceBarberIds.Contains(booking.BarberId.Value)
                     && ActiveBookingStatuses.Contains(booking.BookingStatus)
                     && startAtUtc < booking.EndAt
                     && endAtUtc > booking.StartAt,
                 cancellationToken);
 
         return overlaps ? "Selected time overlaps another booking." : null;
+    }
+
+    private async Task<IReadOnlyList<Guid>> GetBookingResourceBarberIds(Guid barberId, CancellationToken cancellationToken)
+    {
+        var barberName = await dbContext.BarberProfiles
+            .AsNoTracking()
+            .Where(barber => barber.Id == barberId)
+            .Select(barber => barber.User.FullName)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (barberName is not ("ช่างนุค" or "ช่างนุ้ย"))
+        {
+            return [barberId];
+        }
+
+        return await dbContext.BarberProfiles
+            .AsNoTracking()
+            .Where(barber => barber.User.FullName == "ช่างนุค" || barber.User.FullName == "ช่างนุ้ย")
+            .Select(barber => barber.Id)
+            .ToListAsync(cancellationToken);
     }
 
     private async Task<bool> IsShopHoliday(DateOnly date, CancellationToken cancellationToken)
