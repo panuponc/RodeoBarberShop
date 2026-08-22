@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
 import './App.css'
 
@@ -73,6 +73,11 @@ const chairConfigs: ChairConfig[] = [
   { id: 'chair-4', label: 'เก้าอี้ 4', note: 'เก้าอี้ประจำ', order: 4, barberNames: ['ช่างเปิ้ล'] },
   { id: 'chair-5', label: 'เก้าอี้ 5', note: 'หน้าทีวี', order: 5, barberNames: ['ช่างเดียว'] },
 ]
+
+const scheduleTimelineStartHour = 10
+const scheduleTimelineEndHour = 21
+const scheduleTimelineMinutes = (scheduleTimelineEndHour - scheduleTimelineStartHour) * 60
+const scheduleHourHeightPx = 96
 
 type AvailabilitySlot = {
   startAt: string
@@ -165,6 +170,13 @@ const nextStatus: Record<string, string> = {
   InService: 'WaitingPayment',
 }
 
+const previousStatus: Record<string, string> = {
+  Confirmed: 'PendingConfirmation',
+  WaitingService: 'Confirmed',
+  InService: 'WaitingService',
+  WaitingPayment: 'InService',
+}
+
 const statusLabels: Record<string, string> = {
   PendingConfirmation: 'รอยืนยัน',
   Confirmed: 'ยืนยันแล้ว',
@@ -249,7 +261,10 @@ function App() {
   const [myBookings, setMyBookings] = useState<Booking[]>([])
   const [customerReceipt, setCustomerReceipt] = useState<Receipt | null>(null)
   const [isStaffBookingFormOpen, setIsStaffBookingFormOpen] = useState(false)
+  const staffBookingFormRef = useRef<HTMLFormElement | null>(null)
   const [scheduleDate, setScheduleDate] = useState(getTodayDate())
+  const [staffBookingContext, setStaffBookingContext] = useState('')
+  const [staffBookingBarberOptions, setStaffBookingBarberOptions] = useState<string[]>([])
   const [staffBookingForm, setStaffBookingForm] = useState({
     guestName: '',
     guestPhoneNumber: '',
@@ -268,18 +283,16 @@ function App() {
   const selectedServices = services.filter((service) => selectedServiceIds.includes(service.id))
   const selectedTotal = selectedServices.reduce((total, service) => total + service.price, 0)
   const canManageStaff = auth?.role === 'Owner' || auth?.role === 'Admin'
+  const staffBookingBarberOptionSet = new Set(staffBookingBarberOptions)
+  const staffBookingSelectableBarbers = staffBookingBarberOptions.length > 0
+    ? barbers.filter((barber) => staffBookingBarberOptionSet.has(barber.id))
+    : barbers
   const scheduleChairs = useMemo(
     () => getScheduleChairsForDate(barbers, barberSchedules, scheduleDate),
     [barberSchedules, barbers, scheduleDate],
   )
   const staffPanelTitle =
     activeStaffPanel === 'queue' ? 'จัดการคิววันนี้' : activeStaffPanel === 'accounts' ? 'บัญชีรับเงินร้าน' : 'จัดการพนักงาน'
-  const staffPanelSubtitle =
-    activeStaffPanel === 'queue'
-      ? 'ติดตามสถานะคิว รับชำระเงิน และออกใบเสร็จ'
-      : activeStaffPanel === 'accounts'
-        ? 'ตั้งค่าบัญชีรับเงินหลักและทดสอบ QR สำหรับหน้าร้าน'
-        : 'เพิ่ม แก้ไข เปิด/ปิดใช้งาน และ reset password ให้ทีมหน้าร้าน'
   const queueSummary = {
     total: queue.length,
     confirmed: queue.filter((booking) => booking.bookingStatus === 'Confirmed' || booking.bookingStatus === 'WaitingService').length,
@@ -500,8 +513,7 @@ function App() {
     }
   }
 
-  async function moveStatus(booking: Booking) {
-    const targetStatus = nextStatus[booking.bookingStatus]
+  async function moveStatus(booking: Booking, targetStatus = nextStatus[booking.bookingStatus]) {
     if (!targetStatus) return
 
     setIsBusy(true)
@@ -833,7 +845,7 @@ function App() {
         throw new Error('กรุณาเลือกวันเวลาในอนาคต')
       }
 
-      const result = await api<Booking>('/api/bookings/staff', {
+      await api<Booking>('/api/bookings/staff', {
         method: 'POST',
         body: JSON.stringify({
           guestName: staffBookingForm.guestName,
@@ -848,6 +860,8 @@ function App() {
 
       const createdBookingDate = staffBookingForm.startAt.slice(0, 10)
       setIsStaffBookingFormOpen(false)
+      setStaffBookingContext('')
+      setStaffBookingBarberOptions([])
       setStaffBookingForm({
         guestName: '',
         guestPhoneNumber: '',
@@ -859,13 +873,55 @@ function App() {
       })
       setScheduleDate(createdBookingDate)
       await refreshQueue(createdBookingDate)
-      setSelectedBooking(result)
+      setSelectedBooking(null)
+      setPaymentSummary(null)
+      setStaffReceipt(null)
       setMessage('เพิ่มการนัดหมายแล้ว')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'เพิ่มการนัดหมายไม่สำเร็จ')
     } finally {
       setIsBusy(false)
     }
+  }
+
+  function openStaffBookingFormForChair(chair: ScheduleChair) {
+    const defaultBookingDate = clampDateToToday(scheduleDate)
+    const workingChairBarbers = chair.barbers.filter((item) => item.isWorkingToday)
+    const optionIds = workingChairBarbers.map((item) => item.barber.id)
+    const defaultBarberId = optionIds.length === 1
+      ? optionIds[0]
+      : optionIds.includes(staffBookingForm.barberId)
+        ? staffBookingForm.barberId
+        : optionIds[0] ?? ''
+
+    setStaffBookingForm((current) => ({
+      ...current,
+      barberId: defaultBarberId,
+      startAt: current.startAt.slice(0, 10) === defaultBookingDate
+        ? current.startAt
+        : getDefaultBookingDateTime(defaultBookingDate),
+    }))
+    setStaffBookingContext(`${chair.title} / ${chair.meta}`)
+    setStaffBookingBarberOptions(optionIds)
+    setIsStaffBookingFormOpen(true)
+  }
+
+  function closeStaffBookingForm() {
+    setIsStaffBookingFormOpen(false)
+    setStaffBookingContext('')
+    setStaffBookingBarberOptions([])
+  }
+
+  function openBookingDetail(booking: Booking) {
+    setSelectedBooking(booking)
+    setPaymentSummary(null)
+    setStaffReceipt(null)
+  }
+
+  function closeBookingDetail() {
+    setSelectedBooking(null)
+    setPaymentSummary(null)
+    setStaffReceipt(null)
   }
 
   function logout() {
@@ -1100,12 +1156,12 @@ function App() {
           <div>
             <p className="eyebrow">Back Office</p>
             <h1>{staffPanelTitle}</h1>
-            <p className="muted">{staffPanelSubtitle}</p>
           </div>
           <div className="backoffice-user">
             <div>
               <strong>{auth.fullName}</strong>
               <small>{auth.role}</small>
+              {message && <small className="session-message">{message}</small>}
             </div>
             <button className="secondary" onClick={logout} type="button">
               Logout
@@ -1113,65 +1169,104 @@ function App() {
           </div>
         </header>
 
-        {message && <p className="notice">{message}</p>}
-
         {activeStaffPanel === 'queue' ? (
         <section className="schedule-layout">
           <div className="schedule-board-panel">
-            <div className="schedule-summary-grid">
-              <SummaryCard label="คิวทั้งหมด" value={`${queueSummary.total}`} />
-              <SummaryCard label="ยืนยันแล้ว" value={`${queueSummary.confirmed}`} tone="blue" />
-              <SummaryCard label="กำลังให้บริการ" value={`${queueSummary.inProgress}`} tone="amber" />
-              <SummaryCard label="เสร็จแล้ว" value={`${queueSummary.completed}`} tone="green" />
-            </div>
-
             <div className="schedule-toolbar">
-              <div>
-                <h2>ตารางงานช่าง</h2>
-                <p className="muted">{formatScheduleDate(parseLocalDate(scheduleDate))} / {queue.length} คิว</p>
-              </div>
               <div className="schedule-toolbar-actions">
                 <div className="schedule-date-controls">
-                  <button className="secondary" onClick={() => setScheduleDate(addDays(scheduleDate, -1))} type="button">
-                    ก่อนหน้า
+                  <button className="secondary schedule-nav-button" aria-label="ก่อนหน้า" onClick={() => setScheduleDate(addDays(scheduleDate, -1))} type="button">
+                    ←
                   </button>
-                  <input
-                    aria-label="เลือกวันที่ตารางงาน"
-                    type="date"
-                    value={scheduleDate}
-                    onChange={(event) => setScheduleDate(event.target.value)}
-                  />
-                  <button className="secondary" onClick={() => setScheduleDate(addDays(scheduleDate, 1))} type="button">
-                    ถัดไป
+                  <label className="schedule-date-picker">
+                    <span>{formatToolbarDate(parseLocalDate(scheduleDate))}</span>
+                    <input
+                      aria-label="เลือกวันที่ตารางงาน"
+                      type="date"
+                      value={scheduleDate}
+                      onChange={(event) => setScheduleDate(event.target.value)}
+                    />
+                  </label>
+                  <button className="secondary schedule-nav-button" aria-label="ถัดไป" onClick={() => setScheduleDate(addDays(scheduleDate, 1))} type="button">
+                    →
                   </button>
                   <button className="secondary" onClick={() => setScheduleDate(getTodayDate())} type="button">
                     วันนี้
                   </button>
                 </div>
-                <button onClick={() => {
-                  const defaultBookingDate = clampDateToToday(scheduleDate)
-                  setStaffBookingForm((current) => ({
-                    ...current,
-                    startAt: current.startAt.slice(0, 10) === defaultBookingDate
-                      ? current.startAt
-                      : getDefaultBookingDateTime(defaultBookingDate),
-                  }))
-                  setIsStaffBookingFormOpen((current) => !current)
-                }} type="button">
-                  {isStaffBookingFormOpen ? 'ปิดฟอร์ม' : '+ เพิ่มการนัดหมาย'}
-                </button>
-                <button className="secondary" disabled={isBusy} onClick={() => {
-                  void refreshQueue(scheduleDate)
-                  void refreshBarbers()
-                  void refreshServices()
-                }} type="button">
-                  Refresh
-                </button>
+                <div className="schedule-primary-actions">
+                  <button className="secondary" disabled={isBusy} onClick={() => {
+                    void refreshQueue(scheduleDate)
+                    void refreshBarbers()
+                    void refreshServices()
+                  }} type="button">
+                    Refresh
+                  </button>
+                  <button className="primary-action" onClick={() => {
+                    const defaultBookingDate = clampDateToToday(scheduleDate)
+                    setStaffBookingContext('')
+                    setStaffBookingBarberOptions([])
+                    setStaffBookingForm((current) => ({
+                      ...current,
+                      startAt: current.startAt.slice(0, 10) === defaultBookingDate
+                        ? current.startAt
+                        : getDefaultBookingDateTime(defaultBookingDate),
+                    }))
+                    setIsStaffBookingFormOpen((current) => !current)
+                  }} type="button">
+                    {isStaffBookingFormOpen ? 'ปิดฟอร์ม' : '+ เพิ่มการนัดหมาย'}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {isStaffBookingFormOpen && (
-              <form className="staff-booking-form" onSubmit={createStaffBooking}>
+            <div
+              className="schedule-board"
+              style={getScheduleBoardGridStyle(scheduleChairs)}
+            >
+              {barbers.length === 0 ? (
+                <p className="empty-state">ยังไม่มีช่างที่เปิดรับจองออนไลน์</p>
+              ) : (
+                <>
+                  <ScheduleTimeColumn />
+                  {scheduleChairs.map((chair) => (
+                    <ChairScheduleColumn
+                      bookings={queue.filter((booking) => chair.barbers.some(({ barber }) => booking.barberId === barber.id))}
+                      chair={chair}
+                      key={chair.id}
+                      onCreateBooking={openStaffBookingFormForChair}
+                      onSelectBooking={openBookingDetail}
+                      selectedBookingId={selectedBooking?.id}
+                    />
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+
+          {isStaffBookingFormOpen && (
+            <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                closeStaffBookingForm()
+              }
+            }}>
+              <form className="staff-booking-form booking-modal" onSubmit={createStaffBooking} ref={staffBookingFormRef}>
+                <div className="booking-modal-header">
+                  <div>
+                    <p className="eyebrow">เพิ่มการจองคิว</p>
+                    <h3>จองคิวหน้าร้าน</h3>
+                  </div>
+                  <button className="secondary" onClick={closeStaffBookingForm} type="button">
+                    ปิด
+                  </button>
+                </div>
+
+                {staffBookingContext && (
+                  <div className="staff-booking-context">
+                    <span>กำลังเพิ่มคิวให้</span>
+                    <strong>{staffBookingContext}</strong>
+                  </div>
+                )}
                 <label>
                   ชื่อลูกค้า
                   <input
@@ -1196,11 +1291,12 @@ function App() {
                 <label>
                   ช่าง
                   <select
+                    disabled={staffBookingBarberOptions.length === 1}
                     value={staffBookingForm.barberId}
                     onChange={(event) => setStaffBookingForm({ ...staffBookingForm, barberId: event.target.value })}
                   >
                     <option value="">เลือกช่าง</option>
-                    {barbers.map((barber) => (
+                    {staffBookingSelectableBarbers.map((barber) => (
                       <option key={barber.id} value={barber.id}>
                         {getBarberBookingLabel(barber)}
                       </option>
@@ -1256,43 +1352,36 @@ function App() {
                   <button disabled={isBusy} type="submit">
                     บันทึกการนัดหมาย
                   </button>
-                  <button className="secondary" onClick={() => setIsStaffBookingFormOpen(false)} type="button">
+                  <button className="secondary" onClick={closeStaffBookingForm} type="button">
                     ยกเลิก
                   </button>
                 </div>
               </form>
-            )}
-
-            <div
-              className="schedule-board"
-              style={getScheduleBoardGridStyle(scheduleChairs)}
-            >
-              {barbers.length === 0 ? (
-                <p className="empty-state">ยังไม่มีช่างที่เปิดรับจองออนไลน์</p>
-              ) : (
-                scheduleChairs.map((chair) => (
-                  <ChairScheduleColumn
-                    bookings={queue.filter((booking) => chair.barbers.some(({ barber }) => booking.barberId === barber.id))}
-                    chair={chair}
-                    key={chair.id}
-                    onSelectBooking={setSelectedBooking}
-                    selectedBookingId={selectedBooking?.id}
-                  />
-                ))
-              )}
             </div>
-          </div>
+          )}
 
           <aside className="detail-panel schedule-detail-panel">
             <section className="schedule-side-summary">
               <h3>สรุปวันที่เลือก</h3>
               <div>
+                <span>คิวทั้งหมด</span>
+                <strong>{queueSummary.total}</strong>
+              </div>
+              <div>
                 <span>รอยืนยัน</span>
                 <strong>{queueSummary.pending}</strong>
               </div>
               <div>
+                <span>ยืนยันแล้ว</span>
+                <strong>{queueSummary.confirmed}</strong>
+              </div>
+              <div>
                 <span>กำลังให้บริการ/รอชำระ</span>
                 <strong>{queueSummary.inProgress}</strong>
+              </div>
+              <div>
+                <span>เสร็จแล้ว</span>
+                <strong>{queueSummary.completed}</strong>
               </div>
               <div>
                 <span>รายได้ที่รับแล้ว</span>
@@ -1308,17 +1397,32 @@ function App() {
               <span><i className="legend-dot payment" /> รอชำระเงิน</span>
               <span><i className="legend-dot done" /> เสร็จสิ้น</span>
             </section>
+          </aside>
 
-            {selectedBooking ? (
-              <>
-                <div className="panel-heading">
-                  <h2>{selectedBooking.customerName}</h2>
-                  <span className={`status-pill status-${selectedBooking.bookingStatus}`}>
-                    {statusLabels[selectedBooking.bookingStatus]}
-                  </span>
+          {selectedBooking && (
+            <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                closeBookingDetail()
+              }
+            }}>
+              <article className="detail-panel booking-detail-modal" role="dialog" aria-modal="true" aria-labelledby="booking-detail-title">
+                <div className="booking-detail-header">
+                  <div>
+                    <span className="modal-eyebrow">รายละเอียดคิว</span>
+                    <h2 id="booking-detail-title">{selectedBooking.customerName ?? 'Walk-in customer'}</h2>
+                    <small>{selectedBooking.bookingNumber}</small>
+                  </div>
+                  <div className="booking-detail-header-actions">
+                    <span className={`status-pill status-${selectedBooking.bookingStatus}`}>
+                      {statusLabels[selectedBooking.bookingStatus]}
+                    </span>
+                    <button className="icon-button" aria-label="ปิดรายละเอียดคิว" onClick={closeBookingDetail} type="button">
+                      ×
+                    </button>
+                  </div>
                 </div>
 
-                <dl className="summary-list">
+                <dl className="booking-detail-grid">
                   <div>
                     <dt>ช่าง</dt>
                     <dd>{selectedBooking.barberName}</dd>
@@ -1333,18 +1437,40 @@ function App() {
                     <dt>ยอดชำระ</dt>
                     <dd>{formatMoney(selectedBooking.totalAmount)}</dd>
                   </div>
+                  <div>
+                    <dt>ระยะเวลา</dt>
+                    <dd>
+                      {selectedBooking.services.reduce((total, service) => total + service.durationMinutes * service.quantity, 0)} นาที
+                    </dd>
+                  </div>
                 </dl>
 
-                <ServiceList services={selectedBooking.services} />
+                <section className="booking-detail-services">
+                  <div className="booking-detail-section-title">
+                    <h3>บริการที่เลือก</h3>
+                    <span>{selectedBooking.services.length} รายการ</span>
+                  </div>
+                  <ServiceList services={selectedBooking.services} />
+                </section>
 
-                <div className="action-row">
+                <div className="booking-detail-actions">
+                  {previousStatus[selectedBooking.bookingStatus] && (
+                    <button
+                      className="secondary status-back-button"
+                      disabled={isBusy}
+                      onClick={() => moveStatus(selectedBooking, previousStatus[selectedBooking.bookingStatus])}
+                      type="button"
+                    >
+                      ย้อนกลับเป็น {statusLabels[previousStatus[selectedBooking.bookingStatus]]}
+                    </button>
+                  )}
                   {nextStatus[selectedBooking.bookingStatus] && (
-                    <button disabled={isBusy} onClick={() => moveStatus(selectedBooking)} type="button">
+                    <button className="status-next-button" disabled={isBusy} onClick={() => moveStatus(selectedBooking)} type="button">
                       เปลี่ยนเป็น {statusLabels[nextStatus[selectedBooking.bookingStatus]]}
                     </button>
                   )}
                   {selectedBooking.bookingStatus === 'WaitingPayment' && (
-                    <button className="secondary" disabled={isBusy} onClick={() => loadPaymentSummary(selectedBooking)} type="button">
+                    <button className="status-next-button" disabled={isBusy} onClick={() => loadPaymentSummary(selectedBooking)} type="button">
                       แสดง QR
                     </button>
                   )}
@@ -1367,11 +1493,9 @@ function App() {
                 )}
 
                 {staffReceipt && <ReceiptBox receipt={staffReceipt} />}
-              </>
-            ) : (
-              <p className="empty-state">เลือกคิวเพื่อดูรายละเอียด</p>
-            )}
-          </aside>
+              </article>
+            </div>
+          )}
         </section>
       ) : activeStaffPanel === 'accounts' ? (
         <section className="accounts-grid">
@@ -1867,14 +1991,35 @@ function PasswordInput({
   )
 }
 
+function ScheduleTimeColumn() {
+  return (
+    <aside className="schedule-time-column" aria-label="เวลา">
+      <div className="schedule-time-column-header">เวลา</div>
+      <div className="schedule-time-axis">
+        {Array.from({ length: scheduleTimelineEndHour - scheduleTimelineStartHour + 1 }, (_, index) => {
+          const hour = scheduleTimelineStartHour + index
+
+          return (
+            <span key={hour} style={{ top: `${index * scheduleHourHeightPx + 6}px` }}>
+              {String(hour).padStart(2, '0')}:00
+            </span>
+          )
+        })}
+      </div>
+    </aside>
+  )
+}
+
 function ChairScheduleColumn({
   bookings,
   chair,
+  onCreateBooking,
   onSelectBooking,
   selectedBookingId,
 }: {
   chair: ScheduleChair
   bookings: Booking[]
+  onCreateBooking: (chair: ScheduleChair) => void
   onSelectBooking: (booking: Booking) => void
   selectedBookingId?: string
 }) {
@@ -1909,7 +2054,19 @@ function ChairScheduleColumn({
         </div>
       </header>
 
+      {chair.isWorkingToday && (
+        <button className="schedule-add-booking" onClick={() => onCreateBooking(chair)} type="button">
+          + จองคิว
+        </button>
+      )}
+
       <div className="barber-column-body">
+        <div className="schedule-timeline">
+          <div className="schedule-hour-lines" aria-hidden="true">
+            {Array.from({ length: scheduleTimelineEndHour - scheduleTimelineStartHour + 1 }, (_, index) => (
+              <span key={scheduleTimelineStartHour + index} />
+            ))}
+          </div>
         {sortedBookings.length === 0 ? (
           <div className="empty-schedule-slot">
             <span>✂</span>
@@ -1917,35 +2074,48 @@ function ChairScheduleColumn({
             <small>{chair.isWorkingToday ? 'พร้อมรับลูกค้าคิวถัดไป' : 'ไม่มีรอบรับคิววันนี้'}</small>
           </div>
         ) : (
-          sortedBookings.map((booking) => (
-            <button
-              className={selectedBookingId === booking.id ? 'schedule-card selected' : `schedule-card status-border-${booking.bookingStatus}`}
-              key={booking.id}
-              onClick={() => onSelectBooking(booking)}
-              type="button"
-            >
-              <span className="schedule-time">
-                {formatTime(booking.startAt)} - {formatTime(booking.endAt)}
-              </span>
-              <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
-              {(chair.isShared || chair.hasSubstitute) && <em>{booking.barberName}</em>}
-              <small>{booking.services.map((service) => service.serviceName).join(' + ')}</small>
-              <span className={`status-pill status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
-            </button>
-          ))
+          <>
+            {sortedBookings.map((booking) => {
+              const placement = getBookingTimelinePlacement(booking)
+
+              return (
+                <button
+                  className={selectedBookingId === booking.id ? 'schedule-card selected' : `schedule-card status-border-${booking.bookingStatus}`}
+                  key={booking.id}
+                  onClick={() => onSelectBooking(booking)}
+                  style={placement}
+                  type="button"
+                >
+                  <span className="schedule-time">{formatTime(booking.startAt)} - {formatTime(booking.endAt)}</span>
+                  <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
+                  {(chair.isShared || chair.hasSubstitute) && <em>{booking.barberName}</em>}
+                  <small>{booking.services.map((service) => service.serviceName).join(' + ')}</small>
+                  <span className={`schedule-card-status status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
+                </button>
+              )
+            })}
+          </>
         )}
+        </div>
       </div>
     </article>
   )
 }
 
-function SummaryCard({ label, tone, value }: { label: string; tone?: 'amber' | 'blue' | 'green'; value: string }) {
-  return (
-    <article className={tone ? `summary-card ${tone}` : 'summary-card'}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  )
+function getBookingTimelinePlacement(booking: Booking): CSSProperties {
+  const start = new Date(booking.startAt)
+  const end = new Date(booking.endAt)
+  const startMinutes = start.getHours() * 60 + start.getMinutes()
+  const endMinutes = end.getHours() * 60 + end.getMinutes()
+  const offsetMinutes = Math.max(0, startMinutes - scheduleTimelineStartHour * 60)
+  const durationMinutes = Math.max(30, Math.min(scheduleTimelineMinutes - offsetMinutes, endMinutes - startMinutes))
+  const top = (offsetMinutes / 60) * scheduleHourHeightPx
+  const height = Math.max(88, (durationMinutes / 60) * scheduleHourHeightPx - 8)
+
+  return {
+    top: `${top}px`,
+    height: `${height}px`,
+  }
 }
 
 function Header({
@@ -2025,11 +2195,24 @@ function formatDateTime(value: string) {
   }).format(new Date(value))
 }
 
-function formatScheduleDate(value: Date) {
-  return new Intl.DateTimeFormat('th-TH', {
-    dateStyle: 'full',
-    timeZone: 'Asia/Bangkok',
-  }).format(value)
+function formatToolbarDate(value: Date) {
+  const weekdays = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์']
+  const months = [
+    'มกราคม',
+    'กุมภาพันธ์',
+    'มีนาคม',
+    'เมษายน',
+    'พฤษภาคม',
+    'มิถุนายน',
+    'กรกฎาคม',
+    'สิงหาคม',
+    'กันยายน',
+    'ตุลาคม',
+    'พฤศจิกายน',
+    'ธันวาคม',
+  ]
+
+  return `${weekdays[value.getDay()]} ${value.getDate()} ${months[value.getMonth()]} ${value.getFullYear() + 543}`
 }
 
 function getWorkingHourForDate(schedule: BarberSchedule | undefined, dateValue: string) {
@@ -2144,7 +2327,7 @@ function getScheduleBoardGridStyle(scheduleChairs: ScheduleChair[]): CSSProperti
   })
 
   return {
-    gridTemplateColumns: columns.join(' '),
+    gridTemplateColumns: ['44px', ...columns].join(' '),
   }
 }
 

@@ -222,7 +222,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             SubtotalAmount = subtotalAmount,
             DiscountAmount = 0,
             TotalAmount = subtotalAmount,
-            BookingStatus = BookingStatus.Confirmed,
+            BookingStatus = BookingStatus.PendingConfirmation,
             PaymentStatus = PaymentStatus.Unpaid,
             CustomerNote = NormalizeOptionalText(request.CustomerNote),
             CreatedByUserId = GetCurrentUserId(),
@@ -431,8 +431,9 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             return "Booking start time must be in the future.";
         }
 
-        var requestedEndAt = requestedStartAt.Add(endAtUtc - startAtUtc);
-        var bookingDate = DateOnly.FromDateTime(requestedStartAt.DateTime);
+        var requestedStartAtLocal = requestedStartAt.ToOffset(ShopUtcOffset);
+        var requestedEndAtLocal = requestedStartAtLocal.Add(endAtUtc - startAtUtc);
+        var bookingDate = DateOnly.FromDateTime(requestedStartAtLocal.DateTime);
         if (await IsShopHoliday(bookingDate, cancellationToken))
         {
             return "Selected date is a shop holiday.";
@@ -442,7 +443,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 workingHour => workingHour.BarberId == barberId
-                    && workingHour.DayOfWeek == (int)requestedStartAt.DayOfWeek
+                    && workingHour.DayOfWeek == (int)requestedStartAtLocal.DayOfWeek
                     && workingHour.IsWorkingDay,
                 cancellationToken);
 
@@ -451,8 +452,8 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             return "Selected barber is not working at the selected date.";
         }
 
-        if (requestedStartAt.TimeOfDay < workingHour.StartTime.ToTimeSpan()
-            || requestedEndAt.TimeOfDay > workingHour.EndTime.ToTimeSpan())
+        if (requestedStartAtLocal.TimeOfDay < workingHour.StartTime.ToTimeSpan()
+            || requestedEndAtLocal.TimeOfDay > workingHour.EndTime.ToTimeSpan())
         {
             return "Selected time is outside barber working hours.";
         }

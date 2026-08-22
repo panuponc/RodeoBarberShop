@@ -103,6 +103,22 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
             booking.ServiceCompletedAt ??= now;
         }
 
+        if (newStatus == BookingStatus.PendingConfirmation || newStatus == BookingStatus.Confirmed)
+        {
+            booking.CheckedInAt = null;
+            booking.ServiceStartedAt = null;
+            booking.ServiceCompletedAt = null;
+        }
+        else if (newStatus == BookingStatus.WaitingService)
+        {
+            booking.ServiceStartedAt = null;
+            booking.ServiceCompletedAt = null;
+        }
+        else if (newStatus == BookingStatus.InService)
+        {
+            booking.ServiceCompletedAt = null;
+        }
+
         var queueEvent = new QueueEvent
         {
             Id = Guid.NewGuid(),
@@ -193,10 +209,10 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
         var isValid = oldStatus switch
         {
             BookingStatus.PendingConfirmation => newStatus is BookingStatus.Confirmed or BookingStatus.Cancelled or BookingStatus.NoShow,
-            BookingStatus.Confirmed => newStatus is BookingStatus.WaitingService or BookingStatus.Cancelled or BookingStatus.NoShow,
-            BookingStatus.WaitingService => newStatus is BookingStatus.InService or BookingStatus.Cancelled or BookingStatus.NoShow,
-            BookingStatus.InService => newStatus is BookingStatus.WaitingPayment or BookingStatus.Cancelled,
-            BookingStatus.WaitingPayment => newStatus is BookingStatus.Completed or BookingStatus.Cancelled,
+            BookingStatus.Confirmed => newStatus is BookingStatus.PendingConfirmation or BookingStatus.WaitingService or BookingStatus.Cancelled or BookingStatus.NoShow,
+            BookingStatus.WaitingService => newStatus is BookingStatus.Confirmed or BookingStatus.InService or BookingStatus.Cancelled or BookingStatus.NoShow,
+            BookingStatus.InService => newStatus is BookingStatus.WaitingService or BookingStatus.WaitingPayment or BookingStatus.Cancelled,
+            BookingStatus.WaitingPayment => newStatus is BookingStatus.InService or BookingStatus.Completed or BookingStatus.Cancelled,
             _ => false
         };
 
