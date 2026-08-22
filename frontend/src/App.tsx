@@ -1158,10 +1158,10 @@ function App() {
             <h1>{staffPanelTitle}</h1>
           </div>
           <div className="backoffice-user">
+            <span className="backoffice-user-avatar">{getInitials(auth.fullName)}</span>
             <div>
               <strong>{auth.fullName}</strong>
-              <small>{auth.role}</small>
-              {message && <small className="session-message">{message}</small>}
+              <small>เข้าสู่ระบบเป็น {auth.role}</small>
             </div>
             <button className="secondary" onClick={logout} type="button">
               Logout
@@ -1220,25 +1220,31 @@ function App() {
               </div>
             </div>
 
-            <div
-              className="schedule-board"
-              style={getScheduleBoardGridStyle(scheduleChairs)}
-            >
+            <div className="schedule-board">
               {barbers.length === 0 ? (
                 <p className="empty-state">ยังไม่มีช่างที่เปิดรับจองออนไลน์</p>
               ) : (
                 <>
-                  <ScheduleTimeColumn />
+                  <div className="schedule-fixed-grid" style={getScheduleBoardGridStyle(scheduleChairs)}>
+                    <ScheduleTimeColumnHeader />
+                    {scheduleChairs.map((chair) => (
+                      <ChairScheduleHeader chair={chair} key={`${chair.id}-header`} onCreateBooking={openStaffBookingFormForChair} />
+                    ))}
+                  </div>
+                  <div className="schedule-scroll-area">
+                    <div className="schedule-scroll-grid" style={getScheduleBoardGridStyle(scheduleChairs)}>
+                      <ScheduleTimeAxis />
                   {scheduleChairs.map((chair) => (
-                    <ChairScheduleColumn
+                    <ChairScheduleTimeline
                       bookings={queue.filter((booking) => chair.barbers.some(({ barber }) => booking.barberId === barber.id))}
                       chair={chair}
-                      key={chair.id}
-                      onCreateBooking={openStaffBookingFormForChair}
+                      key={`${chair.id}-timeline`}
                       onSelectBooking={openBookingDetail}
                       selectedBookingId={selectedBooking?.id}
                     />
                   ))}
+                    </div>
+                  </div>
                 </>
               )}
             </div>
@@ -1363,27 +1369,11 @@ function App() {
           <aside className="detail-panel schedule-detail-panel">
             <section className="schedule-side-summary">
               <h3>สรุปวันที่เลือก</h3>
-              <div>
+              <div className="summary-highlight">
                 <span>คิวทั้งหมด</span>
                 <strong>{queueSummary.total}</strong>
               </div>
-              <div>
-                <span>รอยืนยัน</span>
-                <strong>{queueSummary.pending}</strong>
-              </div>
-              <div>
-                <span>ยืนยันแล้ว</span>
-                <strong>{queueSummary.confirmed}</strong>
-              </div>
-              <div>
-                <span>กำลังให้บริการ/รอชำระ</span>
-                <strong>{queueSummary.inProgress}</strong>
-              </div>
-              <div>
-                <span>เสร็จแล้ว</span>
-                <strong>{queueSummary.completed}</strong>
-              </div>
-              <div>
+              <div className="summary-highlight">
                 <span>รายได้ที่รับแล้ว</span>
                 <strong>{formatMoney(queueSummary.revenue)}</strong>
               </div>
@@ -1391,11 +1381,10 @@ function App() {
 
             <section className="status-legend">
               <h3>สถานะคิว</h3>
-              <span><i className="legend-dot pending" /> รอยืนยัน</span>
-              <span><i className="legend-dot confirmed" /> ยืนยัน/มาถึงร้าน</span>
-              <span><i className="legend-dot progress" /> กำลังให้บริการ</span>
-              <span><i className="legend-dot payment" /> รอชำระเงิน</span>
-              <span><i className="legend-dot done" /> เสร็จสิ้น</span>
+              <span><i className="legend-dot pending" /> รอยืนยัน <strong>{queueSummary.pending}</strong></span>
+              <span><i className="legend-dot confirmed" /> ยืนยัน/มาถึงร้าน <strong>{queueSummary.confirmed}</strong></span>
+              <span><i className="legend-dot progress" /> กำลังให้บริการ/รอชำระ <strong>{queueSummary.inProgress}</strong></span>
+              <span><i className="legend-dot done" /> เสร็จสิ้น <strong>{queueSummary.completed}</strong></span>
             </section>
           </aside>
 
@@ -1991,75 +1980,90 @@ function PasswordInput({
   )
 }
 
-function ScheduleTimeColumn() {
-  return (
-    <aside className="schedule-time-column" aria-label="เวลา">
-      <div className="schedule-time-column-header">เวลา</div>
-      <div className="schedule-time-axis">
-        {Array.from({ length: scheduleTimelineEndHour - scheduleTimelineStartHour + 1 }, (_, index) => {
-          const hour = scheduleTimelineStartHour + index
+function ScheduleTimeColumnHeader() {
+  return <div className="schedule-time-column-header">เวลา</div>
+}
 
-          return (
-            <span key={hour} style={{ top: `${index * scheduleHourHeightPx + 6}px` }}>
-              {String(hour).padStart(2, '0')}:00
-            </span>
-          )
-        })}
-      </div>
+function ScheduleTimeAxis() {
+  return (
+    <aside className="schedule-time-axis" aria-label="เวลา">
+      {Array.from({ length: scheduleTimelineEndHour - scheduleTimelineStartHour + 1 }, (_, index) => {
+        const hour = scheduleTimelineStartHour + index
+
+        return (
+          <span key={hour} style={{ top: `${index * scheduleHourHeightPx + 6}px` }}>
+            {String(hour).padStart(2, '0')}:00
+          </span>
+        )
+      })}
     </aside>
   )
 }
 
-function ChairScheduleColumn({
-  bookings,
+function ChairScheduleHeader({
   chair,
   onCreateBooking,
+}: {
+  chair: ScheduleChair
+  onCreateBooking: (chair: ScheduleChair) => void
+}) {
+  const headerClassName = [
+    'barber-column-header',
+    chair.isWorkingToday ? '' : 'off-day',
+    chair.isShared ? 'shared-chair' : '',
+  ].filter(Boolean).join(' ')
+
+  return (
+    <header className={headerClassName}>
+      <div className="barber-avatar-wrap">
+        <div className="barber-avatar">{getInitials(chair.title)}</div>
+        <span className={chair.isWorkingToday ? 'availability-dot available' : 'availability-dot'} />
+      </div>
+      <div>
+        <strong>{chair.title}</strong>
+        <small>
+          {chair.isWorkingToday ? (
+            <>
+              <span>{chair.meta}</span>
+              <span className="chair-note">
+                <span>{chair.subtitle}</span>
+              </span>
+            </>
+          ) : (
+            'ไม่อยู่ร้านวันนี้'
+          )}
+        </small>
+      </div>
+      {chair.isWorkingToday && (
+        <button className="schedule-add-booking" onClick={() => onCreateBooking(chair)} type="button">
+          + จอง
+        </button>
+      )}
+    </header>
+  )
+}
+
+function ChairScheduleTimeline({
+  bookings,
+  chair,
   onSelectBooking,
   selectedBookingId,
 }: {
   chair: ScheduleChair
   bookings: Booking[]
-  onCreateBooking: (chair: ScheduleChair) => void
   onSelectBooking: (booking: Booking) => void
   selectedBookingId?: string
 }) {
   const sortedBookings = [...bookings].sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())
   const columnClassName = [
     'barber-column',
+    'barber-column-timeline',
     chair.isWorkingToday ? '' : 'off-day',
     chair.isShared ? 'shared-chair' : '',
   ].filter(Boolean).join(' ')
 
   return (
     <article className={columnClassName}>
-      <header className="barber-column-header">
-        <div className="barber-avatar-wrap">
-          <div className="barber-avatar">{getInitials(chair.title)}</div>
-          <span className={chair.isWorkingToday ? 'availability-dot available' : 'availability-dot'} />
-        </div>
-        <div>
-          <strong>{chair.title}</strong>
-          <small>
-            {chair.isWorkingToday ? (
-              <>
-                <span>{chair.meta}</span>
-                <span className="chair-note">
-                  <span>{chair.subtitle}</span>
-                </span>
-              </>
-            ) : (
-              'ไม่อยู่ร้านวันนี้'
-            )}
-          </small>
-        </div>
-      </header>
-
-      {chair.isWorkingToday && (
-        <button className="schedule-add-booking" onClick={() => onCreateBooking(chair)} type="button">
-          + จองคิว
-        </button>
-      )}
-
       <div className="barber-column-body">
         <div className="schedule-timeline">
           <div className="schedule-hour-lines" aria-hidden="true">
@@ -2067,13 +2071,7 @@ function ChairScheduleColumn({
               <span key={scheduleTimelineStartHour + index} />
             ))}
           </div>
-        {sortedBookings.length === 0 ? (
-          <div className="empty-schedule-slot">
-            <span>✂</span>
-            <strong>{chair.isWorkingToday ? 'ว่าง' : 'ไม่อยู่ร้าน'}</strong>
-            <small>{chair.isWorkingToday ? 'พร้อมรับลูกค้าคิวถัดไป' : 'ไม่มีรอบรับคิววันนี้'}</small>
-          </div>
-        ) : (
+        {sortedBookings.length > 0 && (
           <>
             {sortedBookings.map((booking) => {
               const placement = getBookingTimelinePlacement(booking)
@@ -2320,10 +2318,10 @@ function getScheduleChairsForDate(
 function getScheduleBoardGridStyle(scheduleChairs: ScheduleChair[]): CSSProperties {
   const columns = scheduleChairs.map((chair) => {
     if (chair.isWorkingToday) {
-      return 'minmax(150px, 1fr)'
+      return 'minmax(170px, 1fr)'
     }
 
-    return chair.isShared ? '104px' : '76px'
+    return chair.isShared ? '112px' : '84px'
   })
 
   return {
