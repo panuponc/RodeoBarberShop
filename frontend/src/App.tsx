@@ -262,7 +262,10 @@ function App() {
   const [customerReceipt, setCustomerReceipt] = useState<Receipt | null>(null)
   const [isStaffBookingFormOpen, setIsStaffBookingFormOpen] = useState(false)
   const staffBookingFormRef = useRef<HTMLFormElement | null>(null)
+  const scheduleDatePickerRef = useRef<HTMLDivElement | null>(null)
   const [scheduleDate, setScheduleDate] = useState(getTodayDate())
+  const [isScheduleDatePickerOpen, setIsScheduleDatePickerOpen] = useState(false)
+  const [scheduleCalendarMonth, setScheduleCalendarMonth] = useState(getMonthKey(getTodayDate()))
   const [staffBookingContext, setStaffBookingContext] = useState('')
   const [staffBookingBarberOptions, setStaffBookingBarberOptions] = useState<string[]>([])
   const [staffBookingForm, setStaffBookingForm] = useState({
@@ -303,6 +306,18 @@ function App() {
       .filter((booking) => booking.paymentStatus === 'Paid' || booking.bookingStatus === 'Completed')
       .reduce((total, booking) => total + booking.totalAmount, 0),
   }
+  const scheduleCalendarDays = useMemo(() => getCalendarDays(scheduleCalendarMonth), [scheduleCalendarMonth])
+
+  function openScheduleDatePicker() {
+    setScheduleCalendarMonth(getMonthKey(scheduleDate))
+    setIsScheduleDatePickerOpen((current) => !current)
+  }
+
+  function selectScheduleDate(dateValue: string) {
+    setScheduleDate(dateValue)
+    setScheduleCalendarMonth(getMonthKey(dateValue))
+    setIsScheduleDatePickerOpen(false)
+  }
 
   useEffect(() => {
     if (!auth) return
@@ -327,6 +342,22 @@ function App() {
     void refreshQueue(scheduleDate)
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleDate])
+
+  useEffect(() => {
+    if (!isScheduleDatePickerOpen) return undefined
+
+    function closeDatePickerOnOutsideClick(event: globalThis.MouseEvent) {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (scheduleDatePickerRef.current?.contains(target)) return
+
+      setIsScheduleDatePickerOpen(false)
+    }
+
+    document.addEventListener('mousedown', closeDatePickerOnOutsideClick)
+
+    return () => document.removeEventListener('mousedown', closeDatePickerOnOutsideClick)
+  }, [isScheduleDatePickerOpen])
 
   async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(path, {
@@ -1178,15 +1209,56 @@ function App() {
                   <button className="secondary schedule-nav-button" aria-label="ก่อนหน้า" onClick={() => setScheduleDate(addDays(scheduleDate, -1))} type="button">
                     ←
                   </button>
-                  <label className="schedule-date-picker">
-                    <span>{formatToolbarDate(parseLocalDate(scheduleDate))}</span>
-                    <input
-                      aria-label="เลือกวันที่ตารางงาน"
-                      type="date"
-                      value={scheduleDate}
-                      onChange={(event) => setScheduleDate(event.target.value)}
-                    />
-                  </label>
+                  <div className="schedule-date-picker-wrap" ref={scheduleDatePickerRef}>
+                    <button
+                      aria-expanded={isScheduleDatePickerOpen}
+                      className={`schedule-date-picker ${isScheduleDatePickerOpen ? 'open' : ''}`}
+                      onClick={openScheduleDatePicker}
+                      type="button"
+                    >
+                      <span className="schedule-date-text">{formatToolbarDate(parseLocalDate(scheduleDate))}</span>
+                      <span className="schedule-date-icon" aria-hidden="true">{isScheduleDatePickerOpen ? '▴' : '▾'}</span>
+                    </button>
+                    {isScheduleDatePickerOpen && (
+                      <div className="schedule-calendar-popover">
+                        <div className="schedule-calendar-header">
+                          <button
+                            aria-label="เดือนก่อนหน้า"
+                            className="icon-button schedule-calendar-arrow previous"
+                            onClick={() => setScheduleCalendarMonth(addMonths(scheduleCalendarMonth, -1))}
+                            type="button"
+                          />
+                          <strong>{formatCalendarMonth(scheduleCalendarMonth)}</strong>
+                          <button
+                            aria-label="เดือนถัดไป"
+                            className="icon-button schedule-calendar-arrow next"
+                            onClick={() => setScheduleCalendarMonth(addMonths(scheduleCalendarMonth, 1))}
+                            type="button"
+                          />
+                        </div>
+                        <div className="schedule-calendar-weekdays" aria-hidden="true">
+                          {['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'].map((day) => <span key={day}>{day}</span>)}
+                        </div>
+                        <div className="schedule-calendar-grid">
+                          {scheduleCalendarDays.map((day) => (
+                            <button
+                              className={[
+                                'schedule-calendar-day',
+                                day.isOutsideMonth ? 'muted' : '',
+                                day.dateValue === scheduleDate ? 'selected' : '',
+                                day.dateValue === getTodayDate() ? 'today' : '',
+                              ].filter(Boolean).join(' ')}
+                              key={day.dateValue}
+                              onClick={() => selectScheduleDate(day.dateValue)}
+                              type="button"
+                            >
+                              {day.date.getDate()}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <button className="secondary schedule-nav-button" aria-label="ถัดไป" onClick={() => setScheduleDate(addDays(scheduleDate, 1))} type="button">
                     →
                   </button>
@@ -2213,6 +2285,26 @@ function formatToolbarDate(value: Date) {
   return `${weekdays[value.getDay()]} ${value.getDate()} ${months[value.getMonth()]} ${value.getFullYear() + 543}`
 }
 
+function formatCalendarMonth(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number)
+  const months = [
+    'มกราคม',
+    'กุมภาพันธ์',
+    'มีนาคม',
+    'เมษายน',
+    'พฤษภาคม',
+    'มิถุนายน',
+    'กรกฎาคม',
+    'สิงหาคม',
+    'กันยายน',
+    'ตุลาคม',
+    'พฤศจิกายน',
+    'ธันวาคม',
+  ]
+
+  return `${months[month - 1]} ${year + 543}`
+}
+
 function getWorkingHourForDate(schedule: BarberSchedule | undefined, dateValue: string) {
   const dayOfWeek = parseLocalDate(dateValue).getDay()
 
@@ -2411,6 +2503,35 @@ function getTomorrowDate() {
 
 function getTodayDate() {
   return formatLocalDateInputValue(new Date())
+}
+
+function getMonthKey(dateValue: string) {
+  return dateValue.slice(0, 7)
+}
+
+function addMonths(monthKey: string, months: number) {
+  const [year, month] = monthKey.split('-').map(Number)
+  const date = new Date(year, month - 1 + months, 1)
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function getCalendarDays(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number)
+  const firstDay = new Date(year, month - 1, 1)
+  const startOffset = (firstDay.getDay() + 6) % 7
+  const startDate = new Date(year, month - 1, 1 - startOffset)
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(startDate)
+    date.setDate(startDate.getDate() + index)
+
+    return {
+      date,
+      dateValue: formatLocalDateInputValue(date),
+      isOutsideMonth: date.getMonth() !== month - 1,
+    }
+  })
 }
 
 function addDays(dateValue: string, days: number) {
