@@ -13,4 +13,6 @@ public record QueueBookingResponse(
     decimal TotalAmount,
     string BookingStatus,
     string PaymentStatus,
+    string? CancelReason,
+    DateTimeOffset? CancelledAt,
     IReadOnlyList<QueueBookingServiceResponse> Services);

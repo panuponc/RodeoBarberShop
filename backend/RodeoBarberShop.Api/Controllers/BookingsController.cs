@@ -24,6 +24,11 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         BookingStatus.WaitingPayment
     ];
 
+    private static readonly BookingStatus[] CancellableBookingStatuses =
+    [
+        BookingStatus.PendingConfirmation
+    ];
+
     [Authorize(Roles = "Customer")]
     [HttpPost]
     public async Task<ActionResult<BookingResponse>> CreateBooking(
@@ -318,9 +323,9 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             return Forbid();
         }
 
-        if (booking.BookingStatus is BookingStatus.Completed or BookingStatus.Cancelled or BookingStatus.NoShow)
+        if (!CancellableBookingStatuses.Contains(booking.BookingStatus))
         {
-            return BadRequest(new { message = "Booking cannot be cancelled in its current status." });
+            return BadRequest(new { message = "Booking can only be cancelled before it is confirmed." });
         }
 
         booking.BookingStatus = BookingStatus.Cancelled;
