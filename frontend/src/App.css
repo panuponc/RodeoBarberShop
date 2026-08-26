@@ -221,6 +221,219 @@
   font-weight: 950;
 }
 
+.barber-workspace {
+  width: min(1440px, calc(100% - 32px));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 18px 0 34px;
+}
+
+.barber-workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid rgb(201 151 61 / 16%);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgb(255 253 249 / 97%), rgb(249 240 222 / 94%)),
+    radial-gradient(circle at 15% 0%, rgb(196 126 29 / 12%), transparent 20rem);
+  box-shadow: 0 16px 42px rgb(18 14 9 / 8%);
+  margin-bottom: 12px;
+  padding: 18px 20px;
+}
+
+.barber-workspace-header h1 {
+  color: #15120f;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.02;
+}
+
+.barber-day-card {
+  border: 1px solid rgb(201 151 61 / 16%);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 24px 72px rgb(18 14 9 / 10%);
+  overflow: hidden;
+  padding: 14px;
+}
+
+.barber-day-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #eee3d5;
+  padding-bottom: 12px;
+}
+
+.barber-date-display {
+  min-width: 260px;
+  border: 1px solid #d7cab9;
+  border-radius: 999px;
+  background: #fffdfa;
+  color: #1f1812;
+  font-weight: 950;
+  padding: 10px 18px;
+  text-align: center;
+}
+
+.barber-summary-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 14px 0;
+}
+
+.barber-summary-grid section {
+  border: 1px solid #eadccb;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fffdfa, #fff8ee);
+  padding: 13px 15px;
+}
+
+.barber-summary-grid span,
+.barber-status-list span,
+.barber-muted-list small {
+  color: #756758;
+}
+
+.barber-summary-grid strong {
+  display: block;
+  color: #15120f;
+  font-size: 1.65rem;
+  line-height: 1.1;
+}
+
+.barber-queue-layout {
+  display: grid;
+  align-items: start;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 280px);
+}
+
+.barber-timeline-panel,
+.barber-side-panel {
+  border: 1px solid #eadccb;
+  border-radius: 16px;
+  background: #fffdfa;
+}
+
+.barber-timeline-panel {
+  min-height: 460px;
+  padding: 16px;
+}
+
+.barber-side-panel {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.barber-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #efe2d2;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+}
+
+.barber-section-heading h2,
+.barber-side-panel h2,
+.barber-muted-list h3 {
+  color: #1d1711;
+  line-height: 1.15;
+}
+
+.barber-timeline-list {
+  display: grid;
+  gap: 10px;
+}
+
+.barber-appointment-card {
+  display: grid;
+  width: 100%;
+  gap: 12px;
+  border: 1px solid #eadccb;
+  border-left: 5px solid #cf8c1d;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgb(30 20 10 / 7%);
+  color: #17110d;
+  padding: 14px;
+  text-align: left;
+}
+
+.barber-appointment-time,
+.barber-appointment-footer,
+.barber-status-list span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.barber-appointment-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.barber-appointment-main strong,
+.barber-appointment-main small {
+  display: block;
+}
+
+.barber-customer-avatar {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2d2014, #8e611f);
+  color: #fff8eb;
+  font-size: 0.8rem;
+  font-weight: 950;
+}
+
+.barber-status-list {
+  display: grid;
+  gap: 12px;
+}
+
+.barber-muted-list {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #efe2d2;
+  padding-top: 16px;
+}
+
+.barber-muted-list button {
+  display: grid;
+  gap: 3px;
+  border: 1px solid #f0cdc2;
+  background: #fff5f1;
+  box-shadow: none;
+  color: #7a2e1c;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.barber-empty-state {
+  display: grid;
+  min-height: 280px;
+  place-content: center;
+  border: 1px dashed #e0c8a8;
+  border-radius: 16px;
+  background: #fff9ef;
+  color: #6b5d4f;
+  padding: 24px;
+  text-align: center;
+}
+
 .session-message {
   max-width: 360px;
   overflow: hidden;
@@ -2499,6 +2712,10 @@ button.danger.solid:hover {
 }
 
 @media (min-width: 1800px) {
+  .barber-workspace {
+    width: min(1680px, calc(100% - 48px));
+  }
+
   .backoffice-main {
     gap: 12px;
     padding: 18px 22px;
@@ -2540,6 +2757,20 @@ button.danger.solid:hover {
 }
 
 @media (max-width: 1040px) {
+  .barber-workspace-header,
+  .barber-day-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .barber-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .barber-queue-layout {
+    grid-template-columns: 1fr;
+  }
+
   .backoffice-shell {
     grid-template-columns: 1fr;
   }
@@ -2594,6 +2825,25 @@ button.danger.solid:hover {
 }
 
 @media (max-width: 720px) {
+  .barber-workspace {
+    width: min(100% - 24px, 1440px);
+  }
+
+  .barber-date-display,
+  .barber-day-toolbar .secondary {
+    width: 100%;
+  }
+
+  .barber-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .barber-appointment-time,
+  .barber-appointment-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .login-shell,
   .dashboard-shell {
     width: min(100% - 24px, 1360px);

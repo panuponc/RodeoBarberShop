@@ -37,6 +37,42 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
         return Ok(bookings);
     }
 
+    [HttpGet("me")]
+    [Authorize(Roles = "Barber")]
+    public async Task<ActionResult<IReadOnlyList<QueueBookingResponse>>> GetMyQueue(
+        [FromQuery] DateOnly? date,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var barberProfileId = await dbContext.BarberProfiles
+            .Where(profile => profile.UserId == currentUserId.Value)
+            .Select(profile => (Guid?)profile.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (barberProfileId is null)
+        {
+            return Forbid();
+        }
+
+        var targetDate = date ?? DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(ShopUtcOffset).Date);
+        var (dayStartUtc, dayEndUtc) = GetShopDayRangeUtc(targetDate);
+
+        var bookings = await QueueBookingQuery()
+            .Where(booking => booking.BarberId == barberProfileId.Value
+                && booking.StartAt >= dayStartUtc
+                && booking.StartAt < dayEndUtc)
+            .OrderBy(booking => booking.StartAt)
+            .Select(booking => ToResponse(booking))
+            .ToListAsync(cancellationToken);
+
+        return Ok(bookings);
+    }
+
     [HttpGet("barber/{barberId:guid}/today")]
     public async Task<ActionResult<IReadOnlyList<QueueBookingResponse>>> GetBarberTodayQueue(
         Guid barberId,

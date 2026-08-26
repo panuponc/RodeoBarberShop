@@ -124,6 +124,90 @@ public class DevController(
         return CreatedAtAction(nameof(SeedBarber), ToResponse(barber, barberProfile, created: true));
     }
 
+    [HttpPost("seed-rodeo-barbers")]
+    public async Task<ActionResult<IReadOnlyList<SeedBarberResponse>>> SeedRodeoBarbers(CancellationToken cancellationToken)
+    {
+        if (!environment.IsDevelopment())
+        {
+            return NotFound();
+        }
+
+        var seedBarbers = new[]
+        {
+            new RodeoBarberSeed(
+                "ช่างเค๊ก",
+                "0810000001",
+                "cake.barber@rodeobarber.local",
+                "BarberPassword123!",
+                "เก้าอี้ 1 / ติดกระจก",
+                5,
+                "ตัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
+                new[] { 0, 3, 4, 5, 6 }),
+            new RodeoBarberSeed(
+                "ช่างบั้ม",
+                "0810000002",
+                "bum.barber@rodeobarber.local",
+                "BarberPassword123!",
+                "เก้าอี้ 2 / ผมยาว",
+                5,
+                "ตัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
+                new[] { 0, 1, 2, 4, 5, 6 }),
+            new RodeoBarberSeed(
+                "ช่างนุค",
+                "0810000003",
+                "nook.barber@rodeobarber.local",
+                "BarberPassword123!",
+                "เก้าอี้ 3 / ใช้ร่วมกับช่างนุ้ย",
+                5,
+                "ผู้ชาย ตัดผมหญิง ทำสีแฟชั่น ดัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
+                new[] { 0, 1, 2, 3, 6 }),
+            new RodeoBarberSeed(
+                "ช่างนุ้ย",
+                "0810000004",
+                "nui.barber@rodeobarber.local",
+                "BarberPassword123!",
+                "เก้าอี้ 3 / จองล่วงหน้า 1 วัน",
+                5,
+                "ผู้ชาย ตัดผมหญิง ทำสีแฟชั่น ดัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
+                new[] { 0, 1, 2, 3, 6 }),
+            new RodeoBarberSeed(
+                "ช่างเปิ้ล",
+                "0810000005",
+                "ple.barber@rodeobarber.local",
+                "BarberPassword123!",
+                "เก้าอี้ 4",
+                5,
+                "ตัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
+                new[] { 0, 1, 2, 3, 4 }),
+            new RodeoBarberSeed(
+                "ช่างเดียว",
+                "0810000006",
+                "deaw.barber@rodeobarber.local",
+                "BarberPassword123!",
+                "เก้าอี้ 5 / หน้าทีวี",
+                5,
+                "ตัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
+                new[] { 0, 1, 4, 5, 6 }),
+            new RodeoBarberSeed(
+                "ช่างเหน่ง",
+                "0810000007",
+                "neng.barber@rodeobarber.local",
+                "BarberPassword123!",
+                "ช่างแทน ไม่มีเก้าอี้ประจำ",
+                5,
+                "ช่างแทนประจำร้าน เข้าทำงานแทนช่างที่หยุด",
+                new[] { 1, 2, 3, 5, 6 }),
+        };
+
+        var responses = new List<SeedBarberResponse>();
+        foreach (var seed in seedBarbers)
+        {
+            responses.Add(await UpsertRodeoBarber(seed, cancellationToken));
+        }
+
+        return Ok(responses);
+    }
+
     private static SeedOwnerResponse ToResponse(User user, bool created)
     {
         return new SeedOwnerResponse(
@@ -204,4 +288,91 @@ public class DevController(
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
+
+    private async Task<SeedBarberResponse> UpsertRodeoBarber(RodeoBarberSeed seed, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var normalizedEmail = seed.Email.Trim().ToLowerInvariant();
+        var user = await dbContext.Users
+            .Include(existingUser => existingUser.BarberProfile)
+            .FirstOrDefaultAsync(
+                existingUser => existingUser.Email == normalizedEmail
+                    || existingUser.FullName == seed.FullName,
+                cancellationToken);
+        var created = user is null;
+
+        if (user is null)
+        {
+            user = new User
+            {
+                Id = Guid.NewGuid(),
+                CreatedAt = now,
+                BarberProfile = new BarberProfile
+                {
+                    Id = Guid.NewGuid(),
+                    CreatedAt = now
+                }
+            };
+
+            dbContext.Users.Add(user);
+        }
+        else if (user.Role != UserRole.Barber || user.BarberProfile is null)
+        {
+            throw new InvalidOperationException($"Existing account for {seed.FullName} is not a barber account.");
+        }
+
+        user.FullName = seed.FullName;
+        user.PhoneNumber = seed.PhoneNumber;
+        user.Email = normalizedEmail;
+        user.PasswordHash = passwordHasher.HashPassword(seed.Password);
+        user.Role = UserRole.Barber;
+        user.AccountStatus = AccountStatus.Active;
+        user.UpdatedAt = now;
+
+        var profile = user.BarberProfile!;
+        profile.Specialty = seed.Specialty;
+        profile.ExperienceYears = seed.ExperienceYears;
+        profile.Bio = seed.Bio;
+        profile.IsAvailable = true;
+        profile.AcceptsBooking = true;
+        profile.UpdatedAt = now;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await dbContext.BarberWorkingHours
+            .Where(workingHour => workingHour.BarberId == profile.Id)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        var workingHours = new List<BarberWorkingHour>();
+        foreach (var dayOfWeek in seed.WorkingDays)
+        {
+            workingHours.Add(new BarberWorkingHour
+            {
+                Id = Guid.NewGuid(),
+                BarberId = profile.Id,
+                DayOfWeek = dayOfWeek,
+                StartTime = new TimeOnly(10, 0),
+                EndTime = new TimeOnly(21, 0),
+                IsWorkingDay = true,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+
+        dbContext.BarberWorkingHours.AddRange(workingHours);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.ChangeTracker.Clear();
+
+        return ToResponse(user, profile, created);
+    }
+
+    private sealed record RodeoBarberSeed(
+        string FullName,
+        string PhoneNumber,
+        string Email,
+        string Password,
+        string Specialty,
+        int ExperienceYears,
+        string Bio,
+        IReadOnlyList<int> WorkingDays);
 }

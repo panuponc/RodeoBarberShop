@@ -229,6 +229,8 @@ function App() {
   const [isBusy, setIsBusy] = useState(false)
 
   const [queue, setQueue] = useState<Booking[]>([])
+  const [barberQueue, setBarberQueue] = useState<Booking[]>([])
+  const [barberScheduleDate, setBarberScheduleDate] = useState(getTodayDate())
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [selectedBookingHistory, setSelectedBookingHistory] = useState<Booking[]>([])
   const [isCancelBookingOpen, setIsCancelBookingOpen] = useState(false)
@@ -337,6 +339,14 @@ function App() {
       .filter((booking) => booking.paymentStatus === 'Paid' || booking.bookingStatus === 'Completed')
       .reduce((total, booking) => total + booking.totalAmount, 0),
   }
+  const barberQueueSummary = {
+    total: barberQueue.length,
+    pending: barberQueue.filter((booking) => booking.bookingStatus === 'PendingConfirmation').length,
+    ready: barberQueue.filter((booking) => booking.bookingStatus === 'Confirmed' || booking.bookingStatus === 'WaitingService').length,
+    inProgress: barberQueue.filter((booking) => booking.bookingStatus === 'InService' || booking.bookingStatus === 'WaitingPayment').length,
+    completed: barberQueue.filter((booking) => booking.bookingStatus === 'Completed').length,
+    cancelled: barberQueue.filter((booking) => booking.bookingStatus === 'Cancelled' || booking.bookingStatus === 'NoShow').length,
+  }
   const scheduleCalendarDays = useMemo(() => getCalendarDays(scheduleCalendarMonth), [scheduleCalendarMonth])
 
   function openScheduleDatePicker() {
@@ -355,6 +365,8 @@ function selectScheduleDate(dateValue: string) {
 
     if (auth.role === 'Customer') {
       void refreshCustomerData()
+    } else if (auth.role === 'Barber') {
+      void refreshBarberQueue(barberScheduleDate)
     } else {
       void refreshQueue(scheduleDate)
       void refreshBarbers()
@@ -368,11 +380,18 @@ function selectScheduleDate(dateValue: string) {
   }, [auth])
 
   useEffect(() => {
-    if (!auth || auth.role === 'Customer') return
+    if (!auth || auth.role === 'Customer' || auth.role === 'Barber') return
 
     void refreshQueue(scheduleDate)
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleDate])
+
+  useEffect(() => {
+    if (!auth || auth.role !== 'Barber') return
+
+    void refreshBarberQueue(barberScheduleDate)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [barberScheduleDate])
 
   useEffect(() => {
     if (!isScheduleDatePickerOpen) return undefined
@@ -636,6 +655,16 @@ function selectScheduleDate(dateValue: string) {
       setMessage(error instanceof Error ? error.message : 'เปลี่ยนสถานะไม่สำเร็จ')
     } finally {
       setIsBusy(false)
+    }
+  }
+
+  async function refreshBarberQueue(targetDate = barberScheduleDate) {
+    try {
+      const result = await api<Booking[]>(`/api/queue/me?date=${targetDate}`)
+      setBarberQueue(result)
+      setSelectedBooking((current) => current && result.some((booking) => booking.id === current.id) ? current : null)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'โหลดคิวของช่างไม่สำเร็จ')
     }
   }
 
@@ -1067,6 +1096,7 @@ function selectScheduleDate(dateValue: string) {
   function logout() {
     setAuth(null)
     setQueue([])
+    setBarberQueue([])
     setMyBookings([])
     setAvailability([])
     setSelectedBooking(null)
@@ -1140,6 +1170,191 @@ function selectScheduleDate(dateValue: string) {
 
           {message && <p className="notice">{message}</p>}
         </section>
+      </main>
+    )
+  }
+
+  if (auth.role === 'Barber') {
+    const sortedBarberQueue = [...barberQueue].sort((first, second) => new Date(first.startAt).getTime() - new Date(second.startAt).getTime())
+    const activeBarberQueue = sortedBarberQueue.filter((booking) => booking.bookingStatus !== 'Cancelled' && booking.bookingStatus !== 'NoShow')
+    const inactiveBarberQueue = sortedBarberQueue.filter((booking) => booking.bookingStatus === 'Cancelled' || booking.bookingStatus === 'NoShow')
+
+    return (
+      <main className="barber-workspace">
+        <header className="barber-workspace-header">
+          <div>
+            <p className="eyebrow">Barber Workspace</p>
+            <h1>คิวของฉัน</h1>
+            <small>ดูตารางงานรายวันและรายละเอียดบริการของลูกค้าที่รับผิดชอบ</small>
+          </div>
+          <div className="backoffice-user">
+            <span className="backoffice-user-avatar">{getInitials(auth.fullName)}</span>
+            <div>
+              <strong>{auth.fullName}</strong>
+              <small>ช่างประจำร้าน</small>
+            </div>
+            <button className="secondary" onClick={logout} type="button">
+              Logout
+            </button>
+          </div>
+        </header>
+
+        {message && <p className="notice">{message}</p>}
+
+        <section className="barber-day-card">
+          <div className="barber-day-toolbar">
+            <div className="schedule-date-controls">
+              <button className="secondary schedule-nav-button" aria-label="ก่อนหน้า" onClick={() => setBarberScheduleDate(addDays(barberScheduleDate, -1))} type="button">
+                ←
+              </button>
+              <div className="barber-date-display">{formatToolbarDate(parseLocalDate(barberScheduleDate))}</div>
+              <button className="secondary schedule-nav-button" aria-label="ถัดไป" onClick={() => setBarberScheduleDate(addDays(barberScheduleDate, 1))} type="button">
+                →
+              </button>
+              <button className="secondary" onClick={() => setBarberScheduleDate(getTodayDate())} type="button">
+                วันนี้
+              </button>
+            </div>
+            <button className="secondary" disabled={isBusy} onClick={() => refreshBarberQueue(barberScheduleDate)} type="button">
+              Refresh
+            </button>
+          </div>
+
+          <div className="barber-summary-grid">
+            <section>
+              <span>คิวทั้งหมด</span>
+              <strong>{barberQueueSummary.total}</strong>
+            </section>
+            <section>
+              <span>รอยืนยัน</span>
+              <strong>{barberQueueSummary.pending}</strong>
+            </section>
+            <section>
+              <span>มาถึงร้าน</span>
+              <strong>{barberQueueSummary.ready}</strong>
+            </section>
+            <section>
+              <span>กำลังทำ/รอจ่าย</span>
+              <strong>{barberQueueSummary.inProgress}</strong>
+            </section>
+            <section>
+              <span>เสร็จสิ้น</span>
+              <strong>{barberQueueSummary.completed}</strong>
+            </section>
+          </div>
+
+          <div className="barber-queue-layout">
+            <section className="barber-timeline-panel">
+              <div className="barber-section-heading">
+                <div>
+                  <h2>ตารางคิววันนี้</h2>
+                  <small>{activeBarberQueue.length} คิวที่ต้องดูแล</small>
+                </div>
+              </div>
+
+              {activeBarberQueue.length === 0 ? (
+                <div className="barber-empty-state">
+                  <strong>ยังไม่มีคิวในวันนี้</strong>
+                  <small>ถ้ามีการนัดหมายเข้ามา รายการจะปรากฏตรงนี้อัตโนมัติหลัง Refresh</small>
+                </div>
+              ) : (
+                <div className="barber-timeline-list">
+                  {activeBarberQueue.map((booking) => (
+                    <BarberAppointmentCard booking={booking} key={booking.id} onSelect={() => openBookingDetail(booking)} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <aside className="barber-side-panel">
+              <h2>สรุปสถานะ</h2>
+              <div className="barber-status-list">
+                <span><i className="legend-dot pending" /> รอยืนยัน <strong>{barberQueueSummary.pending}</strong></span>
+                <span><i className="legend-dot confirmed" /> มาถึงร้าน <strong>{barberQueueSummary.ready}</strong></span>
+                <span><i className="legend-dot progress" /> กำลังให้บริการ/รอชำระ <strong>{barberQueueSummary.inProgress}</strong></span>
+                <span><i className="legend-dot done" /> เสร็จสิ้น <strong>{barberQueueSummary.completed}</strong></span>
+                <span><i className="legend-dot cancelled" /> ยกเลิก/ไม่มา <strong>{barberQueueSummary.cancelled}</strong></span>
+              </div>
+
+              {inactiveBarberQueue.length > 0 && (
+                <section className="barber-muted-list">
+                  <h3>รายการที่ไม่ต้องให้บริการ</h3>
+                  {inactiveBarberQueue.map((booking) => (
+                    <button key={booking.id} onClick={() => openBookingDetail(booking)} type="button">
+                      <span>{formatTime(booking.startAt)} - {formatTime(booking.endAt)}</span>
+                      <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
+                      <small>{statusLabels[booking.bookingStatus]}</small>
+                    </button>
+                  ))}
+                </section>
+              )}
+            </aside>
+          </div>
+        </section>
+
+        {selectedBooking && (
+          <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeBookingDetail()
+            }
+          }}>
+            <article className={`detail-panel booking-detail-modal status-modal-${selectedBooking.bookingStatus}`} role="dialog" aria-modal="true" aria-labelledby="barber-booking-detail-title">
+              <div className="booking-detail-header">
+                <div>
+                  <span className="modal-eyebrow">รายละเอียดคิวของฉัน</span>
+                  <h2 id="barber-booking-detail-title">{selectedBooking.customerName ?? 'Walk-in customer'}</h2>
+                  <small className="booking-number-chip">เลขคิว {selectedBooking.bookingNumber}</small>
+                </div>
+                <div className="booking-detail-header-actions">
+                  <span className={`status-pill status-${selectedBooking.bookingStatus}`}>
+                    {statusLabels[selectedBooking.bookingStatus]}
+                  </span>
+                  <button className="icon-button" aria-label="ปิดรายละเอียดคิว" onClick={closeBookingDetail} type="button">
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <dl className="booking-detail-grid">
+                <div>
+                  <dt>เวลา</dt>
+                  <dd>{formatTime(selectedBooking.startAt)} - {formatTime(selectedBooking.endAt)}</dd>
+                </div>
+                <div>
+                  <dt>ยอดชำระ</dt>
+                  <dd>{formatMoney(selectedBooking.totalAmount)}</dd>
+                </div>
+                <div>
+                  <dt>ระยะเวลา</dt>
+                  <dd>{selectedBooking.services.reduce((total, service) => total + service.durationMinutes * service.quantity, 0)} นาที</dd>
+                </div>
+                <div>
+                  <dt>สถานะชำระเงิน</dt>
+                  <dd>{selectedBooking.paymentStatus}</dd>
+                </div>
+              </dl>
+
+              <section className="booking-detail-services">
+                <div className="booking-detail-section-title">
+                  <h3>บริการที่ต้องทำ</h3>
+                  <span>{selectedBooking.services.length} รายการ</span>
+                </div>
+                <ServiceList services={selectedBooking.services} />
+              </section>
+
+              {selectedBooking.cancelReason && (
+                <section className="cancel-reason-note">
+                  <div className="cancel-reason-icon" aria-hidden="true">!</div>
+                  <div>
+                    <span>เหตุผลการยกเลิก</span>
+                    <strong>{selectedBooking.cancelReason}</strong>
+                    {selectedBooking.cancelledAt && <small>ยกเลิกเมื่อ {formatDateTime(selectedBooking.cancelledAt)}</small>}
+                  </div>
+                </section>
+              )}
+            </article>
+          </div>
+        )}
       </main>
     )
   }
@@ -2663,6 +2878,38 @@ function Header({
         </button>
       </div>
     </header>
+  )
+}
+
+function BarberAppointmentCard({
+  booking,
+  onSelect,
+}: {
+  booking: Booking
+  onSelect: () => void
+}) {
+  const services = booking.services.map((service) => service.serviceName).join(' + ')
+
+  return (
+    <button className={`barber-appointment-card status-border-${booking.bookingStatus}`} onClick={onSelect} type="button">
+      <div className="barber-appointment-time">
+        <strong>{formatTime(booking.startAt)} - {formatTime(booking.endAt)}</strong>
+        <span className={`status-pill status-${booking.bookingStatus}`}>
+          {statusLabels[booking.bookingStatus] ?? booking.bookingStatus}
+        </span>
+      </div>
+      <div className="barber-appointment-main">
+        <span className="barber-customer-avatar">{getInitials(booking.customerName ?? booking.bookingNumber)}</span>
+        <div>
+          <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
+          <small>{services || booking.bookingNumber}</small>
+        </div>
+      </div>
+      <div className="barber-appointment-footer">
+        <span>{booking.services.length} รายการ</span>
+        <strong>{formatMoney(booking.totalAmount)}</strong>
+      </div>
+    </button>
   )
 }
 
