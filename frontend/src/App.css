@@ -760,17 +760,18 @@ button.link-button {
 }
 
 .booking-detail-modal {
-  width: min(620px, calc(100vw - 48px));
+  width: min(720px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   overflow: auto;
   margin: 0;
-  border: 1px solid #e4cfad;
-  border-radius: 20px;
+  border: 1px solid #e8d8bd;
+  border-radius: 22px;
   background:
-    linear-gradient(135deg, rgb(255 248 237 / 96%), rgb(255 255 255 / 98%) 46%, rgb(248 238 220 / 96%)),
+    radial-gradient(circle at top right, rgb(213 150 47 / 12%), transparent 34%),
+    linear-gradient(135deg, rgb(255 250 243 / 98%), rgb(255 255 255 / 99%) 48%, rgb(250 241 225 / 96%)),
     #fffaf3;
   padding: 0;
-  box-shadow: 0 28px 80px rgb(31 24 18 / 24%);
+  box-shadow: 0 26px 90px rgb(31 24 18 / 22%);
 }
 
 .booking-detail-header {
@@ -779,22 +780,26 @@ button.link-button {
   justify-content: space-between;
   gap: 18px;
   border-bottom: 1px solid #ead9bf;
-  background: linear-gradient(135deg, #fffaf3, #f7ead5);
-  padding: 22px 24px 18px;
+  background: linear-gradient(135deg, #fff8eb, #f8ead4);
+  padding: 22px 28px 20px;
 }
 
 .booking-detail-header h2 {
   margin: 0;
   color: #1f1710;
-  font-size: 1.8rem;
-  line-height: 1.1;
+  font-size: clamp(1.8rem, 2.5vw, 2.25rem);
+  line-height: 1.05;
 }
 
-.booking-detail-header small {
-  display: block;
-  margin-top: 7px;
-  color: #8a7865;
+.booking-number-chip {
+  display: inline-flex;
+  margin-top: 10px;
+  border: 1px solid #e4d0ad;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 62%);
+  color: #7d6d5c;
   font-weight: 800;
+  padding: 4px 10px;
 }
 
 .booking-detail-header-actions {
@@ -803,36 +808,45 @@ button.link-button {
   gap: 10px;
 }
 
+.booking-detail-header-actions .status-pill {
+  min-height: 36px;
+  border: 1px solid rgb(255 255 255 / 70%);
+  box-shadow: 0 10px 22px rgb(71 47 23 / 8%);
+  font-size: 0.86rem;
+  padding: 9px 12px;
+}
+
 .booking-detail-grid {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
-  padding: 18px 24px 6px;
+  padding: 22px 28px 8px;
 }
 
 .booking-detail-grid div {
-  border: 1px solid #ecdcc4;
-  border-radius: 14px;
-  background: rgb(255 255 255 / 70%);
-  padding: 12px 14px;
+  border: 1px solid #ead8bd;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 74%);
+  padding: 14px 16px;
+  box-shadow: 0 10px 28px rgb(73 49 24 / 5%);
 }
 
 .booking-detail-grid dt {
-  color: #7a6b5d;
+  color: #8a7865;
   font-size: 0.82rem;
   font-weight: 800;
 }
 
 .booking-detail-grid dd {
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   color: #1d1711;
-  font-size: 1.08rem;
+  font-size: 1.14rem;
   font-weight: 950;
 }
 
 .booking-detail-services {
-  padding: 12px 24px 0;
+  padding: 14px 28px 0;
 }
 
 .booking-detail-section-title {
@@ -856,9 +870,9 @@ button.link-button {
 
 .booking-detail-modal .service-list {
   border: 1px solid #ead9bf;
-  border-radius: 14px;
-  background: rgb(255 255 255 / 62%);
-  padding: 8px 12px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 72%);
+  padding: 8px 14px;
 }
 
 .booking-detail-modal .service-list div {
@@ -873,7 +887,7 @@ button.link-button {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  padding: 18px 24px 24px;
+  padding: 18px 28px 28px;
 }
 
 .booking-detail-actions button {
@@ -886,6 +900,198 @@ button.link-button {
 
 .status-back-button {
   order: 1;
+}
+
+.cancel-booking-button {
+  order: 0;
+}
+
+.cancel-reason-note,
+.cancel-booking-box {
+  display: grid;
+  gap: 12px;
+  margin: 0 28px 18px;
+  border: 1px solid #efc2b2;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fff7f3, #fffaf6);
+  padding: 16px 18px;
+}
+
+.cancel-reason-note {
+  display: flex;
+  align-items: flex-start;
+}
+
+.cancel-reason-note span,
+.cancel-booking-box p {
+  color: #8b6b5c;
+  font-size: 0.86rem;
+}
+
+.cancel-reason-note span {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 800;
+}
+
+.cancel-reason-note strong,
+.cancel-booking-box h3 {
+  display: block;
+  margin: 0;
+  color: #7d2817;
+  font-size: 1rem;
+}
+
+.cancel-reason-note small {
+  display: block;
+  margin-top: 8px;
+  color: #9b7f70;
+  font-weight: 700;
+}
+
+.cancel-reason-icon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 999px;
+  background: #ffe1d8;
+  color: #9b321d;
+  font-weight: 950;
+}
+
+.cancel-reason-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cancel-reason-options button {
+  min-height: 38px;
+  border: 1px solid #e8c7b8;
+  border-radius: 999px;
+  background: #fffaf7;
+  box-shadow: none;
+  color: #5b382d;
+  font-size: 0.88rem;
+  padding: 8px 12px;
+}
+
+.cancel-reason-options button:hover {
+  border-color: #c7715d;
+  background: #fff0ea;
+}
+
+.cancel-reason-options button.selected {
+  border-color: #9b321d;
+  background: #9b321d;
+  color: #fffaf3;
+}
+
+.cancel-booking-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.booking-history-box {
+  display: grid;
+  gap: 10px;
+  margin: 0 28px 18px;
+  border: 1px solid #e5d5bf;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 68%);
+  padding: 14px 16px 16px;
+}
+
+.booking-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.booking-history-list button {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  border: 1px solid #ead9bf;
+  border-radius: 13px;
+  background: #fffdf9;
+  box-shadow: none;
+  color: #261b12;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.booking-history-list button:hover,
+.booking-history-list button.selected {
+  border-color: #bf7c1d;
+  background: #fff7ea;
+}
+
+.booking-history-list button span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: #fff0d0;
+  color: #8a5817;
+  font-size: 0.8rem;
+  font-weight: 950;
+}
+
+.booking-history-list button strong,
+.booking-history-list button small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.booking-history-list button strong {
+  font-size: 0.96rem;
+}
+
+.booking-history-list button small {
+  color: #806f60;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.booking-history-list button em {
+  border-radius: 999px;
+  background: #ffe1d8;
+  color: #8f2f1b;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 950;
+  padding: 5px 8px;
+}
+
+button.danger {
+  border: 1px solid #d58b7b;
+  background: #fff4ef;
+  box-shadow: none;
+  color: #9b321d;
+}
+
+button.danger:hover {
+  border-color: #b75237;
+  background: #fff0ea;
+  box-shadow: 0 10px 20px rgb(155 50 29 / 12%);
+}
+
+button.danger.solid {
+  border-color: #9b321d;
+  background: #9b321d;
+  color: #fffaf3;
+}
+
+button.danger.solid:hover {
+  background: #7f2615;
 }
 
 .booking-detail-modal .payment-box,
@@ -1378,7 +1584,7 @@ button.link-button {
   position: absolute;
   left: 4px;
   right: 4px;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   align-content: start;
   gap: 5px;
@@ -1398,6 +1604,99 @@ button.link-button {
   border-color: #bf7c1d;
   box-shadow: 0 14px 28px rgb(161 98 16 / 16%);
   transform: translateY(-1px);
+}
+
+.schedule-card.has-cancelled-history:hover:not(:disabled) {
+  transform: none;
+}
+
+.cancelled-stack-hover-zone {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  z-index: 1;
+  height: 86px;
+}
+
+.cancelled-stack-card {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  width: 100%;
+  height: 58px;
+  align-content: start;
+  gap: 5px;
+  border: 1px solid #d9e1f2;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  box-shadow: 0 8px 18px rgb(28 52 94 / 8%);
+  color: #1d4ed8;
+  overflow: hidden;
+  padding: 6px 12px;
+  text-align: left;
+  transform: translateY(calc(28px - var(--stack-index, 0) * 5px));
+  transition:
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.cancelled-stack-hover-zone:hover .cancelled-stack-card,
+.cancelled-stack-hover-zone:focus-within .cancelled-stack-card,
+.cancelled-stack-card:hover,
+.cancelled-stack-card:focus-visible {
+  box-shadow: 0 12px 24px rgb(28 52 94 / 12%);
+  transform: translateY(calc(var(--stack-index, 0) * -38px));
+}
+
+.cancelled-stack-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.cancelled-stack-row span {
+  min-width: 0;
+  overflow: hidden;
+  color: #1d4ed8;
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cancelled-stack-row strong {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 0.58rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.cancelled-stack-card small {
+  display: block;
+  overflow: hidden;
+  color: #3b4a63;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cancelled-stack-count {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  border-radius: 999px;
+  background: #e0ecff;
+  color: #1e40af;
+  font-size: 0.58rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 4px 7px;
 }
 
 .schedule-time {
@@ -1427,6 +1726,68 @@ button.link-button {
 .schedule-card small {
   color: #4b4137;
   font-size: 0.7rem;
+}
+
+.cancelled-booking-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cancelled-schedule-card {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  z-index: 2;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  border: 1px solid #efc4b8;
+  border-left: 4px solid #b75237;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #fff8f5, #fff1eb);
+  box-shadow: none;
+  color: #2a1b15;
+  overflow: hidden;
+  padding: 9px 9px 27px;
+  pointer-events: auto;
+  text-align: left;
+}
+
+.cancelled-schedule-card:hover,
+.cancelled-schedule-card.selected {
+  border-color: #b75237;
+  background: #fff0ea;
+  box-shadow: 0 14px 28px rgb(183 82 55 / 14%);
+  transform: translateY(-1px);
+}
+
+.cancelled-schedule-card strong,
+.cancelled-schedule-card em,
+.cancelled-schedule-card small {
+  display: block;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cancelled-schedule-card strong {
+  color: #7d2817;
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
+
+.cancelled-schedule-card small {
+  color: #6f554d;
+  font-size: 0.7rem;
+}
+
+.cancelled-schedule-card em {
+  color: #8a6659;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .schedule-card-status {
@@ -1459,6 +1820,12 @@ button.link-button {
 
 .status-border-Completed {
   border-left-color: #3b9a49;
+}
+
+.status-border-Cancelled,
+.status-border-NoShow {
+  border-left-color: #b75237;
+  opacity: 0.78;
 }
 
 .schedule-detail-panel {
@@ -1540,6 +1907,10 @@ button.link-button {
 
 .legend-dot.done {
   background: #3b9a49;
+}
+
+.legend-dot.cancelled {
+  background: #b75237;
 }
 
 .accounts-grid {
@@ -1668,6 +2039,12 @@ button.link-button {
 .status-Completed {
   background: #dff5df;
   color: #226a2c;
+}
+
+.status-Cancelled,
+.status-NoShow {
+  background: #ffe1d8;
+  color: #8f2f1b;
 }
 
 .summary-list {

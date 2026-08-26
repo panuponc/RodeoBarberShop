@@ -105,6 +105,8 @@ type Booking = {
   totalAmount: number
   bookingStatus: string
   paymentStatus: string
+  cancelReason: string | null
+  cancelledAt: string | null
   services: BookingService[]
 }
 
@@ -165,7 +167,7 @@ type StaffAccount = {
 
 const nextStatus: Record<string, string> = {
   PendingConfirmation: 'Confirmed',
-  Confirmed: 'WaitingService',
+  Confirmed: 'InService',
   WaitingService: 'InService',
   InService: 'WaitingPayment',
 }
@@ -173,19 +175,30 @@ const nextStatus: Record<string, string> = {
 const previousStatus: Record<string, string> = {
   Confirmed: 'PendingConfirmation',
   WaitingService: 'Confirmed',
-  InService: 'WaitingService',
+  InService: 'Confirmed',
   WaitingPayment: 'InService',
 }
 
+const cancellableStatuses = ['PendingConfirmation']
+
 const statusLabels: Record<string, string> = {
   PendingConfirmation: 'รอยืนยัน',
-  Confirmed: 'ยืนยันแล้ว',
+  Confirmed: 'มาถึงร้าน',
   WaitingService: 'มาถึงร้าน',
   InService: 'กำลังให้บริการ',
   WaitingPayment: 'รอชำระเงิน',
   Completed: 'เสร็จสิ้น',
   Cancelled: 'ยกเลิก',
+  NoShow: 'ไม่มาตามนัด',
 }
+
+const cancelReasonOptions = [
+  'ลูกค้าไม่มาตามนัด',
+  'ลูกค้ามาไม่ทัน',
+  'จองผิดเวลา',
+  'ลูกค้าขอเลื่อนเวลา',
+  'ลูกค้าขอยกเลิก',
+]
 
 function App() {
   const [auth, setAuth] = useState<AuthResponse | null>(null)
@@ -200,6 +213,9 @@ function App() {
 
   const [queue, setQueue] = useState<Booking[]>([])
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [selectedBookingHistory, setSelectedBookingHistory] = useState<Booking[]>([])
+  const [isCancelBookingOpen, setIsCancelBookingOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null)
   const [staffReceipt, setStaffReceipt] = useState<Receipt | null>(null)
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([])
@@ -302,6 +318,7 @@ function App() {
     inProgress: queue.filter((booking) => booking.bookingStatus === 'InService' || booking.bookingStatus === 'WaitingPayment').length,
     completed: queue.filter((booking) => booking.bookingStatus === 'Completed').length,
     pending: queue.filter((booking) => booking.bookingStatus === 'PendingConfirmation').length,
+    cancelled: queue.filter((booking) => booking.bookingStatus === 'Cancelled').length,
     revenue: queue
       .filter((booking) => booking.paymentStatus === 'Paid' || booking.bookingStatus === 'Completed')
       .reduce((total, booking) => total + booking.totalAmount, 0),
@@ -565,6 +582,34 @@ function App() {
       setMessage(`เปลี่ยนสถานะเป็น ${statusLabels[targetStatus] ?? targetStatus} แล้ว`)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'เปลี่ยนสถานะไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function cancelBooking() {
+    if (!selectedBooking) return
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await api(`/api/bookings/${selectedBooking.id}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({
+          reason: cancelReason.trim() || null,
+        }),
+      })
+      await refreshQueue()
+      setSelectedBooking(null)
+      setSelectedBookingHistory([])
+      setPaymentSummary(null)
+      setStaffReceipt(null)
+      setIsCancelBookingOpen(false)
+      setCancelReason('')
+      setMessage('ยกเลิกคิวแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'ยกเลิกคิวไม่สำเร็จ')
     } finally {
       setIsBusy(false)
     }
@@ -905,6 +950,7 @@ function App() {
       setScheduleDate(createdBookingDate)
       await refreshQueue(createdBookingDate)
       setSelectedBooking(null)
+      setSelectedBookingHistory([])
       setPaymentSummary(null)
       setStaffReceipt(null)
       setMessage('เพิ่มการนัดหมายแล้ว')
@@ -943,16 +989,22 @@ function App() {
     setStaffBookingBarberOptions([])
   }
 
-  function openBookingDetail(booking: Booking) {
+  function openBookingDetail(booking: Booking, history: Booking[] = [booking]) {
     setSelectedBooking(booking)
+    setSelectedBookingHistory(history)
     setPaymentSummary(null)
     setStaffReceipt(null)
+    setIsCancelBookingOpen(false)
+    setCancelReason('')
   }
 
   function closeBookingDetail() {
     setSelectedBooking(null)
+    setSelectedBookingHistory([])
     setPaymentSummary(null)
     setStaffReceipt(null)
+    setIsCancelBookingOpen(false)
+    setCancelReason('')
   }
 
   function logout() {
@@ -961,6 +1013,7 @@ function App() {
     setMyBookings([])
     setAvailability([])
     setSelectedBooking(null)
+    setSelectedBookingHistory([])
     setPaymentSummary(null)
     setCustomerReceipt(null)
     setStaffReceipt(null)
@@ -1454,9 +1507,10 @@ function App() {
             <section className="status-legend">
               <h3>สถานะคิว</h3>
               <span><i className="legend-dot pending" /> รอยืนยัน <strong>{queueSummary.pending}</strong></span>
-              <span><i className="legend-dot confirmed" /> ยืนยัน/มาถึงร้าน <strong>{queueSummary.confirmed}</strong></span>
+              <span><i className="legend-dot confirmed" /> มาถึงร้าน <strong>{queueSummary.confirmed}</strong></span>
               <span><i className="legend-dot progress" /> กำลังให้บริการ/รอชำระ <strong>{queueSummary.inProgress}</strong></span>
               <span><i className="legend-dot done" /> เสร็จสิ้น <strong>{queueSummary.completed}</strong></span>
+              <span><i className="legend-dot cancelled" /> ยกเลิก <strong>{queueSummary.cancelled}</strong></span>
             </section>
           </aside>
 
@@ -1466,12 +1520,12 @@ function App() {
                 closeBookingDetail()
               }
             }}>
-              <article className="detail-panel booking-detail-modal" role="dialog" aria-modal="true" aria-labelledby="booking-detail-title">
+              <article className={`detail-panel booking-detail-modal status-modal-${selectedBooking.bookingStatus}`} role="dialog" aria-modal="true" aria-labelledby="booking-detail-title">
                 <div className="booking-detail-header">
                   <div>
                     <span className="modal-eyebrow">รายละเอียดคิว</span>
                     <h2 id="booking-detail-title">{selectedBooking.customerName ?? 'Walk-in customer'}</h2>
-                    <small>{selectedBooking.bookingNumber}</small>
+                    <small className="booking-number-chip">เลขคิว {selectedBooking.bookingNumber}</small>
                   </div>
                   <div className="booking-detail-header-actions">
                     <span className={`status-pill status-${selectedBooking.bookingStatus}`}>
@@ -1514,6 +1568,46 @@ function App() {
                   <ServiceList services={selectedBooking.services} />
                 </section>
 
+                {selectedBooking.cancelReason && (
+                  <section className="cancel-reason-note">
+                    <div className="cancel-reason-icon" aria-hidden="true">!</div>
+                    <div>
+                      <span>เหตุผลการยกเลิก</span>
+                      <strong>{selectedBooking.cancelReason}</strong>
+                      {selectedBooking.cancelledAt && <small>ยกเลิกเมื่อ {formatDateTime(selectedBooking.cancelledAt)}</small>}
+                    </div>
+                  </section>
+                )}
+
+                {selectedBookingHistory.length > 1 && (
+                  <section className="booking-history-box">
+                    <div className="booking-detail-section-title">
+                      <h3>ประวัติในช่วงเวลานี้</h3>
+                      <span>{selectedBookingHistory.length} รายการ</span>
+                    </div>
+                    <div className="booking-history-list">
+                      {selectedBookingHistory.map((booking, index) => (
+                        <button
+                          className={booking.id === selectedBooking.id ? 'selected' : ''}
+                          key={booking.id}
+                          onClick={() => setSelectedBooking(booking)}
+                          type="button"
+                        >
+                          <span>{index + 1}</span>
+                          <div>
+                            <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
+                            <small>
+                              {formatTime(booking.startAt)} - {formatTime(booking.endAt)}
+                              {booking.cancelReason ? ` / ${booking.cancelReason}` : ''}
+                            </small>
+                          </div>
+                          <em>{statusLabels[booking.bookingStatus] ?? booking.bookingStatus}</em>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
                 <div className="booking-detail-actions">
                   {previousStatus[selectedBooking.bookingStatus] && (
                     <button
@@ -1535,7 +1629,46 @@ function App() {
                       แสดง QR
                     </button>
                   )}
+                  {cancellableStatuses.includes(selectedBooking.bookingStatus) && (
+                    <button
+                      className="danger cancel-booking-button"
+                      disabled={isBusy}
+                      onClick={() => setIsCancelBookingOpen((current) => !current)}
+                      type="button"
+                    >
+                      ยกเลิกคิว
+                    </button>
+                  )}
                 </div>
+
+                {isCancelBookingOpen && selectedBooking.bookingStatus !== 'Cancelled' && (
+                  <section className="cancel-booking-box">
+                    <div>
+                      <h3>ยืนยันการยกเลิกคิว</h3>
+                      <p>คิวนี้จะถูกเปลี่ยนเป็นสถานะยกเลิก และยังคงอยู่ในตารางเพื่อให้ร้านตรวจสอบย้อนหลังได้</p>
+                    </div>
+                    <div className="cancel-reason-options" role="radiogroup" aria-label="เหตุผลการยกเลิก">
+                      {cancelReasonOptions.map((reason) => (
+                        <button
+                          className={cancelReason === reason ? 'selected' : ''}
+                          key={reason}
+                          onClick={() => setCancelReason(reason)}
+                          type="button"
+                        >
+                          {reason}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="cancel-booking-actions">
+                      <button className="secondary" disabled={isBusy} onClick={() => setIsCancelBookingOpen(false)} type="button">
+                        กลับไปก่อน
+                      </button>
+                      <button className="danger solid" disabled={isBusy || !cancelReason} onClick={cancelBooking} type="button">
+                        ยืนยันยกเลิกคิว
+                      </button>
+                    </div>
+                  </section>
+                )}
 
                 {paymentSummary && (
                   <section className="payment-box">
@@ -2123,10 +2256,30 @@ function ChairScheduleTimeline({
 }: {
   chair: ScheduleChair
   bookings: Booking[]
-  onSelectBooking: (booking: Booking) => void
+  onSelectBooking: (booking: Booking, history?: Booking[]) => void
   selectedBookingId?: string
 }) {
   const sortedBookings = [...bookings].sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())
+  const activeBookings = sortedBookings.filter((booking) => booking.bookingStatus !== 'Cancelled')
+  const cancelledBookings = sortedBookings.filter((booking) => booking.bookingStatus === 'Cancelled')
+  const cancelledBookingGroups = groupSameTimelineSlots(cancelledBookings).map(sortCancelledHistory)
+  const layeredCancelledBookingGroups = cancelledBookingGroups
+    .map((group) => {
+      const anchorBooking = group[0]
+      if (!anchorBooking) return []
+
+      const hasActiveBookingInSlot = activeBookings.some((activeBooking) => isSameTimelineSlot(activeBooking, anchorBooking))
+      return hasActiveBookingInSlot ? group : group.slice(0, -1)
+    })
+    .filter((group) => group.length > 0)
+  const standaloneCancelledBookingGroups = cancelledBookingGroups
+    .filter((group) => {
+      const anchorBooking = group[0]
+      if (!anchorBooking) return false
+
+      const hasActiveBookingInSlot = activeBookings.some((activeBooking) => isSameTimelineSlot(activeBooking, anchorBooking))
+      return !hasActiveBookingInSlot
+    })
   const columnClassName = [
     'barber-column',
     'barber-column-timeline',
@@ -2143,22 +2296,61 @@ function ChairScheduleTimeline({
               <span key={scheduleTimelineStartHour + index} />
             ))}
           </div>
-        {sortedBookings.length > 0 && (
+        {layeredCancelledBookingGroups.length > 0 && (
           <>
-            {sortedBookings.map((booking) => {
+            {layeredCancelledBookingGroups.map((group) => {
+              const anchorBooking = group[0]
+              if (!anchorBooking) return null
+
+              const fullHistory = cancelledBookingGroups.find((candidateGroup) =>
+                candidateGroup.some((candidate) => isSameTimelineSlot(candidate, anchorBooking)),
+              ) ?? group
+              const placement = getCancelledStackTimelinePlacement(anchorBooking)
+              const hiddenCount = group.length
+
+              return (
+                <div
+                  className="cancelled-stack-hover-zone"
+                  key={`stack-${anchorBooking.startAt}-${anchorBooking.endAt}`}
+                  style={{ ...placement, zIndex: getCancelledStackLayerIndex(anchorBooking) }}
+                >
+                  <button
+                    aria-label={`ดูประวัติคิวที่ยกเลิก ${anchorBooking.customerName ?? 'Walk-in customer'}`}
+                    className="cancelled-stack-card"
+                    onClick={() => onSelectBooking(anchorBooking, fullHistory)}
+                    type="button"
+                  >
+                    <span className="cancelled-stack-row">
+                      <span>{formatTime(anchorBooking.startAt)} - {formatTime(anchorBooking.endAt)}</span>
+                      <strong>{statusLabels[anchorBooking.bookingStatus]}</strong>
+                    </span>
+                    <small>{anchorBooking.customerName ?? 'Walk-in customer'}</small>
+                    {hiddenCount > 1 && <span className="cancelled-stack-count">+{hiddenCount - 1}</span>}
+                  </button>
+                </div>
+              )
+            })}
+          </>
+        )}
+        {activeBookings.length > 0 && (
+          <>
+            {activeBookings.map((booking) => {
               const placement = getBookingTimelinePlacement(booking)
+              const hasCancelledHistory = cancelledBookings.some((cancelledBooking) => isSameTimelineSlot(booking, cancelledBooking))
 
               return (
                 <button
-                  className={selectedBookingId === booking.id ? 'schedule-card selected' : `schedule-card status-border-${booking.bookingStatus}`}
+                  className={[
+                    selectedBookingId === booking.id ? 'schedule-card selected' : `schedule-card status-border-${booking.bookingStatus}`,
+                    hasCancelledHistory ? 'has-cancelled-history' : '',
+                  ].filter(Boolean).join(' ')}
                   key={booking.id}
                   onClick={() => onSelectBooking(booking)}
-                  style={placement}
+                  style={{ ...placement, zIndex: getBookingLayerIndex(booking) }}
                   type="button"
-                >
+                  >
                   <span className="schedule-time">{formatTime(booking.startAt)} - {formatTime(booking.endAt)}</span>
                   <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
-                  {(chair.isShared || chair.hasSubstitute) && <em>{booking.barberName}</em>}
                   <small>{booking.services.map((service) => service.serviceName).join(' + ')}</small>
                   <span className={`schedule-card-status status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
                 </button>
@@ -2166,21 +2358,102 @@ function ChairScheduleTimeline({
             })}
           </>
         )}
+        {standaloneCancelledBookingGroups.length > 0 && (
+          <div className="cancelled-booking-layer" aria-label="ประวัติคิวที่ยกเลิก">
+            {standaloneCancelledBookingGroups.map((group) => {
+              const booking = group.at(-1)
+              if (!booking) return null
+
+              const placement = getBookingTimelinePlacement(booking)
+
+              return (
+                <button
+                  className={selectedBookingId === booking.id ? 'cancelled-schedule-card selected' : 'cancelled-schedule-card'}
+                  key={booking.id}
+                  onClick={() => onSelectBooking(booking, group)}
+                  style={{ ...placement, zIndex: getBookingLayerIndex(booking) }}
+                  type="button"
+                >
+                  <span className="schedule-time">{formatTime(booking.startAt)} - {formatTime(booking.endAt)}</span>
+                  <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
+                  <small>{booking.services.map((service) => service.serviceName).join(' + ')}</small>
+                  <span className={`schedule-card-status status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
         </div>
       </div>
     </article>
   )
 }
 
-function getBookingTimelinePlacement(booking: Booking): CSSProperties {
+function isSameTimelineSlot(left: Booking, right: Booking) {
+  return left.startAt === right.startAt && left.endAt === right.endAt
+}
+
+function groupSameTimelineSlots(bookings: Booking[]) {
+  const groups: Booking[][] = []
+
+  bookings.forEach((booking) => {
+    const group = groups.find((candidateGroup) => candidateGroup.some((candidate) => isSameTimelineSlot(candidate, booking)))
+
+    if (group) {
+      group.push(booking)
+      return
+    }
+
+    groups.push([booking])
+  })
+
+  return groups
+}
+
+function sortCancelledHistory(bookings: Booking[]) {
+  return [...bookings].sort((left, right) => {
+    const leftTime = left.cancelledAt ? new Date(left.cancelledAt).getTime() : 0
+    const rightTime = right.cancelledAt ? new Date(right.cancelledAt).getTime() : 0
+
+    if (leftTime !== rightTime) return leftTime - rightTime
+
+    return left.bookingNumber.localeCompare(right.bookingNumber)
+  })
+}
+
+function getTimelineStartOffsetMinutes(booking: Booking) {
+  const start = new Date(booking.startAt)
+  return Math.max(0, start.getHours() * 60 + start.getMinutes() - scheduleTimelineStartHour * 60)
+}
+
+function getBookingLayerIndex(booking: Booking) {
+  return 20 + getTimelineStartOffsetMinutes(booking) * 2 + 1
+}
+
+function getCancelledStackLayerIndex(booking: Booking) {
+  return 20 + getTimelineStartOffsetMinutes(booking) * 2
+}
+
+function getCancelledStackTimelinePlacement(booking: Booking): CSSProperties {
+  const start = new Date(booking.startAt)
+  const startMinutes = start.getHours() * 60 + start.getMinutes()
+  const offsetMinutes = Math.max(0, startMinutes - scheduleTimelineStartHour * 60)
+  const top = (offsetMinutes / 60) * scheduleHourHeightPx
+
+  return {
+    top: `${Math.max(0, top - 46)}px`,
+  }
+}
+
+function getBookingTimelinePlacement(booking: Booking, stackIndex = 0): CSSProperties {
   const start = new Date(booking.startAt)
   const end = new Date(booking.endAt)
   const startMinutes = start.getHours() * 60 + start.getMinutes()
   const endMinutes = end.getHours() * 60 + end.getMinutes()
   const offsetMinutes = Math.max(0, startMinutes - scheduleTimelineStartHour * 60)
   const durationMinutes = Math.max(30, Math.min(scheduleTimelineMinutes - offsetMinutes, endMinutes - startMinutes))
-  const top = (offsetMinutes / 60) * scheduleHourHeightPx
-  const height = Math.max(88, (durationMinutes / 60) * scheduleHourHeightPx - 8)
+  const top = (offsetMinutes / 60) * scheduleHourHeightPx + 2 + stackIndex * 12
+  const height = Math.max(74, (durationMinutes / 60) * scheduleHourHeightPx - 4)
 
   return {
     top: `${top}px`,
