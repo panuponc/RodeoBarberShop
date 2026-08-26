@@ -84,6 +84,10 @@ const scheduleTimelineStartHour = 10
 const scheduleTimelineEndHour = 21
 const scheduleTimelineMinutes = (scheduleTimelineEndHour - scheduleTimelineStartHour) * 60
 const scheduleHourHeightPx = 96
+const bookingStartHours = Array.from(
+  { length: scheduleTimelineEndHour - scheduleTimelineStartHour },
+  (_, index) => scheduleTimelineStartHour + index,
+)
 
 type AvailabilitySlot = {
   startAt: string
@@ -169,6 +173,13 @@ type StaffAccount = {
   bio: string | null
   isAvailable: boolean
   acceptsBooking: boolean
+}
+
+type CustomerLookup = {
+  id: string
+  fullName: string
+  phoneNumber: string
+  email: string
 }
 
 const nextStatus: Record<string, string> = {
@@ -291,14 +302,10 @@ function App() {
   const [scheduleCalendarMonth, setScheduleCalendarMonth] = useState(getMonthKey(getTodayDate()))
   const [staffBookingContext, setStaffBookingContext] = useState('')
   const [staffBookingBarberOptions, setStaffBookingBarberOptions] = useState<string[]>([])
+  const [staffBookingCustomerSuggestions, setStaffBookingCustomerSuggestions] = useState<CustomerLookup[]>([])
+  const [isStaffBookingCustomerLookupOpen, setIsStaffBookingCustomerLookupOpen] = useState(false)
   const [staffBookingForm, setStaffBookingForm] = useState({
-    guestName: '',
-    guestPhoneNumber: '',
-    guestEmail: '',
-    barberId: '',
-    startAt: getDefaultBookingDateTime(getTodayDate()),
-    serviceIds: [] as string[],
-    customerNote: '',
+    ...createEmptyStaffBookingForm('', getDefaultBookingDateTime(getTodayDate())),
   })
 
   const defaultPaymentAccount = useMemo(
@@ -337,7 +344,7 @@ function App() {
     setIsScheduleDatePickerOpen((current) => !current)
   }
 
-  function selectScheduleDate(dateValue: string) {
+function selectScheduleDate(dateValue: string) {
     setScheduleDate(dateValue)
     setScheduleCalendarMonth(getMonthKey(dateValue))
     setIsScheduleDatePickerOpen(false)
@@ -382,6 +389,44 @@ function App() {
 
     return () => document.removeEventListener('mousedown', closeDatePickerOnOutsideClick)
   }, [isScheduleDatePickerOpen])
+
+  useEffect(() => {
+    if (!isStaffBookingFormOpen || staffBookingForm.customerId) {
+      setStaffBookingCustomerSuggestions([])
+      setIsStaffBookingCustomerLookupOpen(false)
+      return undefined
+    }
+
+    const query = staffBookingForm.guestPhoneNumber.trim()
+      || staffBookingForm.guestName.trim()
+      || staffBookingForm.guestEmail.trim()
+    if (query.length < 2) {
+      setStaffBookingCustomerSuggestions([])
+      setIsStaffBookingCustomerLookupOpen(false)
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      api<CustomerLookup[]>(`/api/customers/lookup?query=${encodeURIComponent(query)}`)
+        .then((result) => {
+          setStaffBookingCustomerSuggestions(result)
+          setIsStaffBookingCustomerLookupOpen(result.length > 0)
+        })
+        .catch(() => {
+          setStaffBookingCustomerSuggestions([])
+          setIsStaffBookingCustomerLookupOpen(false)
+        })
+    }, 250)
+
+    return () => window.clearTimeout(timeoutId)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isStaffBookingFormOpen,
+    staffBookingForm.customerId,
+    staffBookingForm.guestEmail,
+    staffBookingForm.guestName,
+    staffBookingForm.guestPhoneNumber,
+  ])
 
   async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(path, {
@@ -934,6 +979,7 @@ function App() {
           guestName: staffBookingForm.guestName,
           guestPhoneNumber: staffBookingForm.guestPhoneNumber,
           guestEmail: staffBookingForm.guestEmail || null,
+          customerId: staffBookingForm.customerId || null,
           barberId: staffBookingForm.barberId,
           startAt: new Date(staffBookingForm.startAt).toISOString(),
           serviceIds: staffBookingForm.serviceIds,
@@ -945,15 +991,9 @@ function App() {
       setIsStaffBookingFormOpen(false)
       setStaffBookingContext('')
       setStaffBookingBarberOptions([])
-      setStaffBookingForm({
-        guestName: '',
-        guestPhoneNumber: '',
-        guestEmail: '',
-        barberId: staffBookingForm.barberId,
-        startAt: getDefaultBookingDateTime(createdBookingDate),
-        serviceIds: [],
-        customerNote: '',
-      })
+      setStaffBookingForm(createEmptyStaffBookingForm(staffBookingForm.barberId, getDefaultBookingDateTime(createdBookingDate)))
+      setStaffBookingCustomerSuggestions([])
+      setIsStaffBookingCustomerLookupOpen(false)
       setScheduleDate(createdBookingDate)
       await refreshQueue(createdBookingDate)
       setSelectedBooking(null)
@@ -978,22 +1018,32 @@ function App() {
         ? staffBookingForm.barberId
         : optionIds[0] ?? ''
 
-    setStaffBookingForm((current) => ({
-      ...current,
-      barberId: defaultBarberId,
-      startAt: current.startAt.slice(0, 10) === defaultBookingDate
-        ? current.startAt
-        : getDefaultBookingDateTime(defaultBookingDate),
-    }))
+    setStaffBookingForm(createEmptyStaffBookingForm(defaultBarberId, getDefaultBookingDateTime(defaultBookingDate)))
     setStaffBookingContext(`${chair.title} / ${chair.meta}`)
     setStaffBookingBarberOptions(optionIds)
     setIsStaffBookingFormOpen(true)
   }
 
   function closeStaffBookingForm() {
+    const defaultBookingDate = clampDateToToday(scheduleDate)
     setIsStaffBookingFormOpen(false)
     setStaffBookingContext('')
     setStaffBookingBarberOptions([])
+    setStaffBookingForm(createEmptyStaffBookingForm('', getDefaultBookingDateTime(defaultBookingDate)))
+    setStaffBookingCustomerSuggestions([])
+    setIsStaffBookingCustomerLookupOpen(false)
+  }
+
+  function selectStaffBookingCustomer(customer: CustomerLookup) {
+    setStaffBookingForm((current) => ({
+      ...current,
+      customerId: customer.id,
+      guestName: customer.fullName,
+      guestPhoneNumber: customer.phoneNumber,
+      guestEmail: customer.email,
+    }))
+    setStaffBookingCustomerSuggestions([])
+    setIsStaffBookingCustomerLookupOpen(false)
   }
 
   function openBookingDetail(booking: Booking, history: Booking[] = [booking]) {
@@ -1336,15 +1386,17 @@ function App() {
                   </button>
                   <button className="primary-action" onClick={() => {
                     const defaultBookingDate = clampDateToToday(scheduleDate)
+                    if (isStaffBookingFormOpen) {
+                      closeStaffBookingForm()
+                      return
+                    }
+
                     setStaffBookingContext('')
                     setStaffBookingBarberOptions([])
-                    setStaffBookingForm((current) => ({
-                      ...current,
-                      startAt: current.startAt.slice(0, 10) === defaultBookingDate
-                        ? current.startAt
-                        : getDefaultBookingDateTime(defaultBookingDate),
-                    }))
-                    setIsStaffBookingFormOpen((current) => !current)
+                    setStaffBookingCustomerSuggestions([])
+                    setIsStaffBookingCustomerLookupOpen(false)
+                    setStaffBookingForm(createEmptyStaffBookingForm('', getDefaultBookingDateTime(defaultBookingDate)))
+                    setIsStaffBookingFormOpen(true)
                   }} type="button">
                     {isStaffBookingFormOpen ? 'ปิดฟอร์ม' : '+ เพิ่มการนัดหมาย'}
                   </button>
@@ -1408,29 +1460,44 @@ function App() {
 
                 <section className="staff-booking-card">
                   <h4>ข้อมูลลูกค้า</h4>
-                  <div className="staff-booking-field-grid">
+                  <div className="staff-booking-field-grid staff-customer-field-grid">
                     <label>
                       ชื่อลูกค้า
                       <input
                         placeholder="กรอกชื่อลูกค้า"
                         value={staffBookingForm.guestName}
-                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestName: event.target.value })}
+                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, customerId: '', guestName: event.target.value })}
                       />
                     </label>
-                    <label>
+                    <label className="staff-customer-lookup-field">
                       เบอร์โทร
                       <input
                         placeholder="08X-XXX-XXXX"
                         value={staffBookingForm.guestPhoneNumber}
-                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestPhoneNumber: event.target.value })}
+                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, customerId: '', guestPhoneNumber: event.target.value })}
+                        onFocus={() => setIsStaffBookingCustomerLookupOpen(staffBookingCustomerSuggestions.length > 0)}
                       />
+                      {staffBookingForm.customerId && (
+                        <span className="staff-customer-selected">เลือกสมาชิกแล้ว</span>
+                      )}
+                      {isStaffBookingCustomerLookupOpen && staffBookingCustomerSuggestions.length > 0 && (
+                        <div className="staff-customer-suggestions">
+                          {staffBookingCustomerSuggestions.map((customer) => (
+                            <button key={customer.id} onMouseDown={(event) => event.preventDefault()} onClick={() => selectStaffBookingCustomer(customer)} type="button">
+                              <strong>{customer.fullName}</strong>
+                              <span>{customer.phoneNumber}</span>
+                              <small>{customer.email}</small>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </label>
                     <label>
                       Email
                       <input
                         placeholder="example@email.com"
                         value={staffBookingForm.guestEmail}
-                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestEmail: event.target.value })}
+                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, customerId: '', guestEmail: event.target.value })}
                       />
                     </label>
                   </div>
@@ -1438,7 +1505,7 @@ function App() {
 
                 <section className="staff-booking-card">
                   <h4>เลือกช่างและเวลา</h4>
-                  <div className="staff-booking-field-grid">
+                  <div className={`staff-booking-field-grid ${staffBookingContext ? 'staff-booking-field-grid-locked-date' : ''}`}>
                     <label>
                       ช่าง
                       <select
@@ -1454,17 +1521,35 @@ function App() {
                         ))}
                       </select>
                     </label>
+                    {!staffBookingContext && (
+                      <label>
+                        วันที่
+                        <input
+                          min={getTodayDate()}
+                          type="date"
+                          value={staffBookingForm.startAt.slice(0, 10)}
+                          onChange={(event) => setStaffBookingForm({
+                            ...staffBookingForm,
+                            startAt: clampDateTimeToMinimum(buildBookingDateTime(event.target.value, getBookingHourValue(staffBookingForm.startAt))),
+                          })}
+                        />
+                      </label>
+                    )}
                     <label>
-                      วันเวลา
-                      <input
-                        min={getMinimumStaffBookingDateTime(staffBookingForm.startAt.slice(0, 10))}
-                        type="datetime-local"
-                        value={staffBookingForm.startAt}
+                      เวลาเริ่ม
+                      <select
+                        value={getBookingHourValue(staffBookingForm.startAt)}
                         onChange={(event) => setStaffBookingForm({
                           ...staffBookingForm,
-                          startAt: clampDateTimeToMinimum(event.target.value),
+                          startAt: clampDateTimeToMinimum(buildBookingDateTime(staffBookingForm.startAt.slice(0, 10), event.target.value)),
                         })}
-                      />
+                      >
+                        {bookingStartHours.map((hour) => (
+                          <option key={hour} value={String(hour).padStart(2, '0')}>
+                            {String(hour).padStart(2, '0')}:00
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label>
                       หมายเหตุ
@@ -2929,17 +3014,61 @@ function getDefaultBookingDateTime(dateValue: string) {
 function getMinimumStaffBookingDateTime(dateValue = getTodayDate()) {
   const today = getTodayDate()
 
-  return dateValue <= today ? formatLocalDateTimeInputValue(roundUpToNextSlot(new Date(), 30)) : `${dateValue}T10:00`
+  if (dateValue > today) {
+    return `${dateValue}T10:00`
+  }
+
+  const nextAvailableSlot = roundUpToNextSlot(new Date(), 60)
+  const nextAvailableDate = formatLocalDateInputValue(nextAvailableSlot)
+  const nextAvailableHour = nextAvailableSlot.getHours()
+  const lastBookingStartHour = bookingStartHours.at(-1) ?? scheduleTimelineStartHour
+
+  if (nextAvailableDate > today || nextAvailableHour > lastBookingStartHour) {
+    return `${addDays(today, 1)}T10:00`
+  }
+
+  return formatLocalDateTimeInputValue(nextAvailableSlot)
 }
 
 function clampDateTimeToMinimum(dateTimeValue: string) {
   const dateValue = clampDateToToday(dateTimeValue.slice(0, 10))
   const normalizedValue = dateTimeValue.slice(0, 10) < dateValue
     ? getDefaultBookingDateTime(dateValue)
-    : dateTimeValue
+    : normalizeBookingDateTimeToHour(dateTimeValue)
   const minimumValue = getMinimumStaffBookingDateTime(dateValue)
 
   return normalizedValue < minimumValue ? minimumValue : normalizedValue
+}
+
+function createEmptyStaffBookingForm(barberId = '', startAt = getDefaultBookingDateTime(getTodayDate())) {
+  return {
+    customerId: '',
+    guestName: '',
+    guestPhoneNumber: '',
+    guestEmail: '',
+    barberId,
+    startAt,
+    serviceIds: [] as string[],
+    customerNote: '',
+  }
+}
+
+function buildBookingDateTime(dateValue: string, hourValue: string) {
+  const hour = Number.parseInt(hourValue, 10)
+  const normalizedHour = bookingStartHours.includes(hour) ? hour : scheduleTimelineStartHour
+
+  return `${clampDateToToday(dateValue)}T${String(normalizedHour).padStart(2, '0')}:00`
+}
+
+function getBookingHourValue(dateTimeValue: string) {
+  const hour = Number.parseInt(dateTimeValue.slice(11, 13), 10)
+  const normalizedHour = bookingStartHours.includes(hour) ? hour : scheduleTimelineStartHour
+
+  return String(normalizedHour).padStart(2, '0')
+}
+
+function normalizeBookingDateTimeToHour(dateTimeValue: string) {
+  return buildBookingDateTime(dateTimeValue.slice(0, 10), getBookingHourValue(dateTimeValue))
 }
 
 function roundUpToNextSlot(value: Date, intervalMinutes: number) {

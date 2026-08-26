@@ -14,6 +14,7 @@ namespace RodeoBarberShop.Api.Controllers;
 public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
 {
     private static readonly TimeSpan ShopUtcOffset = TimeSpan.FromHours(7);
+    private const int BookingStartIntervalMinutes = 60;
 
     private static readonly BookingStatus[] ActiveBookingStatuses =
     [
@@ -158,6 +159,23 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             return BadRequest(new { message = "Guest phone number is required." });
         }
 
+        User? customer = null;
+        if (request.CustomerId is not null)
+        {
+            customer = await dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    user => user.Id == request.CustomerId
+                        && user.Role == UserRole.Customer
+                        && user.AccountStatus == AccountStatus.Active,
+                    cancellationToken);
+
+            if (customer is null)
+            {
+                return BadRequest(new { message = "Selected customer account was not found." });
+            }
+        }
+
         var validationError = ValidateCreateBookingRequest(request.BarberId, request.ServiceIds);
         if (validationError is not null)
         {
@@ -217,9 +235,10 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             Id = Guid.NewGuid(),
             BookingNumber = GenerateBookingNumber(now),
             BookingSource = BookingSource.StaffCreated,
-            GuestName = request.GuestName.Trim(),
-            GuestPhoneNumber = request.GuestPhoneNumber.Trim(),
-            GuestEmail = NormalizeOptionalText(request.GuestEmail),
+            CustomerId = customer?.Id,
+            GuestName = customer is null ? request.GuestName.Trim() : null,
+            GuestPhoneNumber = customer is null ? request.GuestPhoneNumber.Trim() : null,
+            GuestEmail = customer is null ? NormalizeOptionalText(request.GuestEmail) : null,
             BarberId = barber.Id,
             StartAt = startAtUtc,
             EndAt = endAtUtc,
@@ -360,15 +379,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         }
 
         var durationMinutes = selectedServices.Sum(service => service.DurationMinutes);
-        var slotIntervalMinutes = await dbContext.ShopSettings
-            .OrderBy(setting => setting.CreatedAt)
-            .Select(setting => setting.SlotIntervalMinutes)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (slotIntervalMinutes <= 0)
-        {
-            slotIntervalMinutes = 30;
-        }
+        var slotIntervalMinutes = BookingStartIntervalMinutes;
 
         var workingHour = await dbContext.BarberWorkingHours
             .AsNoTracking()
@@ -439,6 +450,11 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         var requestedStartAtLocal = requestedStartAt.ToOffset(ShopUtcOffset);
         var requestedEndAtLocal = requestedStartAtLocal.Add(endAtUtc - startAtUtc);
         var bookingDate = DateOnly.FromDateTime(requestedStartAtLocal.DateTime);
+        if (requestedStartAtLocal.Minute != 0 || requestedStartAtLocal.Second != 0 || requestedStartAtLocal.Millisecond != 0)
+        {
+            return "Booking start time must be on the hour.";
+        }
+
         if (await IsShopHoliday(bookingDate, cancellationToken))
         {
             return "Selected date is a shop holiday.";

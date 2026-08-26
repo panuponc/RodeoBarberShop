@@ -1213,7 +1213,15 @@ button.danger.solid:hover {
 .staff-booking-field-grid {
   display: grid;
   gap: 11px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.staff-customer-field-grid {
+  grid-template-columns: minmax(190px, 1fr) minmax(190px, 1fr) minmax(260px, 1.35fr);
+}
+
+.staff-booking-field-grid-locked-date {
+  grid-template-columns: minmax(180px, 0.9fr) minmax(150px, 0.65fr) minmax(220px, 1.2fr);
 }
 
 .staff-booking-field-grid label {
@@ -1229,6 +1237,74 @@ button.danger.solid:hover {
   border-radius: 9px;
   font-size: 0.9rem;
   padding: 9px 11px;
+}
+
+.staff-customer-lookup-field {
+  position: relative;
+}
+
+.staff-customer-selected {
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-radius: 999px;
+  background: #e7f6ea;
+  color: #287742;
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 4px 7px;
+}
+
+.staff-customer-suggestions {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  z-index: 20;
+  display: grid;
+  gap: 6px;
+  width: min(420px, calc(100vw - 96px));
+  max-width: calc(100vw - 96px);
+  border: 1px solid #e9d8bd;
+  border-radius: 12px;
+  background: #fffdf8;
+  box-shadow: 0 18px 36px rgb(70 48 25 / 14%);
+  padding: 7px;
+}
+
+.staff-customer-suggestions button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #1f1710;
+  padding: 10px 11px;
+  text-align: left;
+}
+
+.staff-customer-suggestions button:hover {
+  background: #fff3dc;
+}
+
+.staff-customer-suggestions strong,
+.staff-customer-suggestions small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-customer-suggestions span {
+  color: #7a5a2e;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.staff-customer-suggestions small {
+  grid-column: 1 / -1;
+  color: #8a7a67;
+  font-size: 0.72rem;
 }
 
 .staff-booking-section-title {
