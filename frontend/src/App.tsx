@@ -17,6 +17,12 @@ type Service = {
   durationMinutes: number
 }
 
+type ServiceGroup = {
+  title: string
+  description: string
+  services: Service[]
+}
+
 type Barber = {
   id: string
   fullName: string
@@ -268,6 +274,7 @@ function App() {
   const [isResetPasswordVisible, setIsResetPasswordVisible] = useState(false)
 
   const [services, setServices] = useState<Service[]>([])
+  const staffBookingServiceGroups = useMemo(() => groupServicesForBooking(services), [services])
   const [barbers, setBarbers] = useState<Barber[]>([])
   const [barberSchedules, setBarberSchedules] = useState<Record<string, BarberSchedule>>({})
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
@@ -1387,8 +1394,8 @@ function App() {
                     <p className="eyebrow">เพิ่มการจองคิว</p>
                     <h3>จองคิวหน้าร้าน</h3>
                   </div>
-                  <button className="secondary" onClick={closeStaffBookingForm} type="button">
-                    ปิด
+                  <button className="icon-button" aria-label="ปิดฟอร์มจองคิว" onClick={closeStaffBookingForm} type="button">
+                    ×
                   </button>
                 </div>
 
@@ -1398,93 +1405,131 @@ function App() {
                     <strong>{staffBookingContext}</strong>
                   </div>
                 )}
-                <label>
-                  ชื่อลูกค้า
-                  <input
-                    value={staffBookingForm.guestName}
-                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestName: event.target.value })}
-                  />
-                </label>
-                <label>
-                  เบอร์โทร
-                  <input
-                    value={staffBookingForm.guestPhoneNumber}
-                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestPhoneNumber: event.target.value })}
-                  />
-                </label>
-                <label>
-                  Email
-                  <input
-                    value={staffBookingForm.guestEmail}
-                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestEmail: event.target.value })}
-                  />
-                </label>
-                <label>
-                  ช่าง
-                  <select
-                    disabled={staffBookingBarberOptions.length === 1}
-                    value={staffBookingForm.barberId}
-                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, barberId: event.target.value })}
-                  >
-                    <option value="">เลือกช่าง</option>
-                    {staffBookingSelectableBarbers.map((barber) => (
-                      <option key={barber.id} value={barber.id}>
-                        {getBarberBookingLabel(barber)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  วันเวลา
-                  <input
-                    min={getMinimumStaffBookingDateTime(staffBookingForm.startAt.slice(0, 10))}
-                    type="datetime-local"
-                    value={staffBookingForm.startAt}
-                    onChange={(event) => setStaffBookingForm({
-                      ...staffBookingForm,
-                      startAt: clampDateTimeToMinimum(event.target.value),
-                    })}
-                  />
-                </label>
-                <label>
-                  หมายเหตุ
-                  <input
-                    value={staffBookingForm.customerNote}
-                    onChange={(event) => setStaffBookingForm({ ...staffBookingForm, customerNote: event.target.value })}
-                  />
-                </label>
 
-                <div className="staff-booking-services">
-                  <strong>บริการ</strong>
+                <section className="staff-booking-card">
+                  <h4>ข้อมูลลูกค้า</h4>
+                  <div className="staff-booking-field-grid">
+                    <label>
+                      ชื่อลูกค้า
+                      <input
+                        placeholder="กรอกชื่อลูกค้า"
+                        value={staffBookingForm.guestName}
+                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestName: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      เบอร์โทร
+                      <input
+                        placeholder="08X-XXX-XXXX"
+                        value={staffBookingForm.guestPhoneNumber}
+                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestPhoneNumber: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Email
+                      <input
+                        placeholder="example@email.com"
+                        value={staffBookingForm.guestEmail}
+                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, guestEmail: event.target.value })}
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="staff-booking-card">
+                  <h4>เลือกช่างและเวลา</h4>
+                  <div className="staff-booking-field-grid">
+                    <label>
+                      ช่าง
+                      <select
+                        disabled={staffBookingBarberOptions.length === 1}
+                        value={staffBookingForm.barberId}
+                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, barberId: event.target.value })}
+                      >
+                        <option value="">เลือกช่าง</option>
+                        {staffBookingSelectableBarbers.map((barber) => (
+                          <option key={barber.id} value={barber.id}>
+                            {getBarberBookingLabel(barber)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      วันเวลา
+                      <input
+                        min={getMinimumStaffBookingDateTime(staffBookingForm.startAt.slice(0, 10))}
+                        type="datetime-local"
+                        value={staffBookingForm.startAt}
+                        onChange={(event) => setStaffBookingForm({
+                          ...staffBookingForm,
+                          startAt: clampDateTimeToMinimum(event.target.value),
+                        })}
+                      />
+                    </label>
+                    <label>
+                      หมายเหตุ
+                      <input
+                        placeholder="เพิ่มเติม"
+                        value={staffBookingForm.customerNote}
+                        onChange={(event) => setStaffBookingForm({ ...staffBookingForm, customerNote: event.target.value })}
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="staff-booking-card staff-booking-services">
+                  <div className="staff-booking-section-title">
+                    <h4>บริการ</h4>
+                    <span>{staffBookingForm.serviceIds.length} รายการที่เลือก</span>
+                  </div>
                   {services.length === 0 ? (
                     <small>ยังไม่มีบริการ active</small>
                   ) : (
-                    services.map((service) => (
-                      <label className="checkbox-label" key={service.id}>
-                        <input
-                          checked={staffBookingForm.serviceIds.includes(service.id)}
-                          onChange={(event) => {
-                            setStaffBookingForm((current) => ({
-                              ...current,
-                              serviceIds: event.target.checked
-                                ? [...current.serviceIds, service.id]
-                                : current.serviceIds.filter((serviceId) => serviceId !== service.id),
-                            }))
-                          }}
-                          type="checkbox"
-                        />
-                        {service.name} / {service.durationMinutes} นาที / {formatMoney(service.price)}
-                      </label>
-                    ))
+                    <div className="staff-service-groups">
+                      {staffBookingServiceGroups.map((group) => (
+                        <section className="staff-service-group" key={group.title}>
+                          <div className="staff-service-group-title">
+                            <div>
+                              <strong>{group.title}</strong>
+                              <small>{group.description}</small>
+                            </div>
+                            <span>{group.services.length} รายการ</span>
+                          </div>
+                          <div className="staff-service-grid">
+                            {group.services.map((service) => (
+                              <label className={staffBookingForm.serviceIds.includes(service.id) ? 'staff-service-card selected' : 'staff-service-card'} key={service.id}>
+                                <input
+                                  checked={staffBookingForm.serviceIds.includes(service.id)}
+                                  onChange={(event) => {
+                                    setStaffBookingForm((current) => ({
+                                      ...current,
+                                      serviceIds: event.target.checked
+                                        ? [...current.serviceIds, service.id]
+                                        : current.serviceIds.filter((serviceId) => serviceId !== service.id),
+                                    }))
+                                  }}
+                                  type="checkbox"
+                                />
+                                <span>
+                                  <strong>{service.name}</strong>
+                                  <small>{service.durationMinutes} นาที</small>
+                                </span>
+                                <b>{formatMoney(service.price)}</b>
+                              </label>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
                   )}
-                </div>
+                </section>
 
                 <div className="action-row">
-                  <button disabled={isBusy} type="submit">
-                    บันทึกการนัดหมาย
-                  </button>
                   <button className="secondary" onClick={closeStaffBookingForm} type="button">
                     ยกเลิก
+                  </button>
+                  <button disabled={isBusy} type="submit">
+                    บันทึกการนัดหมาย
                   </button>
                 </div>
               </form>
@@ -2459,6 +2504,55 @@ function getBookingTimelinePlacement(booking: Booking, stackIndex = 0): CSSPrope
     top: `${top}px`,
     height: `${height}px`,
   }
+}
+
+function groupServicesForBooking(services: Service[]): ServiceGroup[] {
+  const definitions = [
+    {
+      title: 'Dev / ทดสอบ',
+      description: 'ข้อมูลทดสอบระหว่างพัฒนา',
+      match: (name: string) => name.startsWith('dev '),
+    },
+    {
+      title: 'ตัดผม',
+      description: 'ตัดผมชาย หญิง สกินเฮด และวอลลุ่ม',
+      match: (name: string) => name.includes('ตัดผม') || name.includes('สกินเฮด') || name.includes('ตัดวอลลุ่ม'),
+    },
+    {
+      title: 'ซอยกรรไกร',
+      description: 'งานซอยกรรไกรตามความยาวผม',
+      match: (name: string) => name.includes('ซอยกรรไกร'),
+    },
+    {
+      title: 'ดัด / ยืด / แพร์ม',
+      description: 'ดัด ยืด ดาวน์แพร์ม อัพดาวน์แพร์ม และฟอยล์',
+      match: (name: string) => name.includes('ดัด') || name.includes('ยืด') || name.includes('แพร์ม') || name.includes('ฟอยล์') || name.includes('ฟรอยด์'),
+    },
+    {
+      title: 'ทำสี / เคมี',
+      description: 'ทำสี ปิดผมขาว แฟชั่น และงานเคมีอื่นๆ',
+      match: (name: string) => name.includes('ทำสี') || name.includes('เคมี'),
+    },
+  ]
+
+  const groups = definitions.map((definition) => ({
+    title: definition.title,
+    description: definition.description,
+    services: services.filter((service) => definition.match(service.name.trim().toLowerCase())),
+  }))
+
+  const groupedServiceIds = new Set(groups.flatMap((group) => group.services.map((service) => service.id)))
+  const uncategorizedServices = services.filter((service) => !groupedServiceIds.has(service.id))
+
+  if (uncategorizedServices.length > 0) {
+    groups.push({
+      title: 'อื่นๆ',
+      description: 'บริการที่ยังไม่ถูกจัดหมวด',
+      services: uncategorizedServices,
+    })
+  }
+
+  return groups.filter((group) => group.services.length > 0)
 }
 
 function Header({
