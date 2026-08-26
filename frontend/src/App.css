@@ -330,6 +330,137 @@
   padding: 18px;
 }
 
+.barber-profile-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #ead6ba;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fff9ef, #fffdfa 70%);
+  padding: 14px;
+}
+
+.barber-profile-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.barber-profile-heading span,
+.barber-profile-summary strong {
+  color: #9a6a21;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.barber-profile-heading strong,
+.barber-profile-heading small {
+  display: block;
+}
+
+.barber-profile-heading strong {
+  margin-top: 2px;
+  color: #1d1711;
+  font-size: 1.05rem;
+}
+
+.barber-profile-heading small {
+  color: #7f7164;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.compact-button {
+  min-height: 34px;
+  padding: 7px 12px;
+  white-space: nowrap;
+}
+
+.barber-profile-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.barber-profile-summary span {
+  display: grid;
+  gap: 2px;
+  color: #35291f;
+  font-size: 0.92rem;
+}
+
+.barber-profile-summary p {
+  border-top: 1px solid #eedfcc;
+  margin: 2px 0 0;
+  color: #6f6257;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  padding-top: 10px;
+}
+
+.barber-profile-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.barber-profile-flags span {
+  border: 1px solid #eadccb;
+  border-radius: 999px;
+  background: #fff;
+  color: #8a7d70;
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 5px 9px;
+}
+
+.barber-profile-flags span.active {
+  border-color: #bfe7c4;
+  background: #ecfff0;
+  color: #2f8b44;
+}
+
+.barber-profile-form {
+  display: grid;
+  gap: 10px;
+}
+
+.barber-profile-form label {
+  display: grid;
+  gap: 5px;
+  color: #6f6257;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.barber-profile-form input,
+.barber-profile-form textarea {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #dfcbb2;
+  border-radius: 10px;
+  background: #fff;
+  color: #201812;
+  font: inherit;
+  padding: 9px 11px;
+}
+
+.barber-profile-form textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.barber-profile-form .toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #34271d;
+}
+
+.barber-profile-form .toggle-row input {
+  width: 16px;
+  min-height: 16px;
+}
+
 .barber-section-heading {
   display: flex;
   align-items: center;

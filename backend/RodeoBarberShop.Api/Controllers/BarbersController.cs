@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -33,6 +34,76 @@ public class BarbersController(ApplicationDbContext dbContext) : ControllerBase
             .FirstOrDefaultAsync(cancellationToken);
 
         return barber is null ? NotFound() : Ok(barber);
+    }
+
+    [Authorize(Roles = "Barber")]
+    [HttpGet("me")]
+    public async Task<ActionResult<BarberResponse>> GetMyProfile(CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var barber = await BaseBarberQuery()
+            .Where(barber => barber.UserId == currentUserId.Value && barber.User.AccountStatus == AccountStatus.Active)
+            .Select(barber => ToResponse(barber))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return barber is null ? NotFound() : Ok(barber);
+    }
+
+    [Authorize(Roles = "Barber")]
+    [HttpPut("me")]
+    public async Task<ActionResult<BarberResponse>> UpdateMyProfile(
+        UpdateOwnBarberProfileRequest request,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var validationError = ValidateOwnProfile(request);
+        if (validationError is not null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        var barber = await dbContext.BarberProfiles
+            .Include(barber => barber.User)
+            .FirstOrDefaultAsync(
+                barber => barber.UserId == currentUserId.Value
+                    && barber.User.AccountStatus == AccountStatus.Active,
+                cancellationToken);
+
+        if (barber is null)
+        {
+            return NotFound();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        barber.User.FullName = request.FullName.Trim();
+        barber.User.Nickname = NormalizeOptionalText(request.Nickname);
+        barber.User.PhoneNumber = request.PhoneNumber.Trim();
+        barber.User.UpdatedAt = now;
+        barber.Specialty = NormalizeOptionalText(request.Specialty);
+        barber.ExperienceYears = request.ExperienceYears;
+        barber.Bio = NormalizeOptionalText(request.Bio);
+        barber.IsAvailable = request.IsAvailable;
+        barber.AcceptsBooking = request.AcceptsBooking;
+        barber.UpdatedAt = now;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = await BaseBarberQuery()
+            .Where(updatedBarber => updatedBarber.Id == barber.Id)
+            .Select(updatedBarber => ToResponse(updatedBarber))
+            .FirstAsync(cancellationToken);
+
+        return Ok(response);
     }
 
     [Authorize(Roles = "Owner,Admin")]
@@ -287,6 +358,26 @@ public class BarbersController(ApplicationDbContext dbContext) : ControllerBase
         return null;
     }
 
+    private static string? ValidateOwnProfile(UpdateOwnBarberProfileRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.FullName))
+        {
+            return "Full name is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(request.PhoneNumber))
+        {
+            return "Phone number is required.";
+        }
+
+        if (request.ExperienceYears is < 0)
+        {
+            return "Experience years must be zero or greater.";
+        }
+
+        return null;
+    }
+
     private static string? ValidateWorkingHours(IReadOnlyList<BarberWorkingHourRequest> workingHours)
     {
         if (workingHours.Count == 0)
@@ -318,5 +409,11 @@ public class BarbersController(ApplicationDbContext dbContext) : ControllerBase
     private static string? NormalizeOptionalText(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private Guid? GetCurrentUserId()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(userId, out var parsedUserId) ? parsedUserId : null;
     }
 }

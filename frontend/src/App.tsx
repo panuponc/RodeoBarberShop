@@ -25,9 +25,14 @@ type ServiceGroup = {
 
 type Barber = {
   id: string
+  userId: string
   fullName: string
+  nickname: string | null
+  email: string
+  phoneNumber: string
   specialty: string | null
   experienceYears: number | null
+  bio: string | null
   isAvailable: boolean
   acceptsBooking: boolean
 }
@@ -230,6 +235,18 @@ function App() {
 
   const [queue, setQueue] = useState<Booking[]>([])
   const [barberQueue, setBarberQueue] = useState<Booking[]>([])
+  const [barberProfile, setBarberProfile] = useState<Barber | null>(null)
+  const [isBarberProfileEditing, setIsBarberProfileEditing] = useState(false)
+  const [barberProfileForm, setBarberProfileForm] = useState({
+    fullName: '',
+    nickname: '',
+    phoneNumber: '',
+    specialty: '',
+    experienceYears: '',
+    bio: '',
+    isAvailable: true,
+    acceptsBooking: true,
+  })
   const [barberScheduleDate, setBarberScheduleDate] = useState(getTodayDate())
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [selectedBookingHistory, setSelectedBookingHistory] = useState<Booking[]>([])
@@ -367,6 +384,7 @@ function selectScheduleDate(dateValue: string) {
       void refreshCustomerData()
     } else if (auth.role === 'Barber') {
       void refreshBarberQueue(barberScheduleDate)
+      void refreshBarberProfile()
     } else {
       void refreshQueue(scheduleDate)
       void refreshBarbers()
@@ -665,6 +683,66 @@ function selectScheduleDate(dateValue: string) {
       setSelectedBooking((current) => current && result.some((booking) => booking.id === current.id) ? current : null)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'โหลดคิวของช่างไม่สำเร็จ')
+    }
+  }
+
+  async function refreshBarberProfile() {
+    try {
+      const result = await api<Barber>('/api/barbers/me')
+      setBarberProfile(result)
+      setBarberProfileForm({
+        fullName: result.fullName,
+        nickname: result.nickname ?? '',
+        phoneNumber: result.phoneNumber,
+        specialty: result.specialty ?? '',
+        experienceYears: result.experienceYears?.toString() ?? '',
+        bio: result.bio ?? '',
+        isAvailable: result.isAvailable,
+        acceptsBooking: result.acceptsBooking,
+      })
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'โหลดข้อมูลช่างไม่สำเร็จ')
+    }
+  }
+
+  async function saveBarberProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const result = await api<Barber>('/api/barbers/me', {
+        method: 'PUT',
+        body: JSON.stringify({
+          fullName: barberProfileForm.fullName,
+          nickname: barberProfileForm.nickname || null,
+          phoneNumber: barberProfileForm.phoneNumber,
+          specialty: barberProfileForm.specialty || null,
+          experienceYears: barberProfileForm.experienceYears ? Number(barberProfileForm.experienceYears) : null,
+          bio: barberProfileForm.bio || null,
+          isAvailable: barberProfileForm.isAvailable,
+          acceptsBooking: barberProfileForm.acceptsBooking,
+        }),
+      })
+
+      setBarberProfile(result)
+      setBarberProfileForm({
+        fullName: result.fullName,
+        nickname: result.nickname ?? '',
+        phoneNumber: result.phoneNumber,
+        specialty: result.specialty ?? '',
+        experienceYears: result.experienceYears?.toString() ?? '',
+        bio: result.bio ?? '',
+        isAvailable: result.isAvailable,
+        acceptsBooking: result.acceptsBooking,
+      })
+      setAuth((current) => current ? { ...current, fullName: result.fullName } : current)
+      setIsBarberProfileEditing(false)
+      setMessage('บันทึกข้อมูลส่วนตัวแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'บันทึกข้อมูลส่วนตัวไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
     }
   }
 
@@ -1097,6 +1175,8 @@ function selectScheduleDate(dateValue: string) {
     setAuth(null)
     setQueue([])
     setBarberQueue([])
+    setBarberProfile(null)
+    setIsBarberProfileEditing(false)
     setMyBookings([])
     setAvailability([])
     setSelectedBooking(null)
@@ -1267,6 +1347,103 @@ function selectScheduleDate(dateValue: string) {
             </section>
 
             <aside className="barber-side-panel">
+              <section className="barber-profile-card">
+                <div className="barber-profile-heading">
+                  <div>
+                    <span>โปรไฟล์ของฉัน</span>
+                    <strong>{barberProfile?.fullName ?? auth.fullName}</strong>
+                    <small>{barberProfile?.email ?? auth.email}</small>
+                  </div>
+                  <button
+                    className="secondary compact-button"
+                    onClick={() => setIsBarberProfileEditing((current) => !current)}
+                    type="button"
+                  >
+                    {isBarberProfileEditing ? 'ปิด' : 'แก้ไข'}
+                  </button>
+                </div>
+
+                {isBarberProfileEditing ? (
+                  <form className="barber-profile-form" onSubmit={saveBarberProfile}>
+                    <label>
+                      ชื่อที่แสดง
+                      <input
+                        value={barberProfileForm.fullName}
+                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, fullName: event.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      ชื่อเล่น
+                      <input
+                        value={barberProfileForm.nickname}
+                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, nickname: event.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      เบอร์โทร
+                      <input
+                        value={barberProfileForm.phoneNumber}
+                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, phoneNumber: event.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      ความถนัด / จุดเด่น
+                      <input
+                        value={barberProfileForm.specialty}
+                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, specialty: event.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      ประสบการณ์ (ปี)
+                      <input
+                        min="0"
+                        type="number"
+                        value={barberProfileForm.experienceYears}
+                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, experienceYears: event.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      Bio
+                      <textarea
+                        rows={3}
+                        value={barberProfileForm.bio}
+                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, bio: event.target.value }))}
+                      />
+                    </label>
+                    <label className="toggle-row">
+                      <input
+                        checked={barberProfileForm.isAvailable}
+                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, isAvailable: event.target.checked }))}
+                        type="checkbox"
+                      />
+                      พร้อมให้บริการ
+                    </label>
+                    <label className="toggle-row">
+                      <input
+                        checked={barberProfileForm.acceptsBooking}
+                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, acceptsBooking: event.target.checked }))}
+                        type="checkbox"
+                      />
+                      รับจองออนไลน์
+                    </label>
+                    <button disabled={isBusy} type="submit">
+                      บันทึกโปรไฟล์
+                    </button>
+                  </form>
+                ) : (
+                  <div className="barber-profile-summary">
+                    <span><strong>เบอร์โทร</strong>{barberProfile?.phoneNumber ?? '-'}</span>
+                    <span><strong>ความถนัด</strong>{barberProfile?.specialty ?? '-'}</span>
+                    <span><strong>ประสบการณ์</strong>{barberProfile?.experienceYears ?? 0} ปี</span>
+                    <p>{barberProfile?.bio || 'ยังไม่มี Bio'}</p>
+                    <div className="barber-profile-flags">
+                      <span className={barberProfile?.isAvailable ? 'active' : ''}>พร้อมให้บริการ</span>
+                      <span className={barberProfile?.acceptsBooking ? 'active' : ''}>รับจองออนไลน์</span>
+                    </div>
+                  </div>
+                )}
+              </section>
+
               <h2>สรุปสถานะ</h2>
               <div className="barber-status-list">
                 <span><i className="legend-dot pending" /> รอยืนยัน <strong>{barberQueueSummary.pending}</strong></span>
