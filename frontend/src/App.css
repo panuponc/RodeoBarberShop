@@ -1923,7 +1923,7 @@ button.danger.solid:hover {
   box-shadow: none;
   color: #2a1b15;
   overflow: hidden;
-  padding: 9px 9px 27px;
+  padding: 9px 68px 10px 10px;
   pointer-events: auto;
   text-align: left;
 }
@@ -1962,6 +1962,12 @@ button.danger.solid:hover {
   font-size: 0.68rem;
   font-style: normal;
   font-weight: 800;
+}
+
+.cancelled-schedule-card .schedule-card-status {
+  top: 8px;
+  right: 8px;
+  bottom: auto;
 }
 
 .schedule-card-status {
