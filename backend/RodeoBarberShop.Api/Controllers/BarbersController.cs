@@ -17,7 +17,7 @@ public class BarbersController(ApplicationDbContext dbContext) : ControllerBase
     public async Task<ActionResult<IReadOnlyList<BarberResponse>>> GetBarbers(CancellationToken cancellationToken)
     {
         var barbers = await BaseBarberQuery()
-            .Where(barber => barber.User.AccountStatus == AccountStatus.Active && barber.AcceptsBooking)
+            .Where(barber => barber.User.AccountStatus == AccountStatus.Active)
             .OrderBy(barber => barber.User.FullName)
             .Select(barber => ToResponse(barber))
             .ToListAsync(cancellationToken);

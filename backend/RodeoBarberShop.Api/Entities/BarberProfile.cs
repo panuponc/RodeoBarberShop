@@ -17,4 +17,5 @@ public class BarberProfile
     public ICollection<BarberService> BarberServices { get; set; } = [];
     public ICollection<BarberWorkingHour> WorkingHours { get; set; } = [];
     public ICollection<LeaveRequest> LeaveRequests { get; set; } = [];
+    public ICollection<BarberChairAssignment> ChairAssignments { get; set; } = [];
 }

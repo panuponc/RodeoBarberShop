@@ -15,6 +15,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ShopHoliday> ShopHolidays => Set<ShopHoliday>();
     public DbSet<BarberService> BarberServices => Set<BarberService>();
     public DbSet<BarberWorkingHour> BarberWorkingHours => Set<BarberWorkingHour>();
+    public DbSet<Chair> Chairs => Set<Chair>();
+    public DbSet<BarberChairAssignment> BarberChairAssignments => Set<BarberChairAssignment>();
     public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
     public DbSet<PaymentAccount> PaymentAccounts => Set<PaymentAccount>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -299,6 +301,50 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.HasOne(workingHour => workingHour.Barber)
                 .WithMany(barber => barber.WorkingHours)
                 .HasForeignKey(workingHour => workingHour.BarberId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Chair>(entity =>
+        {
+            entity.ToTable("chairs");
+            entity.HasKey(chair => chair.Id);
+
+            entity.Property(chair => chair.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
+            entity.Property(chair => chair.Note).HasColumnName("note").HasMaxLength(255);
+            entity.Property(chair => chair.SortOrder).HasColumnName("sort_order").IsRequired();
+            entity.Property(chair => chair.IsActive).HasColumnName("is_active").IsRequired();
+            entity.Property(chair => chair.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(chair => chair.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            entity.HasIndex(chair => chair.SortOrder);
+            entity.HasIndex(chair => chair.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<BarberChairAssignment>(entity =>
+        {
+            entity.ToTable("barber_chair_assignments");
+            entity.HasKey(assignment => assignment.Id);
+
+            entity.Property(assignment => assignment.ChairId).HasColumnName("chair_id").IsRequired();
+            entity.Property(assignment => assignment.BarberId).HasColumnName("barber_id").IsRequired();
+            entity.Property(assignment => assignment.StartDate).HasColumnName("start_date").IsRequired();
+            entity.Property(assignment => assignment.EndDate).HasColumnName("end_date");
+            entity.Property(assignment => assignment.IsPrimary).HasColumnName("is_primary").IsRequired();
+            entity.Property(assignment => assignment.Note).HasColumnName("note").HasMaxLength(255);
+            entity.Property(assignment => assignment.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(assignment => assignment.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            entity.HasIndex(assignment => new { assignment.ChairId, assignment.StartDate, assignment.EndDate });
+            entity.HasIndex(assignment => new { assignment.BarberId, assignment.StartDate, assignment.EndDate });
+
+            entity.HasOne(assignment => assignment.Chair)
+                .WithMany(chair => chair.Assignments)
+                .HasForeignKey(assignment => assignment.ChairId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(assignment => assignment.Barber)
+                .WithMany(barber => barber.ChairAssignments)
+                .HasForeignKey(assignment => assignment.BarberId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

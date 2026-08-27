@@ -135,7 +135,7 @@ public class DevController(
         var seedBarbers = new[]
         {
             new RodeoBarberSeed(
-                "ช่างเค๊ก",
+                "ช่างเค้ก",
                 "0810000001",
                 "cake.barber@rodeobarber.local",
                 "BarberPassword123!",
@@ -204,6 +204,8 @@ public class DevController(
         {
             responses.Add(await UpsertRodeoBarber(seed, cancellationToken));
         }
+
+        await UpsertRodeoChairs(responses, cancellationToken);
 
         return Ok(responses);
     }
@@ -366,6 +368,112 @@ public class DevController(
         return ToResponse(user, profile, created);
     }
 
+    private async Task UpsertRodeoChairs(
+        IReadOnlyList<SeedBarberResponse> seededBarbers,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var standbyBarberEmail = "neng.barber@rodeobarber.local";
+        var chairSeeds = new[]
+        {
+            new RodeoChairSeed("เก้าอี้ 1", "ติดกระจก", 1, new[] { "cake.barber@rodeobarber.local" }, new[] { standbyBarberEmail }),
+            new RodeoChairSeed("เก้าอี้ 2", "เก้าอี้ประจำ", 2, new[] { "bum.barber@rodeobarber.local" }, new[] { standbyBarberEmail }),
+            new RodeoChairSeed("เก้าอี้ 3", "ช่างนุ้ยจองล่วงหน้า 1 วัน", 3, new[] { "nook.barber@rodeobarber.local", "nui.barber@rodeobarber.local" }, new[] { standbyBarberEmail }),
+            new RodeoChairSeed("เก้าอี้ 4", "เก้าอี้ประจำ", 4, new[] { "ple.barber@rodeobarber.local" }, new[] { standbyBarberEmail }),
+            new RodeoChairSeed("เก้าอี้ 5", "หน้าทีวี", 5, new[] { "deaw.barber@rodeobarber.local" }, new[] { standbyBarberEmail })
+        };
+        var seededBarberByEmail = seededBarbers.ToDictionary(
+            barber => barber.Email.ToLowerInvariant(),
+            barber => barber.BarberId);
+        var seededBarberIds = seededBarbers.Select(barber => barber.BarberId).ToList();
+        var chairNames = chairSeeds.Select(chair => chair.Name).ToList();
+
+        var existingChairs = await dbContext.Chairs
+            .Where(chair => chairNames.Contains(chair.Name))
+            .ToDictionaryAsync(chair => chair.Name, cancellationToken);
+
+        var chairs = new List<Chair>();
+        foreach (var seed in chairSeeds)
+        {
+            if (!existingChairs.TryGetValue(seed.Name, out var chair))
+            {
+                chair = new Chair
+                {
+                    Id = Guid.NewGuid(),
+                    CreatedAt = now
+                };
+
+                dbContext.Chairs.Add(chair);
+            }
+
+            chair.Name = seed.Name;
+            chair.Note = seed.Note;
+            chair.SortOrder = seed.SortOrder;
+            chair.IsActive = true;
+            chair.UpdatedAt = now;
+            chairs.Add(chair);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var chairIds = chairs.Select(chair => chair.Id).ToList();
+        await dbContext.BarberChairAssignments
+            .Where(assignment => chairIds.Contains(assignment.ChairId)
+                || seededBarberIds.Contains(assignment.BarberId))
+            .ExecuteDeleteAsync(cancellationToken);
+
+        var assignments = new List<BarberChairAssignment>();
+        foreach (var seed in chairSeeds)
+        {
+            var chair = existingChairs.GetValueOrDefault(seed.Name)
+                ?? chairs.First(existingChair => existingChair.Name == seed.Name);
+
+            foreach (var barberEmail in seed.PrimaryBarberEmails)
+            {
+                if (!seededBarberByEmail.TryGetValue(barberEmail, out var barberId))
+                {
+                    continue;
+                }
+
+                assignments.Add(new BarberChairAssignment
+                {
+                    Id = Guid.NewGuid(),
+                    ChairId = chair.Id,
+                    BarberId = barberId,
+                    StartDate = new DateOnly(2026, 1, 1),
+                    IsPrimary = true,
+                    Note = seed.Note,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+            }
+
+            foreach (var barberEmail in seed.StandbyBarberEmails)
+            {
+                if (!seededBarberByEmail.TryGetValue(barberEmail, out var barberId))
+                {
+                    continue;
+                }
+
+                assignments.Add(new BarberChairAssignment
+                {
+                    Id = Guid.NewGuid(),
+                    ChairId = chair.Id,
+                    BarberId = barberId,
+                    StartDate = new DateOnly(2026, 1, 1),
+                    IsPrimary = false,
+                    Note = "ช่างสำรองรอแทนเก้าอี้ว่าง",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+            }
+        }
+
+        dbContext.BarberChairAssignments.AddRange(assignments);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.ChangeTracker.Clear();
+    }
+
     private sealed record RodeoBarberSeed(
         string FullName,
         string PhoneNumber,
@@ -375,4 +483,11 @@ public class DevController(
         int ExperienceYears,
         string Bio,
         IReadOnlyList<int> WorkingDays);
+
+    private sealed record RodeoChairSeed(
+        string Name,
+        string Note,
+        int SortOrder,
+        IReadOnlyList<string> PrimaryBarberEmails,
+        IReadOnlyList<string> StandbyBarberEmails);
 }

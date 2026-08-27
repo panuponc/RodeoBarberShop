@@ -249,6 +249,11 @@
   line-height: 1.02;
 }
 
+.barber-profile-trigger {
+  min-height: 42px;
+  padding-inline: 14px;
+}
+
 .barber-day-card {
   border: 1px solid rgb(201 151 61 / 16%);
   border-radius: 18px;
@@ -459,6 +464,72 @@
 .barber-profile-form .toggle-row input {
   width: 16px;
   min-height: 16px;
+}
+
+.barber-profile-modal {
+  width: min(720px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+}
+
+.barber-profile-modal-form {
+  gap: 16px;
+  padding: 20px 28px 28px;
+}
+
+.barber-profile-form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.barber-profile-form-grid .wide-field {
+  grid-column: 1 / -1;
+}
+
+.barber-profile-toggle-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.barber-profile-toggle-grid .toggle-row {
+  border: 1px solid #ead8bd;
+  border-radius: 14px;
+  background: #fffdfa;
+  padding: 12px;
+}
+
+.barber-profile-toggle-grid .toggle-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.barber-profile-toggle-grid .toggle-row strong {
+  color: #241a12;
+  font-size: 0.92rem;
+}
+
+.barber-profile-toggle-grid .toggle-row small {
+  color: #7d6f61;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.modal-action-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+}
+
+.modal-action-row button {
+  min-height: 50px;
+}
+
+.barber-mobile-nav {
+  display: none;
 }
 
 .barber-section-heading {
@@ -1102,6 +1173,150 @@ button.link-button {
   overflow: auto;
   box-shadow: 0 28px 80px rgb(31 24 18 / 24%);
   margin: 0;
+}
+
+.staff-account-modal,
+.standby-modal {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid #e8d8bd;
+  border-radius: 22px;
+  background: #fffaf3;
+  box-shadow: 0 28px 80px rgb(31 24 18 / 24%);
+}
+
+.password-reset-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.modal-header.compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #ead8bd;
+  background: linear-gradient(135deg, #fffaf3, #f8ecd8);
+}
+
+.modal-header.compact h2 {
+  margin: 4px 0 0;
+  color: #1f1710;
+}
+
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  padding: 0;
+  background: #fffdf8;
+  color: #3b2b1e;
+  font-size: 1.5rem;
+  box-shadow: 0 10px 24px rgba(80, 54, 24, 0.1);
+}
+
+.staff-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 14px;
+  padding: 22px 24px;
+}
+
+.staff-modal-grid label,
+.standby-chair-option {
+  display: grid;
+  gap: 7px;
+  color: #6f5a45;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.staff-modal-grid input,
+.staff-modal-grid select {
+  min-height: 46px;
+  border: 1px solid #ddc8a7;
+  border-radius: 12px;
+  background: #fffdf8;
+  color: #1f1710;
+  font: inherit;
+  font-weight: 900;
+  padding: 0 12px;
+}
+
+.staff-derived-field {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-height: 46px;
+  border: 1px solid #ead8bd;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgb(255 248 236 / 92%), rgb(255 253 248 / 92%));
+  color: #6f5a45;
+  padding: 11px 14px;
+}
+
+.staff-derived-field span,
+.staff-derived-field small {
+  color: #85715c;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.staff-derived-field strong {
+  color: #1f1710;
+  font-size: 1.02rem;
+  line-height: 1.2;
+}
+
+.staff-modal-wide {
+  grid-column: 1 / -1;
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px 24px 24px;
+  border-top: 1px solid #ead8bd;
+  background: rgba(255, 250, 242, 0.92);
+}
+
+.standby-modal {
+  padding-bottom: 0;
+}
+
+.standby-modal > p {
+  padding: 0 24px;
+}
+
+.standby-chair-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 12px 24px 22px;
+}
+
+.standby-chair-option {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #ead8bd;
+  border-radius: 14px;
+  background: #fffdf8;
+}
+
+.standby-chair-option strong,
+.standby-chair-option small {
+  display: block;
+}
+
+.standby-chair-option small {
+  color: #806b55;
 }
 
 .booking-detail-modal {
@@ -2518,7 +2733,7 @@ button.danger.solid:hover {
 }
 
 .staff-management-grid {
-  grid-template-columns: minmax(360px, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .customer-grid {
@@ -2553,6 +2768,429 @@ button.danger.solid:hover {
 .account-form h2 {
   margin: 0;
   color: #1d1711;
+}
+
+.chair-management-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #ead8bd;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fffaf2 0%, #fff 72%);
+}
+
+.master-roster-panel {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid #ead8bd;
+  border-radius: 18px;
+  background:
+    linear-gradient(120deg, rgba(236, 246, 239, 0.9), rgba(255, 250, 242, 0.96) 54%, rgba(255, 255, 255, 0.94)),
+    #fffdf8;
+}
+
+.roster-table {
+  overflow: hidden;
+  border: 1px solid #eadfce;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.roster-row {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.6fr) repeat(7, minmax(38px, 0.32fr));
+  align-items: center;
+  min-height: 48px;
+  border-bottom: 1px solid #f0e3cf;
+}
+
+.roster-row:last-child {
+  border-bottom: 0;
+}
+
+.roster-row > span,
+.roster-row > button {
+  text-align: center;
+}
+
+.roster-head {
+  min-height: 36px;
+  background: rgba(50, 67, 57, 0.06);
+  color: #68543e;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.roster-barber {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 12px;
+}
+
+.roster-barber strong,
+.roster-barber small {
+  display: block;
+}
+
+.roster-barber small {
+  color: #7c6a56;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 20%, #7d5114, #2b1c0d);
+  color: #fffaf0;
+  font-size: 0.76rem;
+  font-weight: 1000;
+}
+
+.roster-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: #eee8dd;
+  color: #9b8873;
+  cursor: pointer;
+  font-weight: 1000;
+  line-height: 1;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.roster-check.active {
+  background: #d59a2e;
+  color: #fff7e8;
+}
+
+.roster-check:hover:not(:disabled),
+.roster-check:focus-visible {
+  border-color: #b97e21;
+  box-shadow: 0 8px 18px rgba(100, 62, 15, 0.16);
+  transform: translateY(-1px);
+}
+
+.roster-check:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.assignment-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 0.42fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.section-heading-inline {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.section-heading-inline h3 {
+  margin: 0;
+}
+
+.section-heading-inline small {
+  color: #8b755d;
+  font-weight: 900;
+}
+
+.chair-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.chair-roster-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-self: start;
+  gap: 11px;
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid #ead8bd;
+  border-radius: 16px;
+  background: rgba(255, 253, 248, 0.86);
+  box-shadow: 0 10px 28px rgba(80, 54, 24, 0.04);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.chair-roster-card:hover {
+  border-color: #d2962c;
+  box-shadow: 0 14px 30px rgba(80, 54, 24, 0.08);
+  transform: translateY(-1px);
+}
+
+.chair-roster-card.shared {
+  border-color: #d2962c;
+  background:
+    linear-gradient(135deg, rgba(255, 246, 230, 0.95), rgba(255, 253, 248, 0.96)),
+    #fffdf8;
+}
+
+.chair-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #f6ead6;
+  color: #9a5b00;
+  font-weight: 1000;
+}
+
+.chair-roster-card strong,
+.chair-roster-card small {
+  display: block;
+}
+
+.chair-roster-card small {
+  color: #806b55;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.25;
+  margin-top: 2px;
+}
+
+.chair-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.chair-share-toggle {
+  border-radius: 999px;
+  border: 1px solid #ead8bd;
+  background: #fffdf8;
+  color: #7a6045;
+  font-size: 0.7rem;
+  font-weight: 1000;
+  line-height: 1;
+  min-height: 28px;
+  padding: 6px 10px;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.chair-share-toggle.active {
+  border-color: #d2962c;
+  background: #fff0d1;
+  color: #a06000;
+}
+
+.chair-share-toggle:hover:not(:disabled) {
+  border-color: #d2962c;
+  transform: translateY(-1px);
+}
+
+.chair-roster-card select {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  border: 1px solid #ddc8a7;
+  border-radius: 12px;
+  background: #fff;
+  color: #1f1710;
+  font: inherit;
+  font-weight: 900;
+  padding: 0 12px;
+}
+
+.chair-roster-card .single-chair-select {
+  margin-top: 12px;
+}
+
+.shared-chair-picker {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(234, 216, 189, 0.72);
+}
+
+.shared-chair-picker label {
+  display: grid;
+  gap: 6px;
+  color: #7a6045;
+  font-size: 0.78rem;
+  font-weight: 1000;
+}
+
+.shared-chair-picker select {
+  margin-top: 0;
+}
+
+.standby-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.standby-roster-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ead8bd;
+  border-radius: 14px;
+  background: #fff;
+  color: #1f1710;
+  text-align: left;
+  box-shadow: none;
+}
+
+.standby-roster-card:hover {
+  border-color: #d2962c;
+  transform: translateY(-1px);
+}
+
+.standby-roster-card strong,
+.standby-roster-card small {
+  display: block;
+}
+
+.standby-roster-card small {
+  color: #7d6a55;
+  font-weight: 800;
+}
+
+.standby-roster-card b {
+  border-radius: 999px;
+  background: #eee8dd;
+  color: #5e5143;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.chair-assignment-form {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(110px, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.chair-assignment-form label {
+  display: grid;
+  gap: 6px;
+  color: #6f5a45;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.chair-assignment-form input,
+.chair-assignment-form select {
+  min-height: 44px;
+  border: 1px solid #ddc8a7;
+  border-radius: 12px;
+  background: #fffdf8;
+  color: #1f1710;
+  font: inherit;
+  font-weight: 900;
+  padding: 0 12px;
+}
+
+.chair-assignment-form button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.chair-assignment-list {
+  display: grid;
+  gap: 8px;
+}
+
+.chair-assignment-card {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #eadfce;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.chair-assignment-card strong,
+.chair-assignment-card span {
+  display: block;
+}
+
+.chair-assignment-card span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #7a664f;
+  font-weight: 800;
+}
+
+.assignment-role {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.assignment-role.primary {
+  background: #ecfdf3;
+  color: #217345;
+}
+
+.assignment-role.standby {
+  background: #fff2d8;
+  color: #9a5b00;
+}
+
+.chair-assignment-card small,
+.chair-assignment-card em {
+  color: #806b55;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .queue-list,
@@ -2783,58 +3421,100 @@ button.danger.solid:hover {
   padding: 14px;
 }
 
-.account-card > div:first-child:not(.staff-card-summary),
+.staff-directory {
+  overflow: hidden;
+}
+
+.staff-directory .panel-heading {
+  align-items: center;
+  border-bottom: 1px solid #ead8bd;
+  margin-bottom: 0;
+  padding-bottom: 14px;
+}
+
+.staff-directory .header-actions {
+  flex-wrap: nowrap;
+}
+
+.staff-account-row {
+  border: 1px solid #ead8bd;
+  border-radius: 14px;
+  background: rgba(255, 253, 248, 0.9);
+  margin-top: 10px;
+  padding: 0;
+  overflow: hidden;
+}
+
 .staff-card-summary {
+  display: grid;
+  align-items: center;
+  gap: 14px;
+  grid-template-columns: minmax(240px, 1.4fr) minmax(170px, 0.66fr) minmax(240px, 1.1fr) minmax(260px, auto);
+  min-width: 0;
+  padding: 13px 14px;
+}
+
+.staff-person-cell,
+.staff-contact-cell {
+  display: grid;
   min-width: 0;
 }
 
-.account-card strong,
-.account-card span,
-.account-card small {
-  overflow-wrap: anywhere;
+.staff-person-cell strong,
+.staff-person-cell small,
+.staff-contact-cell small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-person-cell strong {
+  color: #1f1710;
+  font-size: 1rem;
+}
+
+.staff-person-cell small,
+.staff-contact-cell small {
+  color: #776754;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.staff-role-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border-radius: 999px;
+  background: #f6ead6;
+  color: #8c5810;
+  font-size: 0.78rem;
+  font-weight: 1000;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.staff-badge-cell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
 }
 
 .account-actions {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   justify-content: flex-end;
-}
-
-.staff-card-summary {
-  display: grid;
-  align-items: start;
-  gap: 14px;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
-}
-
-.staff-management-grid .account-actions {
-  align-content: start;
-  max-width: 320px;
+  min-width: 0;
 }
 
 .staff-management-grid .account-actions button {
-  padding: 8px 11px;
-}
-
-.inline-staff-form {
-  display: grid;
-  gap: 13px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid #ece1d2;
-  background: #fffaf3;
-  margin: 2px -2px -2px;
-  padding: 16px;
-}
-
-.inline-staff-form.compact {
-  grid-template-columns: 1fr;
-}
-
-.inline-staff-form .action-row {
-  grid-column: 1 / -1;
-  margin-top: 2px;
+  min-height: 38px;
+  padding: 8px 10px;
+  white-space: nowrap;
 }
 
 .muted-pill {
@@ -2902,6 +3582,10 @@ button.danger.solid:hover {
     grid-template-columns: 1fr;
   }
 
+  .barber-side-panel {
+    order: -1;
+  }
+
   .backoffice-shell {
     grid-template-columns: 1fr;
   }
@@ -2946,6 +3630,30 @@ button.danger.solid:hover {
     grid-template-columns: 1fr;
   }
 
+  .chair-assignment-form,
+  .chair-assignment-card {
+    grid-template-columns: 1fr;
+  }
+
+  .assignment-dashboard,
+  .chair-card-grid,
+  .standby-chair-options,
+  .staff-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-table {
+    overflow-x: auto;
+  }
+
+  .roster-row {
+    min-width: 620px;
+  }
+
+  .master-roster-panel {
+    padding: 14px;
+  }
+
   .detail-panel.schedule-detail-panel {
     grid-template-columns: 1fr;
   }
@@ -2956,23 +3664,562 @@ button.danger.solid:hover {
 }
 
 @media (max-width: 720px) {
-  .barber-workspace {
-    width: min(100% - 24px, 1440px);
+  .backoffice-shell {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
 
-  .barber-date-display,
-  .barber-day-toolbar .secondary {
+  .backoffice-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    gap: 12px;
+    padding: 10px 12px 12px;
+  }
+
+  .brand-block {
+    padding: 0;
+  }
+
+  .brand-block strong {
+    font-size: 1.6rem;
+  }
+
+  .brand-block span {
+    font-size: 0.58rem;
+  }
+
+  .side-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .side-nav button {
+    min-height: 46px;
+    border-radius: 12px;
+    justify-content: center;
+    grid-template-columns: auto minmax(0, auto);
+    padding: 8px 9px;
+    font-size: 0.82rem;
+  }
+
+  .backoffice-main {
+    width: 100%;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+    padding: 12px;
+  }
+
+  .backoffice-header {
+    display: grid;
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    border-radius: 18px;
+    padding: 16px;
+  }
+
+  .backoffice-header h1 {
+    font-size: clamp(1.62rem, 8vw, 2rem);
+  }
+
+  .backoffice-header .eyebrow {
+    font-size: 0.68rem;
+  }
+
+  .backoffice-user {
+    display: grid;
+    align-items: center;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: 9px;
+    width: 100%;
+    border-radius: 16px;
+    padding: 8px;
+  }
+
+  .backoffice-user div {
+    min-width: 0;
+  }
+
+  .backoffice-user strong,
+  .backoffice-user small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .backoffice-user .secondary {
+    min-height: 36px;
+    padding: 7px 12px;
+  }
+
+  .staff-management-grid {
+    gap: 14px;
+  }
+
+  .master-roster-panel,
+  .staff-directory {
+    border-radius: 18px;
+    padding: 16px;
+  }
+
+  .master-roster-panel .panel-heading,
+  .staff-directory .panel-heading {
+    display: grid;
+    align-items: start;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .master-roster-panel .panel-heading button,
+  .staff-directory .header-actions button {
     width: 100%;
   }
 
-  .barber-summary-grid {
+  .roster-table {
+    display: grid;
+    gap: 10px;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .roster-head {
+    display: none;
+  }
+
+  .roster-row {
+    min-width: 0;
+    min-height: 0;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+    border: 1px solid #ead8bd;
+    border-radius: 16px;
+    background: rgb(255 255 255 / 82%);
+    padding: 12px;
+  }
+
+  .roster-row:last-child {
+    border-bottom: 1px solid #ead8bd;
+  }
+
+  .roster-barber {
+    grid-column: 1 / -1;
+    padding: 0 0 9px;
+    border-bottom: 1px solid #f0e2ce;
+  }
+
+  .roster-barber strong {
+    font-size: 1rem;
+  }
+
+  .roster-barber small {
+    white-space: normal;
+  }
+
+  .roster-check {
+    display: grid;
+    width: 100%;
+    height: 48px;
+    min-height: 48px;
+    gap: 2px;
+    place-items: center;
+    border-color: #eadfce;
+    border-radius: 12px;
+    font-size: 1rem;
+  }
+
+  .roster-check::before {
+    color: #776754;
+    font-size: 0.64rem;
+    font-weight: 1000;
+    line-height: 1;
+  }
+
+  .roster-row > button:nth-of-type(1)::before { content: "จ"; }
+  .roster-row > button:nth-of-type(2)::before { content: "อ"; }
+  .roster-row > button:nth-of-type(3)::before { content: "พ"; }
+  .roster-row > button:nth-of-type(4)::before { content: "พฤ"; }
+  .roster-row > button:nth-of-type(5)::before { content: "ศ"; }
+  .roster-row > button:nth-of-type(6)::before { content: "ส"; }
+  .roster-row > button:nth-of-type(7)::before { content: "อา"; }
+
+  .assignment-dashboard {
+    gap: 16px;
+  }
+
+  .section-heading-inline {
+    align-items: flex-start;
+  }
+
+  .chair-card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .chair-roster-card {
+    grid-template-columns: 38px minmax(0, 1fr);
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .chair-title-row {
+    align-items: flex-start;
+  }
+
+  .chair-roster-card select {
+    min-height: 46px;
+    font-size: 0.95rem;
+  }
+
+  .shared-chair-picker {
+    gap: 10px;
+  }
+
+  .standby-roster-card {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .standby-roster-card b {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .staff-directory {
+    overflow: visible;
+  }
+
+  .staff-directory .header-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .staff-account-row {
+    border-radius: 18px;
+    margin-top: 12px;
+  }
+
+  .staff-card-summary {
+    display: grid;
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .staff-person-cell strong {
+    white-space: normal;
+  }
+
+  .staff-contact-cell {
+    gap: 2px;
+    border-top: 1px solid #f0e2ce;
+    padding-top: 9px;
+  }
+
+  .staff-contact-cell small {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .staff-badge-cell {
+    gap: 7px;
+  }
+
+  .staff-directory .account-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    justify-content: stretch;
+    border-top: 1px solid #f0e2ce;
+    padding-top: 10px;
+  }
+
+  .staff-management-grid .account-actions button {
+    width: 100%;
+    min-height: 36px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    padding: 7px 8px;
+  }
+
+  .barber-workspace {
+    width: 100%;
+    padding: 0 0 86px;
+  }
+
+  .barber-workspace-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: grid;
+    gap: 12px;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    box-shadow: 0 8px 24px rgb(18 14 9 / 9%);
+    margin-bottom: 0;
+    padding: 14px 16px;
+  }
+
+  .barber-workspace-header h1 {
+    font-size: 1.65rem;
+  }
+
+  .barber-workspace-header .eyebrow,
+  .barber-workspace-header small {
+    display: none;
+  }
+
+  .barber-workspace-header .backoffice-user {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    border-radius: 14px;
+    box-shadow: none;
+    padding: 8px;
+  }
+
+  .barber-workspace-header .backoffice-user div {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .barber-workspace-header .backoffice-user strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .barber-workspace-header .backoffice-user .secondary:not(.barber-profile-trigger) {
+    display: none;
+  }
+
+  .barber-profile-trigger {
+    min-height: 36px;
+    border-radius: 999px;
+    padding: 7px 11px;
+  }
+
+  .barber-day-card {
+    border-width: 0 0 1px;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 14px 12px 18px;
+  }
+
+  .barber-day-toolbar {
+    display: grid;
+    gap: 10px;
+    border-bottom: 0;
+    padding-bottom: 8px;
+  }
+
+  .barber-day-toolbar > .secondary {
+    display: none;
+  }
+
+  .barber-date-display {
+    min-width: 0;
+    width: 100%;
+    padding: 9px 12px;
+  }
+
+  .barber-day-toolbar .schedule-date-controls {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 42px auto;
+  }
+
+  .barber-day-toolbar .schedule-date-controls button {
+    min-height: 42px;
+    padding-inline: 10px;
+  }
+
+  .barber-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 8px 0 12px;
+  }
+
+  .barber-summary-grid section {
+    padding: 11px 12px;
+  }
+
+  .barber-summary-grid section:nth-child(4) {
+    display: none;
+  }
+
+  .barber-summary-grid span {
+    font-size: 0.76rem;
+  }
+
+  .barber-summary-grid strong {
+    font-size: 1.4rem;
+  }
+
+  .barber-queue-layout {
+    gap: 10px;
+  }
+
+  .barber-timeline-panel,
+  .barber-side-panel {
+    border-radius: 16px;
+  }
+
+  .barber-timeline-panel {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .barber-section-heading {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+
+  .barber-section-heading h2 {
+    font-size: 1.05rem;
+  }
+
+  .barber-side-panel {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .barber-status-list {
+    gap: 8px;
+  }
+
+  .barber-status-list span {
+    border: 1px solid #eee0cf;
+    border-radius: 12px;
+    background: #fff;
+    padding: 9px 10px;
+  }
+
+  .barber-muted-list {
+    padding-top: 12px;
   }
 
   .barber-appointment-time,
   .barber-appointment-footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .barber-appointment-card {
+    border-radius: 16px;
+    padding: 13px;
+  }
+
+  .barber-profile-modal {
+    width: 100%;
+    max-height: calc(100vh - 16px);
+    border-radius: 22px 22px 0 0;
+    align-self: end;
+  }
+
+  .staff-account-modal,
+  .standby-modal {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+    border-radius: 18px;
+  }
+
+  .modal-header.compact {
+    padding: 16px;
+  }
+
+  .staff-modal-grid,
+  .standby-chair-options,
+  .modal-actions {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .modal-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .chair-roster-card,
+  .standby-roster-card {
+    padding: 12px;
+  }
+
+  .barber-profile-modal .booking-detail-header {
+    padding: 18px 18px 16px;
+  }
+
+  .barber-profile-modal-form {
+    padding: 16px 18px 22px;
+  }
+
+  .barber-profile-form-grid,
+  .barber-profile-toggle-grid,
+  .modal-action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-directory .header-actions,
+  .staff-directory .account-actions {
+    flex-wrap: wrap;
+    justify-content: stretch;
+  }
+
+  .staff-directory .header-actions button,
+  .staff-directory .account-actions button {
+    flex: 1 1 150px;
+  }
+
+  .staff-account-row {
+    border-radius: 16px;
+  }
+
+  .staff-card-summary {
+    padding: 14px;
+  }
+
+  .barber-mobile-nav {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    z-index: 40;
+    display: grid;
+    gap: 6px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border: 1px solid rgb(228 204 170 / 80%);
+    border-radius: 20px;
+    background: rgb(255 252 247 / 94%);
+    box-shadow: 0 16px 42px rgb(33 24 15 / 18%);
+    padding: 7px;
+    backdrop-filter: blur(14px);
+  }
+
+  .barber-mobile-nav button {
+    display: grid;
+    min-height: 48px;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #6f6255;
+    font-size: 0.72rem;
+    font-weight: 900;
+    padding: 6px;
+  }
+
+  .barber-mobile-nav button span {
+    color: inherit;
+    font-size: 0.9rem;
+  }
+
+  .barber-mobile-nav button.active {
+    border-radius: 15px;
+    background: linear-gradient(135deg, #d09323, #b87916);
+    color: #fff9ed;
   }
 
   .login-shell,
@@ -2983,8 +4230,6 @@ button.danger.solid:hover {
   .topbar,
   .user-box,
   .panel-heading,
-  .backoffice-header,
-  .backoffice-user,
   .staff-card-summary {
     align-items: stretch;
     grid-template-columns: 1fr;

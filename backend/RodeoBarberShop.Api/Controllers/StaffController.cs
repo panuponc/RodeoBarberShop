@@ -74,7 +74,7 @@ public class StaffController(ApplicationDbContext dbContext, IPasswordHasher pas
 
         if (request.Role == UserRole.Barber)
         {
-            user.BarberProfile = new BarberProfile
+            var barberProfile = new BarberProfile
             {
                 Id = Guid.NewGuid(),
                 Specialty = NormalizeOptionalText(request.Specialty),
@@ -85,6 +85,9 @@ public class StaffController(ApplicationDbContext dbContext, IPasswordHasher pas
                 CreatedAt = now,
                 UpdatedAt = now
             };
+
+            user.BarberProfile = barberProfile;
+            dbContext.BarberWorkingHours.AddRange(CreateDefaultWorkingHours(barberProfile.Id, now));
         }
 
         dbContext.Users.Add(user);
@@ -119,6 +122,7 @@ public class StaffController(ApplicationDbContext dbContext, IPasswordHasher pas
             return NotFound();
         }
 
+        var previousAccountStatus = user.AccountStatus;
         var now = DateTimeOffset.UtcNow;
         user.FullName = request.FullName.Trim();
         user.Nickname = NormalizeOptionalText(request.Nickname);
@@ -131,6 +135,8 @@ public class StaffController(ApplicationDbContext dbContext, IPasswordHasher pas
 
         if (request.Role == UserRole.Barber)
         {
+            var isNewBarberProfile = user.BarberProfile is null;
+            var wasReactivated = previousAccountStatus != AccountStatus.Active && request.AccountStatus == AccountStatus.Active;
             user.BarberProfile ??= new BarberProfile
             {
                 Id = Guid.NewGuid(),
@@ -141,9 +147,19 @@ public class StaffController(ApplicationDbContext dbContext, IPasswordHasher pas
             user.BarberProfile.Specialty = NormalizeOptionalText(request.Specialty);
             user.BarberProfile.ExperienceYears = request.ExperienceYears;
             user.BarberProfile.Bio = NormalizeOptionalText(request.Bio);
-            user.BarberProfile.IsAvailable = request.IsAvailable;
-            user.BarberProfile.AcceptsBooking = request.AcceptsBooking;
+            user.BarberProfile.IsAvailable = request.AccountStatus == AccountStatus.Active && (request.IsAvailable || wasReactivated);
+            user.BarberProfile.AcceptsBooking = request.AccountStatus == AccountStatus.Active && (request.AcceptsBooking || wasReactivated);
             user.BarberProfile.UpdatedAt = now;
+
+            var hasWorkingHours = !isNewBarberProfile
+                && await dbContext.BarberWorkingHours.AnyAsync(
+                    workingHour => workingHour.BarberId == user.BarberProfile.Id,
+                    cancellationToken);
+
+            if (isNewBarberProfile || !hasWorkingHours)
+            {
+                dbContext.BarberWorkingHours.AddRange(CreateDefaultWorkingHours(user.BarberProfile.Id, now));
+            }
         }
         else if (user.BarberProfile is not null)
         {
@@ -274,5 +290,22 @@ public class StaffController(ApplicationDbContext dbContext, IPasswordHasher pas
     private static string? NormalizeOptionalText(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static IReadOnlyList<BarberWorkingHour> CreateDefaultWorkingHours(Guid barberId, DateTimeOffset now)
+    {
+        return Enumerable.Range(0, 7)
+            .Select(dayOfWeek => new BarberWorkingHour
+            {
+                Id = Guid.NewGuid(),
+                BarberId = barberId,
+                DayOfWeek = dayOfWeek,
+                StartTime = new TimeOnly(10, 0),
+                EndTime = new TimeOnly(21, 0),
+                IsWorkingDay = false,
+                CreatedAt = now,
+                UpdatedAt = now
+            })
+            .ToList();
     }
 }

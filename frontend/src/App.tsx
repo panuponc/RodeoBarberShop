@@ -50,6 +50,47 @@ type BarberSchedule = {
   workingHours: BarberWorkingHour[]
 }
 
+type ChairScheduleBarber = {
+  assignmentId: string
+  barberId: string
+  fullName: string
+  nickname: string | null
+  email: string
+  isPrimary: boolean
+  assignmentNote: string | null
+  startDate: string
+  endDate: string | null
+}
+
+type ChairScheduleConfig = {
+  id: string
+  name: string
+  note: string | null
+  sortOrder: number
+  isActive: boolean
+  barbers: ChairScheduleBarber[]
+}
+
+type Chair = {
+  id: string
+  name: string
+  note: string | null
+  sortOrder: number
+  isActive: boolean
+}
+
+type ChairAssignment = {
+  id: string
+  chairId: string
+  chairName: string
+  barberId: string
+  barberName: string
+  startDate: string
+  endDate: string | null
+  isPrimary: boolean
+  note: string | null
+}
+
 type ScheduleBarber = {
   barber: Barber
   isWorkingToday: boolean
@@ -74,21 +115,27 @@ type ChairConfig = {
   label: string
   note: string
   order: number
+  barberIds: string[]
   barberNames: string[]
+  barberEmails: string[]
+  standbyBarberIds: string[]
+  standbyBarberNames: string[]
+  standbyBarberEmails: string[]
 }
 
-const chairConfigs: ChairConfig[] = [
-  { id: 'chair-1', label: 'เก้าอี้ 1', note: 'ติดกระจก', order: 1, barberNames: ['ช่างเค๊ก'] },
-  { id: 'chair-2', label: 'เก้าอี้ 2', note: 'เก้าอี้ประจำ', order: 2, barberNames: ['ช่างบั้ม'] },
-  { id: 'chair-3', label: 'เก้าอี้ 3', note: 'ช่างนุ้ยจองล่วงหน้า 1 วัน', order: 3, barberNames: ['ช่างนุค', 'ช่างนุ้ย'] },
-  { id: 'chair-4', label: 'เก้าอี้ 4', note: 'เก้าอี้ประจำ', order: 4, barberNames: ['ช่างเปิ้ล'] },
-  { id: 'chair-5', label: 'เก้าอี้ 5', note: 'หน้าทีวี', order: 5, barberNames: ['ช่างเดียว'] },
+const defaultChairConfigs: ChairConfig[] = [
+  { id: 'chair-1', label: 'เก้าอี้ 1', note: 'ติดกระจก', order: 1, barberIds: [], barberNames: ['ช่างเค้ก'], barberEmails: ['cake.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: ['ช่างเหน่ง'], standbyBarberEmails: ['neng.barber@rodeobarber.local'] },
+  { id: 'chair-2', label: 'เก้าอี้ 2', note: 'เก้าอี้ประจำ', order: 2, barberIds: [], barberNames: ['ช่างบั้ม'], barberEmails: ['bum.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: ['ช่างเหน่ง'], standbyBarberEmails: ['neng.barber@rodeobarber.local'] },
+  { id: 'chair-3', label: 'เก้าอี้ 3', note: 'ช่างนุ้ยจองล่วงหน้า 1 วัน', order: 3, barberIds: [], barberNames: ['ช่างนุค', 'ช่างนุ้ย'], barberEmails: ['nook.barber@rodeobarber.local', 'nui.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: ['ช่างเหน่ง'], standbyBarberEmails: ['neng.barber@rodeobarber.local'] },
+  { id: 'chair-4', label: 'เก้าอี้ 4', note: 'เก้าอี้ประจำ', order: 4, barberIds: [], barberNames: ['ช่างเปิ้ล'], barberEmails: ['ple.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: ['ช่างเหน่ง'], standbyBarberEmails: ['neng.barber@rodeobarber.local'] },
+  { id: 'chair-5', label: 'เก้าอี้ 5', note: 'หน้าทีวี', order: 5, barberIds: [], barberNames: ['ช่างเดียว'], barberEmails: ['deaw.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: ['ช่างเหน่ง'], standbyBarberEmails: ['neng.barber@rodeobarber.local'] },
 ]
 
 const scheduleTimelineStartHour = 10
 const scheduleTimelineEndHour = 21
 const scheduleTimelineMinutes = (scheduleTimelineEndHour - scheduleTimelineStartHour) * 60
 const scheduleHourHeightPx = 96
+const rosterAssignmentStartDate = '2026-01-01'
 const bookingStartHours = Array.from(
   { length: scheduleTimelineEndHour - scheduleTimelineStartHour },
   (_, index) => scheduleTimelineStartHour + index,
@@ -302,11 +349,18 @@ function App() {
   const [resetPassword, setResetPassword] = useState('StaffPassword123!')
   const [isStaffPasswordVisible, setIsStaffPasswordVisible] = useState(false)
   const [isResetPasswordVisible, setIsResetPasswordVisible] = useState(false)
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false)
 
   const [services, setServices] = useState<Service[]>([])
   const staffBookingServiceGroups = useMemo(() => groupServicesForBooking(services), [services])
   const [barbers, setBarbers] = useState<Barber[]>([])
   const [barberSchedules, setBarberSchedules] = useState<Record<string, BarberSchedule>>({})
+  const [scheduleChairConfigs, setScheduleChairConfigs] = useState<ChairConfig[]>(defaultChairConfigs)
+  const [chairs, setChairs] = useState<Chair[]>([])
+  const [chairAssignments, setChairAssignments] = useState<ChairAssignment[]>([])
+  const [sharedChairIds, setSharedChairIds] = useState<string[]>([])
+  const [standbyModalBarberId, setStandbyModalBarberId] = useState<string | null>(null)
+  const [standbyModalChairIds, setStandbyModalChairIds] = useState<string[]>([])
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
   const [selectedBarberId, setSelectedBarberId] = useState('')
   const [bookingDate, setBookingDate] = useState(getTomorrowDate())
@@ -340,8 +394,44 @@ function App() {
     ? barbers.filter((barber) => staffBookingBarberOptionSet.has(barber.id))
     : barbers
   const scheduleChairs = useMemo(
-    () => getScheduleChairsForDate(barbers, barberSchedules, scheduleDate),
-    [barberSchedules, barbers, scheduleDate],
+    () => getScheduleChairsForDate(barbers, barberSchedules, scheduleChairConfigs, scheduleDate),
+    [barberSchedules, barbers, scheduleChairConfigs, scheduleDate],
+  )
+  const currentRosterChairAssignments = useMemo(
+    () => chairAssignments.filter((assignment) => !assignment.endDate || assignment.endDate >= rosterAssignmentStartDate),
+    [chairAssignments],
+  )
+  const activePrimaryAssignmentsByChair = useMemo(() => {
+    const assignmentMap = new Map<string, ChairAssignment[]>()
+    currentRosterChairAssignments
+      .filter((assignment) => assignment.isPrimary)
+      .forEach((assignment) => {
+        const current = assignmentMap.get(assignment.chairId) ?? []
+        assignmentMap.set(assignment.chairId, [...current, assignment])
+      })
+
+    chairs.forEach((chair) => {
+      const assignments = assignmentMap.get(chair.id)
+      if (assignments) {
+        assignmentMap.set(chair.id, sortChairAssignmentsForDisplay(assignments, chair))
+      }
+    })
+
+    return assignmentMap
+  }, [currentRosterChairAssignments, chairs])
+  const activeStandbyAssignments = useMemo(
+    () => currentRosterChairAssignments.filter((assignment) => !assignment.isPrimary),
+    [currentRosterChairAssignments],
+  )
+  const standbyBarberIds = useMemo(
+    () => [...new Set(activeStandbyAssignments.map((assignment) => assignment.barberId))],
+    [activeStandbyAssignments],
+  )
+  const standbyBarbers = useMemo(
+    () => standbyBarberIds
+      .map((barberId) => barbers.find((barber) => barber.id === barberId))
+      .filter((barber): barber is Barber => Boolean(barber)),
+    [barbers, standbyBarberIds],
   )
   const staffPanelTitle =
     activeStaffPanel === 'queue' ? 'จัดการคิววันนี้' : activeStaffPanel === 'accounts' ? 'บัญชีรับเงินร้าน' : 'จัดการพนักงาน'
@@ -392,6 +482,7 @@ function selectScheduleDate(dateValue: string) {
       void refreshPaymentAccounts()
       if (auth.role === 'Owner' || auth.role === 'Admin') {
         void refreshStaffAccounts()
+        void refreshChairManagement()
       }
     }
     // oxlint-disable-next-line react-hooks/exhaustive-deps
@@ -401,6 +492,7 @@ function selectScheduleDate(dateValue: string) {
     if (!auth || auth.role === 'Customer' || auth.role === 'Barber') return
 
     void refreshQueue(scheduleDate)
+    void refreshScheduleChairConfigs(scheduleDate)
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleDate])
 
@@ -522,6 +614,7 @@ function selectScheduleDate(dateValue: string) {
       const sortedBarbers = sortBarbersByChair(barberResult)
       setBarbers(sortedBarbers)
       await refreshBarberSchedules(sortedBarbers)
+      await refreshScheduleChairConfigs(bookingDate)
       setMyBookings(bookingResult)
       setSelectedBarberId((current) => current || sortedBarbers[0]?.id || '')
     } catch (error) {
@@ -609,8 +702,269 @@ function selectScheduleDate(dateValue: string) {
       const sortedBarbers = sortBarbersByChair(result)
       setBarbers(sortedBarbers)
       await refreshBarberSchedules(sortedBarbers)
+      await refreshScheduleChairConfigs(scheduleDate)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'โหลดรายชื่อช่างไม่สำเร็จ')
+    }
+  }
+
+  async function refreshScheduleChairConfigs(targetDate = scheduleDate) {
+    const result = await api<ChairScheduleConfig[]>(`/api/chairs/schedule?date=${targetDate}`)
+    const mappedChairs = result
+      .filter((chair) => chair.isActive)
+      .map((chair) => {
+        const primaryBarbers = sortChairScheduleBarbers(
+          chair.barbers.filter((barber) => barber.isPrimary),
+          chair,
+        )
+        const standbyBarbers = sortChairScheduleBarbers(
+          chair.barbers.filter((barber) => !barber.isPrimary),
+          chair,
+        )
+
+        return {
+          id: chair.id,
+          label: chair.name,
+          note: chair.note ?? '',
+          order: chair.sortOrder,
+          barberIds: primaryBarbers.map((barber) => barber.barberId),
+          barberNames: primaryBarbers.map((barber) => barber.fullName),
+          barberEmails: primaryBarbers.map((barber) => barber.email),
+          standbyBarberIds: standbyBarbers.map((barber) => barber.barberId),
+          standbyBarberNames: standbyBarbers.map((barber) => barber.fullName),
+          standbyBarberEmails: standbyBarbers.map((barber) => barber.email),
+        }
+      })
+
+    setScheduleChairConfigs(mappedChairs.length > 0 ? mappedChairs : defaultChairConfigs)
+  }
+
+  async function refreshChairManagement() {
+    try {
+      const [chairResult, assignmentResult] = await Promise.all([
+        api<Chair[]>('/api/chairs'),
+        api<ChairAssignment[]>('/api/chairs/assignments'),
+      ])
+
+      setChairs(chairResult)
+      setChairAssignments(assignmentResult)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'โหลดข้อมูลเก้าอี้ไม่สำเร็จ')
+    }
+  }
+
+  async function savePrimaryChairAssignment(chair: Chair, barberId: string) {
+    if (!barberId) return
+
+    const currentAssignments = activePrimaryAssignmentsByChair.get(chair.id) ?? []
+    const currentAssignment = currentAssignments[0]
+    if (currentAssignments.length === 1 && currentAssignment?.barberId === barberId) return
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      if (currentAssignment) {
+        await api(`/api/chairs/assignments/${currentAssignment.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            chairId: chair.id,
+            barberId,
+            startDate: rosterAssignmentStartDate,
+            endDate: currentAssignment.endDate,
+            isPrimary: true,
+            note: chair.note || null,
+          }),
+        })
+      } else {
+        await api(`/api/chairs/${chair.id}/assignments`, {
+          method: 'POST',
+          body: JSON.stringify({
+            barberId,
+            startDate: rosterAssignmentStartDate,
+            endDate: null,
+            isPrimary: true,
+            note: chair.note || null,
+          }),
+        })
+      }
+
+      await Promise.all(
+        currentAssignments
+          .slice(1)
+          .map((assignment) => api(`/api/chairs/assignments/${assignment.id}`, { method: 'DELETE' })),
+      )
+
+      await refreshChairManagement()
+      await refreshScheduleChairConfigs(scheduleDate)
+      setMessage(`บันทึกช่างประจำ ${chair.name} แล้ว`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'บันทึกช่างประจำไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function saveSharedChairAssignments(chair: Chair, primaryBarberId: string, secondaryBarberId: string) {
+    const currentAssignments = activePrimaryAssignmentsByChair.get(chair.id) ?? []
+    const nextBarberIds = [primaryBarberId, secondaryBarberId].filter((barberId, index, barberIds) => (
+      barberId && barberIds.indexOf(barberId) === index
+    ))
+
+    if (nextBarberIds.length === 0) return
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await Promise.all(nextBarberIds.map((barberId, index) => {
+        const existingAssignment = currentAssignments[index]
+        const payload = {
+          chairId: chair.id,
+          barberId,
+          startDate: rosterAssignmentStartDate,
+          endDate: existingAssignment?.endDate ?? null,
+          isPrimary: true,
+          note: index === 0 ? 'ช่างหลัก' : 'ช่างรอง',
+        }
+
+        return existingAssignment
+          ? api(`/api/chairs/assignments/${existingAssignment.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          })
+          : api(`/api/chairs/${chair.id}/assignments`, {
+            method: 'POST',
+            body: JSON.stringify({
+              barberId,
+              startDate: rosterAssignmentStartDate,
+              endDate: null,
+              isPrimary: true,
+              note: payload.note,
+            }),
+          })
+      }))
+
+      await Promise.all(
+        currentAssignments
+          .slice(nextBarberIds.length)
+          .map((assignment) => api(`/api/chairs/assignments/${assignment.id}`, { method: 'DELETE' })),
+      )
+
+      await refreshChairManagement()
+      await refreshScheduleChairConfigs(scheduleDate)
+      setMessage(`บันทึกช่างหลัก/รอง ${chair.name} แล้ว`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'บันทึกช่างหลัก/รองไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  function changeSharedPrimaryChairAssignment(chair: Chair, nextPrimaryBarberId: string) {
+    const currentAssignments = activePrimaryAssignmentsByChair.get(chair.id) ?? []
+    const currentPrimaryBarberId = currentAssignments[0]?.barberId ?? ''
+    const currentSecondaryBarberId = currentAssignments[1]?.barberId ?? ''
+    const nextSecondaryBarberId = nextPrimaryBarberId === currentSecondaryBarberId
+      ? currentPrimaryBarberId
+      : currentSecondaryBarberId
+
+    void saveSharedChairAssignments(chair, nextPrimaryBarberId, nextSecondaryBarberId)
+  }
+
+  function changeSharedSecondaryChairAssignment(chair: Chair, nextSecondaryBarberId: string) {
+    const currentAssignments = activePrimaryAssignmentsByChair.get(chair.id) ?? []
+    const currentPrimaryBarberId = currentAssignments[0]?.barberId ?? ''
+    const currentSecondaryBarberId = currentAssignments[1]?.barberId ?? ''
+    const nextPrimaryBarberId = nextSecondaryBarberId === currentPrimaryBarberId
+      ? currentSecondaryBarberId
+      : currentPrimaryBarberId
+
+    void saveSharedChairAssignments(chair, nextPrimaryBarberId, nextSecondaryBarberId)
+  }
+
+  async function toggleChairSharing(chair: Chair, isCurrentlyShared: boolean) {
+    const currentAssignments = activePrimaryAssignmentsByChair.get(chair.id) ?? []
+
+    if (!isCurrentlyShared) {
+      setSharedChairIds((current) => current.includes(chair.id) ? current : [...current, chair.id])
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await Promise.all(
+        currentAssignments
+          .slice(1)
+          .map((assignment) => api(`/api/chairs/assignments/${assignment.id}`, { method: 'DELETE' })),
+      )
+
+      setSharedChairIds((current) => current.filter((chairId) => chairId !== chair.id))
+      await refreshChairManagement()
+      await refreshScheduleChairConfigs(scheduleDate)
+      setMessage(`ปิดแชร์ ${chair.name} แล้ว`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'ปิดแชร์เก้าอี้ไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  function openStandbyModal(barberId: string) {
+    const assignedChairIds = activeStandbyAssignments
+      .filter((assignment) => assignment.barberId === barberId)
+      .map((assignment) => assignment.chairId)
+
+    setStandbyModalBarberId(barberId)
+    setStandbyModalChairIds(assignedChairIds)
+  }
+
+  function toggleStandbyChair(chairId: string) {
+    setStandbyModalChairIds((current) => (
+      current.includes(chairId)
+        ? current.filter((selectedChairId) => selectedChairId !== chairId)
+        : [...current, chairId]
+    ))
+  }
+
+  async function saveStandbyAssignments() {
+    if (!standbyModalBarberId) return
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const currentAssignments = activeStandbyAssignments.filter((assignment) => assignment.barberId === standbyModalBarberId)
+      const currentChairIds = new Set(currentAssignments.map((assignment) => assignment.chairId))
+      const desiredChairIds = new Set(standbyModalChairIds)
+      const assignmentsToDelete = currentAssignments.filter((assignment) => !desiredChairIds.has(assignment.chairId))
+      const chairIdsToCreate = standbyModalChairIds.filter((chairId) => !currentChairIds.has(chairId))
+
+      await Promise.all([
+        ...assignmentsToDelete.map((assignment) => api(`/api/chairs/assignments/${assignment.id}`, { method: 'DELETE' })),
+        ...chairIdsToCreate.map((chairId) => api(`/api/chairs/${chairId}/assignments`, {
+          method: 'POST',
+          body: JSON.stringify({
+            barberId: standbyModalBarberId,
+            startDate: rosterAssignmentStartDate,
+            endDate: null,
+            isPrimary: false,
+            note: 'ช่างสำรองรอแทนเก้าอี้ว่าง',
+          }),
+        })),
+      ])
+
+      setStandbyModalBarberId(null)
+      setStandbyModalChairIds([])
+      await refreshChairManagement()
+      await refreshScheduleChairConfigs(scheduleDate)
+      setMessage('บันทึกช่างสำรองแล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'บันทึกช่างสำรองไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
     }
   }
 
@@ -620,6 +974,44 @@ function selectScheduleDate(dateValue: string) {
     )
 
     setBarberSchedules(Object.fromEntries(schedules.map((schedule) => [schedule.barberId, schedule])))
+  }
+
+  async function toggleBarberWorkingDay(barber: Barber, dayOfWeek: number) {
+    const currentSchedule = barberSchedules[barber.id]
+    const existingWorkingHours = currentSchedule?.workingHours ?? []
+    const existingWorkingHour = existingWorkingHours.find((workingHour) => workingHour.dayOfWeek === dayOfWeek)
+    const nextIsWorkingDay = !(existingWorkingHour?.isWorkingDay ?? false)
+    const nextWorkingHours = [0, 1, 2, 3, 4, 5, 6].map((day) => {
+      const workingHour = existingWorkingHours.find((item) => item.dayOfWeek === day)
+
+      return {
+        dayOfWeek: day,
+        startTime: workingHour?.startTime ?? '10:00:00',
+        endTime: workingHour?.endTime ?? '21:00:00',
+        isWorkingDay: day === dayOfWeek ? nextIsWorkingDay : (workingHour?.isWorkingDay ?? false),
+      }
+    })
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const updatedSchedule = await api<BarberSchedule>(`/api/barbers/${barber.id}/working-hours`, {
+        method: 'PUT',
+        body: JSON.stringify({ workingHours: nextWorkingHours }),
+      })
+
+      setBarberSchedules((current) => ({
+        ...current,
+        [barber.id]: updatedSchedule,
+      }))
+      await refreshScheduleChairConfigs(scheduleDate)
+      setMessage(nextIsWorkingDay ? `เปิดวันทำงานของ ${barber.fullName} แล้ว` : `ปิดวันทำงานของ ${barber.fullName} แล้ว`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'บันทึกวันทำงานไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
   }
 
   async function refreshServices() {
@@ -934,10 +1326,10 @@ function selectScheduleDate(dateValue: string) {
           startDate: staffForm.startDate || null,
           note: staffForm.note || null,
           specialty: staffForm.specialty || null,
-          experienceYears: staffForm.experienceYears ? Number(staffForm.experienceYears) : null,
+          experienceYears: getExperienceYearsFromStartDate(staffForm.startDate),
           bio: staffForm.bio || null,
-          isAvailable: staffForm.role === 'Barber' ? staffForm.isAvailable : false,
-          acceptsBooking: staffForm.role === 'Barber' ? staffForm.acceptsBooking : false,
+          isAvailable: staffForm.role === 'Barber',
+          acceptsBooking: staffForm.role === 'Barber',
         }),
       })
 
@@ -953,6 +1345,10 @@ function selectScheduleDate(dateValue: string) {
         note: '',
       }))
       await refreshStaffAccounts()
+      if (staffForm.role === 'Barber') {
+        await refreshBarbers()
+      }
+      setIsStaffModalOpen(false)
       setMessage('เพิ่มบัญชีพนักงานแล้ว')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'เพิ่มบัญชีพนักงานไม่สำเร็จ')
@@ -966,6 +1362,7 @@ function selectScheduleDate(dateValue: string) {
     setMessage('')
 
     try {
+      const shouldActivateBarber = accountStatus === 'Active' && staff.role === 'Barber'
       await api(`/api/staff/${staff.id}`, {
         method: 'PUT',
         body: JSON.stringify({
@@ -979,11 +1376,15 @@ function selectScheduleDate(dateValue: string) {
           specialty: staff.specialty,
           experienceYears: staff.experienceYears,
           bio: staff.bio,
-          isAvailable: accountStatus === 'Active' && staff.role === 'Barber' ? staff.isAvailable : false,
-          acceptsBooking: accountStatus === 'Active' && staff.role === 'Barber' ? staff.acceptsBooking : false,
+          isAvailable: shouldActivateBarber,
+          acceptsBooking: shouldActivateBarber,
         }),
       })
       await refreshStaffAccounts()
+      if (staff.role === 'Barber') {
+        await refreshBarbers()
+        await refreshChairManagement()
+      }
       setMessage(accountStatus === 'Active' ? 'เปิดใช้งานพนักงานแล้ว' : 'ปิดใช้งานพนักงานแล้ว')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'อัปเดตสถานะพนักงานไม่สำเร็จ')
@@ -1028,15 +1429,18 @@ function selectScheduleDate(dateValue: string) {
           startDate: editStaffForm.startDate || null,
           note: editStaffForm.note || null,
           specialty: editStaffForm.specialty || null,
-          experienceYears: editStaffForm.experienceYears ? Number(editStaffForm.experienceYears) : null,
+          experienceYears: getExperienceYearsFromStartDate(editStaffForm.startDate),
           bio: editStaffForm.bio || null,
-          isAvailable: editStaffForm.role === 'Barber' ? editStaffForm.isAvailable : false,
-          acceptsBooking: editStaffForm.role === 'Barber' ? editStaffForm.acceptsBooking : false,
+          isAvailable: editStaffForm.role === 'Barber' && editStaffForm.accountStatus === 'Active',
+          acceptsBooking: editStaffForm.role === 'Barber' && editStaffForm.accountStatus === 'Active',
         }),
       })
 
       setEditingStaffId(null)
       await refreshStaffAccounts()
+      if (staff.role === 'Barber' || editStaffForm.role === 'Barber') {
+        await refreshBarbers()
+      }
       setMessage('บันทึกข้อมูลพนักงานแล้ว')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'บันทึกข้อมูลพนักงานไม่สำเร็จ')
@@ -1171,6 +1575,23 @@ function selectScheduleDate(dateValue: string) {
     setCancelReason('')
   }
 
+  function closeBarberProfileEditor() {
+    if (barberProfile) {
+      setBarberProfileForm({
+        fullName: barberProfile.fullName,
+        nickname: barberProfile.nickname ?? '',
+        phoneNumber: barberProfile.phoneNumber,
+        specialty: barberProfile.specialty ?? '',
+        experienceYears: barberProfile.experienceYears?.toString() ?? '',
+        bio: barberProfile.bio ?? '',
+        isAvailable: barberProfile.isAvailable,
+        acceptsBooking: barberProfile.acceptsBooking,
+      })
+    }
+
+    setIsBarberProfileEditing(false)
+  }
+
   function logout() {
     setAuth(null)
     setQueue([])
@@ -1273,6 +1694,9 @@ function selectScheduleDate(dateValue: string) {
               <strong>{auth.fullName}</strong>
               <small>ช่างประจำร้าน</small>
             </div>
+            <button className="secondary barber-profile-trigger" onClick={() => setIsBarberProfileEditing(true)} type="button">
+              โปรไฟล์
+            </button>
             <button className="secondary" onClick={logout} type="button">
               Logout
             </button>
@@ -1347,103 +1771,6 @@ function selectScheduleDate(dateValue: string) {
             </section>
 
             <aside className="barber-side-panel">
-              <section className="barber-profile-card">
-                <div className="barber-profile-heading">
-                  <div>
-                    <span>โปรไฟล์ของฉัน</span>
-                    <strong>{barberProfile?.fullName ?? auth.fullName}</strong>
-                    <small>{barberProfile?.email ?? auth.email}</small>
-                  </div>
-                  <button
-                    className="secondary compact-button"
-                    onClick={() => setIsBarberProfileEditing((current) => !current)}
-                    type="button"
-                  >
-                    {isBarberProfileEditing ? 'ปิด' : 'แก้ไข'}
-                  </button>
-                </div>
-
-                {isBarberProfileEditing ? (
-                  <form className="barber-profile-form" onSubmit={saveBarberProfile}>
-                    <label>
-                      ชื่อที่แสดง
-                      <input
-                        value={barberProfileForm.fullName}
-                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, fullName: event.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      ชื่อเล่น
-                      <input
-                        value={barberProfileForm.nickname}
-                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, nickname: event.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      เบอร์โทร
-                      <input
-                        value={barberProfileForm.phoneNumber}
-                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, phoneNumber: event.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      ความถนัด / จุดเด่น
-                      <input
-                        value={barberProfileForm.specialty}
-                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, specialty: event.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      ประสบการณ์ (ปี)
-                      <input
-                        min="0"
-                        type="number"
-                        value={barberProfileForm.experienceYears}
-                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, experienceYears: event.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      Bio
-                      <textarea
-                        rows={3}
-                        value={barberProfileForm.bio}
-                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, bio: event.target.value }))}
-                      />
-                    </label>
-                    <label className="toggle-row">
-                      <input
-                        checked={barberProfileForm.isAvailable}
-                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, isAvailable: event.target.checked }))}
-                        type="checkbox"
-                      />
-                      พร้อมให้บริการ
-                    </label>
-                    <label className="toggle-row">
-                      <input
-                        checked={barberProfileForm.acceptsBooking}
-                        onChange={(event) => setBarberProfileForm((current) => ({ ...current, acceptsBooking: event.target.checked }))}
-                        type="checkbox"
-                      />
-                      รับจองออนไลน์
-                    </label>
-                    <button disabled={isBusy} type="submit">
-                      บันทึกโปรไฟล์
-                    </button>
-                  </form>
-                ) : (
-                  <div className="barber-profile-summary">
-                    <span><strong>เบอร์โทร</strong>{barberProfile?.phoneNumber ?? '-'}</span>
-                    <span><strong>ความถนัด</strong>{barberProfile?.specialty ?? '-'}</span>
-                    <span><strong>ประสบการณ์</strong>{barberProfile?.experienceYears ?? 0} ปี</span>
-                    <p>{barberProfile?.bio || 'ยังไม่มี Bio'}</p>
-                    <div className="barber-profile-flags">
-                      <span className={barberProfile?.isAvailable ? 'active' : ''}>พร้อมให้บริการ</span>
-                      <span className={barberProfile?.acceptsBooking ? 'active' : ''}>รับจองออนไลน์</span>
-                    </div>
-                  </div>
-                )}
-              </section>
-
               <h2>สรุปสถานะ</h2>
               <div className="barber-status-list">
                 <span><i className="legend-dot pending" /> รอยืนยัน <strong>{barberQueueSummary.pending}</strong></span>
@@ -1468,6 +1795,126 @@ function selectScheduleDate(dateValue: string) {
             </aside>
           </div>
         </section>
+
+        <nav className="barber-mobile-nav" aria-label="เมนูช่าง">
+          <button className="active" type="button">
+            <span>คิว</span>
+            วันนี้
+          </button>
+          <button onClick={() => refreshBarberQueue(barberScheduleDate)} type="button">
+            <span>รีเฟรช</span>
+            งาน
+          </button>
+          <button onClick={() => setIsBarberProfileEditing(true)} type="button">
+            <span>ตั้งค่า</span>
+            โปรไฟล์
+          </button>
+        </nav>
+
+        {isBarberProfileEditing && (
+          <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeBarberProfileEditor()
+            }
+          }}>
+            <article className="detail-panel barber-profile-modal" role="dialog" aria-modal="true" aria-labelledby="barber-profile-title">
+              <div className="booking-detail-header">
+                <div>
+                  <span className="modal-eyebrow">ตั้งค่าช่าง</span>
+                  <h2 id="barber-profile-title">โปรไฟล์ของฉัน</h2>
+                  <small className="booking-number-chip">{barberProfile?.email ?? auth.email}</small>
+                </div>
+                <button className="icon-button" aria-label="ปิดโปรไฟล์" onClick={closeBarberProfileEditor} type="button">
+                  ×
+                </button>
+              </div>
+
+              <form className="barber-profile-form barber-profile-modal-form" onSubmit={saveBarberProfile}>
+                <div className="barber-profile-form-grid">
+                  <label>
+                    ชื่อที่แสดง
+                    <input
+                      value={barberProfileForm.fullName}
+                      onChange={(event) => setBarberProfileForm((current) => ({ ...current, fullName: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    ชื่อเล่น
+                    <input
+                      value={barberProfileForm.nickname}
+                      onChange={(event) => setBarberProfileForm((current) => ({ ...current, nickname: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    เบอร์โทร
+                    <input
+                      value={barberProfileForm.phoneNumber}
+                      onChange={(event) => setBarberProfileForm((current) => ({ ...current, phoneNumber: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    ประสบการณ์ (ปี)
+                    <input
+                      min="0"
+                      type="number"
+                      value={barberProfileForm.experienceYears}
+                      onChange={(event) => setBarberProfileForm((current) => ({ ...current, experienceYears: event.target.value }))}
+                    />
+                  </label>
+                  <label className="wide-field">
+                    ความถนัด / จุดเด่น
+                    <input
+                      value={barberProfileForm.specialty}
+                      onChange={(event) => setBarberProfileForm((current) => ({ ...current, specialty: event.target.value }))}
+                    />
+                  </label>
+                  <label className="wide-field">
+                    Bio
+                    <textarea
+                      rows={4}
+                      value={barberProfileForm.bio}
+                      onChange={(event) => setBarberProfileForm((current) => ({ ...current, bio: event.target.value }))}
+                    />
+                  </label>
+                </div>
+
+                <div className="barber-profile-toggle-grid">
+                  <label className="toggle-row">
+                    <input
+                      checked={barberProfileForm.isAvailable}
+                      onChange={(event) => setBarberProfileForm((current) => ({ ...current, isAvailable: event.target.checked }))}
+                      type="checkbox"
+                    />
+                    <span>
+                      <strong>พร้อมให้บริการ</strong>
+                      <small>ใช้บอกสถานะหน้าคิวของร้าน</small>
+                    </span>
+                  </label>
+                  <label className="toggle-row">
+                    <input
+                      checked={barberProfileForm.acceptsBooking}
+                      onChange={(event) => setBarberProfileForm((current) => ({ ...current, acceptsBooking: event.target.checked }))}
+                      type="checkbox"
+                    />
+                    <span>
+                      <strong>รับจองออนไลน์</strong>
+                      <small>เปิด/ปิดการรับคิวจากลูกค้า</small>
+                    </span>
+                  </label>
+                </div>
+
+                <div className="modal-action-row">
+                  <button className="secondary" onClick={closeBarberProfileEditor} type="button">
+                    ยกเลิก
+                  </button>
+                  <button disabled={isBusy} type="submit">
+                    บันทึกโปรไฟล์
+                  </button>
+                </div>
+              </form>
+            </article>
+          </div>
+        )}
 
         {selectedBooking && (
           <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
@@ -2375,129 +2822,213 @@ function selectScheduleDate(dateValue: string) {
         </section>
       ) : (
         <section className="accounts-grid staff-management-grid">
-          <form className="account-form" onSubmit={saveStaffAccount}>
-            <h2>เพิ่มพนักงาน</h2>
-            <label>
-              ชื่อ-นามสกุล
-              <input value={staffForm.fullName} onChange={(event) => setStaffForm({ ...staffForm, fullName: event.target.value })} />
-            </label>
-            <label>
-              ชื่อเล่น
-              <input value={staffForm.nickname} onChange={(event) => setStaffForm({ ...staffForm, nickname: event.target.value })} />
-            </label>
-            <label>
-              เบอร์โทร
-              <input value={staffForm.phoneNumber} onChange={(event) => setStaffForm({ ...staffForm, phoneNumber: event.target.value })} />
-            </label>
-            <label>
-              Email
-              <input value={staffForm.email} onChange={(event) => setStaffForm({ ...staffForm, email: event.target.value })} />
-            </label>
-            <label>
-              Password เริ่มต้น
-              <PasswordInput
-                isVisible={isStaffPasswordVisible}
-                onChange={(value) => setStaffForm({ ...staffForm, password: value })}
-                onToggleVisibility={() => setIsStaffPasswordVisible((current) => !current)}
-                value={staffForm.password}
-              />
-              <small>รหัสนี้ใช้ให้พนักงาน login ครั้งแรก เจ้าของร้านแก้ก่อนสร้างบัญชีได้</small>
-            </label>
-            <label>
-              Role
-              <select
-                value={staffForm.role}
-                onChange={(event) => setStaffForm({ ...staffForm, role: event.target.value as 'Barber' | 'FrontDeskStaff' })}
-              >
-                <option value="Barber">Barber</option>
-                <option value="FrontDeskStaff">Front Desk Staff</option>
-              </select>
-            </label>
-            <label>
-              วันเริ่มงาน
-              <input
-                type="date"
-                value={staffForm.startDate}
-                onChange={(event) => setStaffForm({ ...staffForm, startDate: event.target.value })}
-              />
-            </label>
-
-            {staffForm.role === 'Barber' && (
-              <>
-                <label>
-                  ความถนัด
-                  <input value={staffForm.specialty} onChange={(event) => setStaffForm({ ...staffForm, specialty: event.target.value })} />
-                </label>
-                <label>
-                  ประสบการณ์ (ปี)
-                  <input
-                    min="0"
-                    type="number"
-                    value={staffForm.experienceYears}
-                    onChange={(event) => setStaffForm({ ...staffForm, experienceYears: event.target.value })}
-                  />
-                </label>
-                <label>
-                  Bio
-                  <input value={staffForm.bio} onChange={(event) => setStaffForm({ ...staffForm, bio: event.target.value })} />
-                </label>
-                <label className="checkbox-label">
-                  <input
-                    checked={staffForm.isAvailable}
-                    onChange={(event) => setStaffForm({ ...staffForm, isAvailable: event.target.checked })}
-                    type="checkbox"
-                  />
-                  พร้อมให้บริการ
-                </label>
-                <label className="checkbox-label">
-                  <input
-                    checked={staffForm.acceptsBooking}
-                    onChange={(event) => setStaffForm({ ...staffForm, acceptsBooking: event.target.checked })}
-                    type="checkbox"
-                  />
-                  รับจองออนไลน์
-                </label>
-              </>
-            )}
-
-            <label>
-              หมายเหตุ
-              <input value={staffForm.note} onChange={(event) => setStaffForm({ ...staffForm, note: event.target.value })} />
-            </label>
-            <button disabled={isBusy} type="submit">
-              สร้างบัญชีพนักงาน
-            </button>
-          </form>
-
-          <div className="account-list">
+          <section className="master-roster-panel">
             <div className="panel-heading">
-              <h2>รายชื่อพนักงาน</h2>
-              <button disabled={isBusy} onClick={refreshStaffAccounts} type="button">
+              <div>
+                <h2>Master Roster</h2>
+                <p className="muted">ภาพรวมวันทำงาน เก้าอี้ประจำ และช่างสำรองของร้าน</p>
+              </div>
+              <button
+                disabled={isBusy}
+                onClick={() => {
+                  void refreshBarbers()
+                  void refreshChairManagement()
+                }}
+                type="button"
+              >
                 Refresh
               </button>
+            </div>
+
+            <div className="roster-table">
+              <div className="roster-row roster-head">
+                <span>ช่าง</span>
+                {['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'].map((day) => <span key={day}>{day}</span>)}
+              </div>
+              {barbers.map((barber) => {
+                const schedule = barberSchedules[barber.id]
+                return (
+                  <div className="roster-row" key={barber.id}>
+                    <div className="roster-barber">
+                      <span className="mini-avatar">{getInitials(barber.nickname || barber.fullName || 'ช')}</span>
+                      <div>
+                        <strong>{barber.fullName}</strong>
+                        <small>{barber.specialty ?? 'ยังไม่ระบุความถนัด'}</small>
+                      </div>
+                    </div>
+                    {[1, 2, 3, 4, 5, 6, 0].map((day) => {
+                      const workingHour = schedule?.workingHours.find((item) => item.dayOfWeek === day)
+                      const isWorkingDay = workingHour?.isWorkingDay ?? false
+                      return (
+                        <button
+                          aria-label={`${isWorkingDay ? 'ปิด' : 'เปิด'}วันทำงาน ${barber.fullName}`}
+                          className={isWorkingDay ? 'roster-check active' : 'roster-check'}
+                          disabled={isBusy}
+                          key={day}
+                          onClick={() => void toggleBarberWorkingDay(barber, day)}
+                          title={isWorkingDay ? 'กดเพื่อปิดวันทำงาน' : 'กดเพื่อเปิดวันทำงาน'}
+                          type="button"
+                        >
+                          {isWorkingDay ? '✓' : '×'}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="assignment-dashboard">
+              <section>
+                <div className="section-heading-inline">
+                  <h3>Chair Assignments</h3>
+                  <small>{formatDateOnly(scheduleDate)}</small>
+                </div>
+                <div className="chair-card-grid">
+                  {chairs.map((chair) => {
+                    const primaryAssignments = activePrimaryAssignmentsByChair.get(chair.id) ?? []
+                    const primaryAssignment = primaryAssignments[0]
+                    const isShared = isSharedChair(chair, primaryAssignments, sharedChairIds)
+                    const sharedBarberOptions = getSharedChairBarberOptions(chair, barbers)
+                    return (
+                      <article className={isShared ? 'chair-roster-card shared' : 'chair-roster-card'} key={chair.id}>
+                        <div className="chair-icon">▣</div>
+                        <div>
+                          <div className="chair-title-row">
+                            <strong>{chair.name}</strong>
+                            <button
+                              className={isShared ? 'chair-share-toggle active' : 'chair-share-toggle'}
+                              disabled={isBusy}
+                              onClick={() => void toggleChairSharing(chair, isShared)}
+                              type="button"
+                            >
+                              {isShared ? 'แชร์อยู่' : 'เปิดแชร์'}
+                            </button>
+                          </div>
+                          <small>{chair.note ?? 'ไม่มีหมายเหตุ'}</small>
+                          {isShared ? (
+                            <div className="shared-chair-picker">
+                              <label>
+                                ช่างหลัก
+                                <select
+                                  value={primaryAssignments[0]?.barberId ?? ''}
+                                  onChange={(event) => changeSharedPrimaryChairAssignment(chair, event.target.value)}
+                                >
+                                  <option value="">เลือกช่างหลัก</option>
+                                  {sharedBarberOptions.map((barber) => (
+                                    <option key={barber.id} value={barber.id}>
+                                      {barber.fullName}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label>
+                                ช่างรอง
+                                <select
+                                  value={primaryAssignments[1]?.barberId ?? ''}
+                                  onChange={(event) => changeSharedSecondaryChairAssignment(chair, event.target.value)}
+                                >
+                                  <option value="">ไม่ระบุช่างรอง</option>
+                                  {sharedBarberOptions.map((barber) => (
+                                    <option key={barber.id} value={barber.id}>
+                                      {barber.fullName}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+                          ) : (
+                            <select
+                              className="single-chair-select"
+                              value={primaryAssignment?.barberId ?? ''}
+                              onChange={(event) => void savePrimaryChairAssignment(chair, event.target.value)}
+                            >
+                              <option value="">เลือกช่างประจำ</option>
+                              {barbers.map((barber) => (
+                                <option key={barber.id} value={barber.id}>
+                                  {barber.fullName}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              </section>
+
+              <section>
+                <div className="section-heading-inline">
+                  <h3>Standby Roster</h3>
+                  <small>{standbyBarbers.length} คน</small>
+                </div>
+                <div className="standby-card-list">
+                  {standbyBarbers.length === 0 ? (
+                    <p className="empty-state">ยังไม่มีช่างสำรอง</p>
+                  ) : (
+                    standbyBarbers.map((barber) => {
+                      const assignedChairs = activeStandbyAssignments
+                        .filter((assignment) => assignment.barberId === barber.id)
+                        .map((assignment) => assignment.chairName)
+                      return (
+                        <button className="standby-roster-card" key={barber.id} onClick={() => openStandbyModal(barber.id)} type="button">
+                          <span className="mini-avatar">{getInitials(barber.nickname || barber.fullName || 'ช')}</span>
+                          <span>
+                            <strong>{barber.fullName}</strong>
+                            <small>{assignedChairs.join(', ') || 'ยังไม่เลือกเก้าอี้'}</small>
+                          </span>
+                          <b>Standby</b>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <div className="account-list staff-directory">
+            <div className="panel-heading">
+              <div>
+                <h2>รายชื่อพนักงาน</h2>
+                <p className="muted">จัดการบัญชีและสถานะพนักงาน</p>
+              </div>
+              <div className="header-actions">
+                <button className="secondary" disabled={isBusy} onClick={refreshStaffAccounts} type="button">
+                  Refresh
+                </button>
+                <button disabled={isBusy} onClick={() => setIsStaffModalOpen(true)} type="button">
+                  + เพิ่มพนักงาน
+                </button>
+              </div>
             </div>
 
             {staffAccounts.length === 0 ? (
               <p className="empty-state">ยังไม่มีบัญชีพนักงาน</p>
             ) : (
               staffAccounts.map((staff) => (
-                <article className="account-card" key={staff.id}>
+                <article className="account-card staff-account-row" key={staff.id}>
                   <div className="staff-card-summary">
-                    <div>
+                    <div className="staff-person-cell">
                       <strong>{staff.fullName}</strong>
-                      <span>{staff.role}</span>
-                      <small>{staff.email}</small>
-                      <small>{staff.phoneNumber}</small>
                       {staff.role === 'Barber' && (
                         <small>
-                          {staff.specialty ?? 'ยังไม่ระบุความถนัด'} / {staff.acceptsBooking ? 'รับจองออนไลน์' : 'ไม่รับจองออนไลน์'}
+                          {staff.specialty ?? 'ยังไม่ระบุความถนัด'} / {formatEmploymentTenure(staff.startDate)}
                         </small>
                       )}
                     </div>
-                    <div className="account-actions">
+                    <div className="staff-badge-cell">
+                      <span className="staff-role-pill">{staff.role}</span>
                       <span className={staff.accountStatus === 'Active' ? 'status-pill' : 'status-pill muted-pill'}>
                         {staff.accountStatus}
                       </span>
+                    </div>
+                    <div className="staff-contact-cell">
+                      <small>{staff.email}</small>
+                      <small>{staff.phoneNumber}</small>
+                    </div>
+                    <div className="account-actions">
                       <button className="secondary" disabled={isBusy} onClick={() => startEditingStaff(staff)} type="button">
                         แก้ไข
                       </button>
@@ -2505,13 +3036,13 @@ function selectScheduleDate(dateValue: string) {
                         className="secondary"
                         disabled={isBusy}
                         onClick={() => {
-                          setResetPasswordStaffId(resetPasswordStaffId === staff.id ? null : staff.id)
+                          setResetPasswordStaffId(staff.id)
                           setEditingStaffId(null)
                           setResetPassword('StaffPassword123!')
                         }}
                         type="button"
                       >
-                        Reset Password
+                        รีเซ็ตรหัส
                       </button>
                       {staff.accountStatus === 'Active' ? (
                         <button
@@ -2535,139 +3066,6 @@ function selectScheduleDate(dateValue: string) {
                     </div>
                   </div>
 
-                  {editingStaffId === staff.id && (
-                    <form className="inline-staff-form" onSubmit={(event) => saveStaffEdit(event, staff)}>
-                      <label>
-                        ชื่อ-นามสกุล
-                        <input
-                          value={editStaffForm.fullName}
-                          onChange={(event) => setEditStaffForm({ ...editStaffForm, fullName: event.target.value })}
-                        />
-                      </label>
-                      <label>
-                        ชื่อเล่น
-                        <input
-                          value={editStaffForm.nickname}
-                          onChange={(event) => setEditStaffForm({ ...editStaffForm, nickname: event.target.value })}
-                        />
-                      </label>
-                      <label>
-                        เบอร์โทร
-                        <input
-                          value={editStaffForm.phoneNumber}
-                          onChange={(event) => setEditStaffForm({ ...editStaffForm, phoneNumber: event.target.value })}
-                        />
-                      </label>
-                      <label>
-                        Role
-                        <select
-                          value={editStaffForm.role}
-                          onChange={(event) =>
-                            setEditStaffForm({ ...editStaffForm, role: event.target.value as 'Barber' | 'FrontDeskStaff' })
-                          }
-                        >
-                          <option value="Barber">Barber</option>
-                          <option value="FrontDeskStaff">Front Desk Staff</option>
-                        </select>
-                      </label>
-                      <label>
-                        สถานะบัญชี
-                        <select
-                          value={editStaffForm.accountStatus}
-                          onChange={(event) => setEditStaffForm({ ...editStaffForm, accountStatus: event.target.value })}
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Disabled">Disabled</option>
-                          <option value="Suspended">Suspended</option>
-                          <option value="Resigned">Resigned</option>
-                        </select>
-                      </label>
-                      <label>
-                        วันเริ่มงาน
-                        <input
-                          type="date"
-                          value={editStaffForm.startDate}
-                          onChange={(event) => setEditStaffForm({ ...editStaffForm, startDate: event.target.value })}
-                        />
-                      </label>
-
-                      {editStaffForm.role === 'Barber' && (
-                        <>
-                          <label>
-                            ความถนัด
-                            <input
-                              value={editStaffForm.specialty}
-                              onChange={(event) => setEditStaffForm({ ...editStaffForm, specialty: event.target.value })}
-                            />
-                          </label>
-                          <label>
-                            ประสบการณ์ (ปี)
-                            <input
-                              min="0"
-                              type="number"
-                              value={editStaffForm.experienceYears}
-                              onChange={(event) => setEditStaffForm({ ...editStaffForm, experienceYears: event.target.value })}
-                            />
-                          </label>
-                          <label>
-                            Bio
-                            <input value={editStaffForm.bio} onChange={(event) => setEditStaffForm({ ...editStaffForm, bio: event.target.value })} />
-                          </label>
-                          <label className="checkbox-label">
-                            <input
-                              checked={editStaffForm.isAvailable}
-                              onChange={(event) => setEditStaffForm({ ...editStaffForm, isAvailable: event.target.checked })}
-                              type="checkbox"
-                            />
-                            พร้อมให้บริการ
-                          </label>
-                          <label className="checkbox-label">
-                            <input
-                              checked={editStaffForm.acceptsBooking}
-                              onChange={(event) => setEditStaffForm({ ...editStaffForm, acceptsBooking: event.target.checked })}
-                              type="checkbox"
-                            />
-                            รับจองออนไลน์
-                          </label>
-                        </>
-                      )}
-
-                      <label>
-                        หมายเหตุ
-                        <input value={editStaffForm.note} onChange={(event) => setEditStaffForm({ ...editStaffForm, note: event.target.value })} />
-                      </label>
-                      <div className="action-row">
-                        <button disabled={isBusy} type="submit">
-                          บันทึก
-                        </button>
-                        <button className="secondary" onClick={() => setEditingStaffId(null)} type="button">
-                          ยกเลิก
-                        </button>
-                      </div>
-                    </form>
-                  )}
-
-                  {resetPasswordStaffId === staff.id && (
-                    <form className="inline-staff-form compact" onSubmit={(event) => saveStaffPassword(event, staff)}>
-                      <label>
-                        Password ใหม่
-                        <PasswordInput
-                          isVisible={isResetPasswordVisible}
-                          onChange={setResetPassword}
-                          onToggleVisibility={() => setIsResetPasswordVisible((current) => !current)}
-                          value={resetPassword}
-                        />
-                      </label>
-                      <div className="action-row">
-                        <button disabled={isBusy} type="submit">
-                          บันทึก Password ใหม่
-                        </button>
-                        <button className="secondary" onClick={() => setResetPasswordStaffId(null)} type="button">
-                          ยกเลิก
-                        </button>
-                      </div>
-                    </form>
-                  )}
                 </article>
               ))
             )}
@@ -2675,6 +3073,294 @@ function selectScheduleDate(dateValue: string) {
         </section>
         )}
       </section>
+
+      {isStaffModalOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <form className="staff-account-modal" onSubmit={saveStaffAccount}>
+            <div className="modal-header compact">
+              <div>
+                <span className="eyebrow">Staff Account</span>
+                <h2>เพิ่มพนักงาน</h2>
+              </div>
+              <button className="modal-close" onClick={() => setIsStaffModalOpen(false)} type="button">
+                ×
+              </button>
+            </div>
+
+            <div className="staff-modal-grid">
+              <label>
+                ชื่อ-นามสกุล
+                <input value={staffForm.fullName} onChange={(event) => setStaffForm({ ...staffForm, fullName: event.target.value })} />
+              </label>
+              <label>
+                ชื่อเล่น
+                <input value={staffForm.nickname} onChange={(event) => setStaffForm({ ...staffForm, nickname: event.target.value })} />
+              </label>
+              <label>
+                เบอร์โทร
+                <input value={staffForm.phoneNumber} onChange={(event) => setStaffForm({ ...staffForm, phoneNumber: event.target.value })} />
+              </label>
+              <label>
+                Email
+                <input value={staffForm.email} onChange={(event) => setStaffForm({ ...staffForm, email: event.target.value })} />
+              </label>
+              <label>
+                Password เริ่มต้น
+                <PasswordInput
+                  isVisible={isStaffPasswordVisible}
+                  onChange={(value) => setStaffForm({ ...staffForm, password: value })}
+                  onToggleVisibility={() => setIsStaffPasswordVisible((current) => !current)}
+                  value={staffForm.password}
+                />
+              </label>
+              <label>
+                Role
+                <select
+                  value={staffForm.role}
+                  onChange={(event) => setStaffForm({ ...staffForm, role: event.target.value as 'Barber' | 'FrontDeskStaff' })}
+                >
+                  <option value="Barber">Barber</option>
+                  <option value="FrontDeskStaff">Front Desk Staff</option>
+                </select>
+              </label>
+              <label>
+                วันเริ่มงาน
+                <input
+                  type="date"
+                  value={staffForm.startDate}
+                  onChange={(event) => setStaffForm({ ...staffForm, startDate: event.target.value })}
+                />
+              </label>
+              <label>
+                หมายเหตุ
+                <input value={staffForm.note} onChange={(event) => setStaffForm({ ...staffForm, note: event.target.value })} />
+              </label>
+              {staffForm.role === 'Barber' && (
+                <>
+                  <label>
+                    ความถนัด
+                    <input value={staffForm.specialty} onChange={(event) => setStaffForm({ ...staffForm, specialty: event.target.value })} />
+                  </label>
+                  <div className="staff-derived-field">
+                    <span>อายุงาน</span>
+                    <strong>{formatEmploymentTenure(staffForm.startDate)}</strong>
+                    <small>คำนวณจากวันเริ่มงาน</small>
+                  </div>
+                  <label className="staff-modal-wide">
+                    Bio
+                    <input value={staffForm.bio} onChange={(event) => setStaffForm({ ...staffForm, bio: event.target.value })} />
+                  </label>
+                </>
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button className="secondary" onClick={() => setIsStaffModalOpen(false)} type="button">
+                ยกเลิก
+              </button>
+              <button disabled={isBusy} type="submit">
+                สร้างบัญชีพนักงาน
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {editingStaffId && (() => {
+        const staff = staffAccounts.find((item) => item.id === editingStaffId)
+        if (!staff) return null
+
+        return (
+          <div className="modal-backdrop" role="presentation">
+            <form className="staff-account-modal" onSubmit={(event) => saveStaffEdit(event, staff)}>
+              <div className="modal-header compact">
+                <div>
+                  <span className="eyebrow">Edit Staff</span>
+                  <h2>แก้ไขพนักงาน</h2>
+                  <p className="muted">{staff.fullName}</p>
+                </div>
+                <button className="modal-close" onClick={() => setEditingStaffId(null)} type="button">
+                  ×
+                </button>
+              </div>
+
+              <div className="staff-modal-grid">
+                <label>
+                  ชื่อ-นามสกุล
+                  <input
+                    value={editStaffForm.fullName}
+                    onChange={(event) => setEditStaffForm({ ...editStaffForm, fullName: event.target.value })}
+                  />
+                </label>
+                <label>
+                  ชื่อเล่น
+                  <input
+                    value={editStaffForm.nickname}
+                    onChange={(event) => setEditStaffForm({ ...editStaffForm, nickname: event.target.value })}
+                  />
+                </label>
+                <label>
+                  เบอร์โทร
+                  <input
+                    value={editStaffForm.phoneNumber}
+                    onChange={(event) => setEditStaffForm({ ...editStaffForm, phoneNumber: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Role
+                  <select
+                    value={editStaffForm.role}
+                    onChange={(event) =>
+                      setEditStaffForm({ ...editStaffForm, role: event.target.value as 'Barber' | 'FrontDeskStaff' })
+                    }
+                  >
+                    <option value="Barber">Barber</option>
+                    <option value="FrontDeskStaff">Front Desk Staff</option>
+                  </select>
+                </label>
+                <label>
+                  สถานะบัญชี
+                  <select
+                    value={editStaffForm.accountStatus}
+                    onChange={(event) => setEditStaffForm({ ...editStaffForm, accountStatus: event.target.value })}
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Disabled">Disabled</option>
+                    <option value="Suspended">Suspended</option>
+                    <option value="Resigned">Resigned</option>
+                  </select>
+                </label>
+                <label>
+                  วันเริ่มงาน
+                  <input
+                    type="date"
+                    value={editStaffForm.startDate}
+                    onChange={(event) => setEditStaffForm({ ...editStaffForm, startDate: event.target.value })}
+                  />
+                </label>
+
+                {editStaffForm.role === 'Barber' && (
+                  <>
+                    <label>
+                      ความถนัด
+                      <input
+                        value={editStaffForm.specialty}
+                        onChange={(event) => setEditStaffForm({ ...editStaffForm, specialty: event.target.value })}
+                      />
+                    </label>
+                    <div className="staff-derived-field">
+                      <span>อายุงาน</span>
+                      <strong>{formatEmploymentTenure(editStaffForm.startDate)}</strong>
+                      <small>คำนวณจากวันเริ่มงาน ไม่ต้องกรอกเอง</small>
+                    </div>
+                    <label className="staff-modal-wide">
+                      Bio
+                      <input value={editStaffForm.bio} onChange={(event) => setEditStaffForm({ ...editStaffForm, bio: event.target.value })} />
+                    </label>
+                  </>
+                )}
+
+                <label className="staff-modal-wide">
+                  หมายเหตุ
+                  <input value={editStaffForm.note} onChange={(event) => setEditStaffForm({ ...editStaffForm, note: event.target.value })} />
+                </label>
+              </div>
+
+              <div className="modal-actions">
+                <button className="secondary" onClick={() => setEditingStaffId(null)} type="button">
+                  ยกเลิก
+                </button>
+                <button disabled={isBusy} type="submit">
+                  บันทึกข้อมูล
+                </button>
+              </div>
+            </form>
+          </div>
+        )
+      })()}
+
+      {resetPasswordStaffId && (() => {
+        const staff = staffAccounts.find((item) => item.id === resetPasswordStaffId)
+        if (!staff) return null
+
+        return (
+          <div className="modal-backdrop" role="presentation">
+            <form className="staff-account-modal password-reset-modal" onSubmit={(event) => saveStaffPassword(event, staff)}>
+              <div className="modal-header compact">
+                <div>
+                  <span className="eyebrow">Reset Password</span>
+                  <h2>ตั้งรหัสผ่านใหม่</h2>
+                  <p className="muted">{staff.fullName}</p>
+                </div>
+                <button className="modal-close" onClick={() => setResetPasswordStaffId(null)} type="button">
+                  ×
+                </button>
+              </div>
+
+              <div className="staff-modal-grid">
+                <label className="staff-modal-wide">
+                  Password ใหม่
+                  <PasswordInput
+                    isVisible={isResetPasswordVisible}
+                    onChange={setResetPassword}
+                    onToggleVisibility={() => setIsResetPasswordVisible((current) => !current)}
+                    value={resetPassword}
+                  />
+                </label>
+              </div>
+
+              <div className="modal-actions">
+                <button className="secondary" onClick={() => setResetPasswordStaffId(null)} type="button">
+                  ยกเลิก
+                </button>
+                <button disabled={isBusy} type="submit">
+                  บันทึก Password ใหม่
+                </button>
+              </div>
+            </form>
+          </div>
+        )
+      })()}
+
+      {standbyModalBarberId && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="standby-modal">
+            <div className="modal-header compact">
+              <div>
+                <span className="eyebrow">Standby Roster</span>
+                <h2>{barbers.find((barber) => barber.id === standbyModalBarberId)?.fullName ?? 'ช่างสำรอง'}</h2>
+              </div>
+              <button className="modal-close" onClick={() => setStandbyModalBarberId(null)} type="button">
+                ×
+              </button>
+            </div>
+            <p className="muted">เลือกเก้าอี้ที่ช่างคนนี้สามารถเข้าแทนเมื่อช่างประจำหยุด</p>
+            <div className="standby-chair-options">
+              {chairs.map((chair) => (
+                <label className="standby-chair-option" key={chair.id}>
+                  <input
+                    checked={standbyModalChairIds.includes(chair.id)}
+                    onChange={() => toggleStandbyChair(chair.id)}
+                    type="checkbox"
+                  />
+                  <span>
+                    <strong>{chair.name}</strong>
+                    <small>{chair.note ?? 'ไม่มีหมายเหตุ'}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button className="secondary" onClick={() => setStandbyModalBarberId(null)} type="button">
+                ยกเลิก
+              </button>
+              <button disabled={isBusy} onClick={() => void saveStandbyAssignments()} type="button">
+                บันทึก Standby
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   )
 }
@@ -3118,6 +3804,55 @@ function ReceiptBox({ receipt }: { receipt: Receipt }) {
   )
 }
 
+function getExperienceYearsFromStartDate(value: string | null) {
+  if (!value) return null
+
+  const startDate = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(startDate.getTime())) return null
+
+  const today = new Date()
+  let years = today.getFullYear() - startDate.getFullYear()
+  const hasNotReachedAnniversary =
+    today.getMonth() < startDate.getMonth() ||
+    (today.getMonth() === startDate.getMonth() && today.getDate() < startDate.getDate())
+
+  if (hasNotReachedAnniversary) {
+    years -= 1
+  }
+
+  return Math.max(0, years)
+}
+
+function formatEmploymentTenure(value: string | null) {
+  if (!value) return 'ยังไม่ระบุวันเริ่มงาน'
+
+  const startDate = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(startDate.getTime())) return 'วันเริ่มงานไม่ถูกต้อง'
+
+  const today = new Date()
+  if (startDate > today) return 'ยังไม่เริ่มงาน'
+
+  let years = today.getFullYear() - startDate.getFullYear()
+  let months = today.getMonth() - startDate.getMonth()
+
+  if (today.getDate() < startDate.getDate()) {
+    months -= 1
+  }
+
+  if (months < 0) {
+    years -= 1
+    months += 12
+  }
+
+  years = Math.max(0, years)
+  months = Math.max(0, months)
+
+  if (years === 0 && months === 0) return 'น้อยกว่า 1 เดือน'
+  if (years === 0) return `${months} เดือน`
+  if (months === 0) return `${years} ปี`
+  return `${years} ปี ${months} เดือน`
+}
+
 function formatMoney(value: number) {
   return new Intl.NumberFormat('th-TH', {
     style: 'currency',
@@ -3139,6 +3874,139 @@ function formatDateTime(value: string) {
     timeStyle: 'short',
     timeZone: 'Asia/Bangkok',
   }).format(new Date(value))
+}
+
+function formatDateOnly(value: string) {
+  return formatToolbarDate(parseLocalDate(value))
+}
+
+function getDefaultChairConfigByOrder(order: number) {
+  return defaultChairConfigs.find((config) => config.order === order)
+}
+
+function getAssignmentRoleOrder(assignment: ChairAssignment) {
+  if (assignment.note === 'ช่างหลัก') return 0
+  if (assignment.note === 'ช่างรอง') return 1
+
+  return 50
+}
+
+function getConfiguredBarberOrder(
+  chairOrder: number,
+  identity: { id?: string; email?: string; fullName?: string },
+) {
+  const defaultConfig = getDefaultChairConfigByOrder(chairOrder)
+
+  if (!defaultConfig) {
+    return 50
+  }
+
+  if (identity.id) {
+    const idIndex = defaultConfig.barberIds.indexOf(identity.id)
+    if (idIndex >= 0) return idIndex
+  }
+
+  if (identity.email) {
+    const emailIndex = defaultConfig.barberEmails.findIndex((email) => (
+      normalizeIdentityValue(email) === normalizeIdentityValue(identity.email ?? '')
+    ))
+    if (emailIndex >= 0) return emailIndex
+  }
+
+  if (identity.fullName) {
+    const nameIndex = defaultConfig.barberNames.indexOf(identity.fullName)
+    if (nameIndex >= 0) return nameIndex
+  }
+
+  return 50
+}
+
+function sortChairAssignmentsForDisplay(assignments: ChairAssignment[], chair: Chair) {
+  return [...assignments].sort((left, right) => {
+    const leftOrder = getConfiguredBarberOrder(chair.sortOrder, {
+      id: left.barberId,
+      fullName: left.barberName,
+    })
+    const rightOrder = getConfiguredBarberOrder(chair.sortOrder, {
+      id: right.barberId,
+      fullName: right.barberName,
+    })
+
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder
+    }
+
+    const leftRoleOrder = getAssignmentRoleOrder(left)
+    const rightRoleOrder = getAssignmentRoleOrder(right)
+
+    if (leftRoleOrder !== rightRoleOrder) {
+      return leftRoleOrder - rightRoleOrder
+    }
+
+    return left.barberName.localeCompare(right.barberName, 'th')
+  })
+}
+
+function sortChairScheduleBarbers(barbers: ChairScheduleBarber[], chair: ChairScheduleConfig) {
+  return [...barbers].sort((left, right) => {
+    const leftOrder = getConfiguredBarberOrder(chair.sortOrder, {
+      id: left.barberId,
+      email: left.email,
+      fullName: left.fullName,
+    })
+    const rightOrder = getConfiguredBarberOrder(chair.sortOrder, {
+      id: right.barberId,
+      email: right.email,
+      fullName: right.fullName,
+    })
+
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder
+    }
+
+    return left.fullName.localeCompare(right.fullName, 'th')
+  })
+}
+
+function sortScheduleBarbersForChair(barbers: ScheduleBarber[], chair: ChairConfig) {
+  return [...barbers].sort((left, right) => {
+    const leftOrder = getConfiguredBarberOrder(chair.order, {
+      id: left.barber.id,
+      email: left.barber.email,
+      fullName: left.barber.fullName,
+    })
+    const rightOrder = getConfiguredBarberOrder(chair.order, {
+      id: right.barber.id,
+      email: right.barber.email,
+      fullName: right.barber.fullName,
+    })
+
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder
+    }
+
+    return left.barber.fullName.localeCompare(right.barber.fullName, 'th')
+  })
+}
+
+function isSharedChair(chair: Chair, primaryAssignments: ChairAssignment[], sharedChairIds: string[]) {
+  const defaultConfig = getDefaultChairConfigByOrder(chair.sortOrder)
+
+  return sharedChairIds.includes(chair.id)
+    || primaryAssignments.length > 1
+    || (defaultConfig?.barberEmails.length ?? 0) > 1
+}
+
+function getSharedChairBarberOptions(chair: Chair, barbers: Barber[]) {
+  const defaultConfig = getDefaultChairConfigByOrder(chair.sortOrder)
+  const configuredBarbers = defaultConfig && defaultConfig.barberEmails.length > 1
+    ? barbers.filter((barber) => isChairBarber(barber, defaultConfig))
+    : []
+
+  const configuredBarberIds = new Set(configuredBarbers.map((barber) => barber.id))
+  const remainingBarbers = barbers.filter((barber) => !configuredBarberIds.has(barber.id))
+
+  return [...configuredBarbers, ...remainingBarbers]
 }
 
 function formatToolbarDate(value: Date) {
@@ -3190,6 +4058,7 @@ function getWorkingHourForDate(schedule: BarberSchedule | undefined, dateValue: 
 function getScheduleChairsForDate(
   barbers: Barber[],
   schedules: Record<string, BarberSchedule>,
+  chairConfigs: ChairConfig[],
   dateValue: string,
 ) {
   const scheduleBarbers: ScheduleBarber[] = barbers
@@ -3202,19 +4071,19 @@ function getScheduleChairsForDate(
         workingHour,
       }
     })
-  const scheduleBarberByName = new Map(scheduleBarbers.map((item) => [item.barber.fullName, item]))
-  const substituteBarber = scheduleBarberByName.get('ช่างเหน่ง')
-  let isSubstituteAssigned = false
+  const assignedStandbyBarberIds = new Set<string>()
 
   const activeChairs = chairConfigs.flatMap((chair) => {
-    const regularBarbers = chair.barberNames
-      .map((barberName) => scheduleBarberByName.get(barberName))
-      .filter((barber): barber is ScheduleBarber => Boolean(barber))
+    const regularBarbers = sortScheduleBarbersForChair(
+      scheduleBarbers.filter((scheduleBarber) => isChairBarber(scheduleBarber.barber, chair)),
+      chair,
+    )
+    const standbyBarbers = scheduleBarbers.filter((scheduleBarber) => isStandbyChairBarber(scheduleBarber.barber, chair))
     const workingRegularBarbers = regularBarbers.filter((item) => item.isWorkingToday)
+    const availableStandbyBarber = standbyBarbers.find((item) => item.isWorkingToday && !assignedStandbyBarberIds.has(item.barber.id))
     const canUseSubstitute = workingRegularBarbers.length === 0
-      && Boolean(substituteBarber?.isWorkingToday)
-      && !isSubstituteAssigned
-    const assignedBarbers: ScheduleBarber[] = canUseSubstitute && substituteBarber ? [substituteBarber] : workingRegularBarbers
+      && Boolean(availableStandbyBarber)
+    const assignedBarbers: ScheduleBarber[] = canUseSubstitute && availableStandbyBarber ? [availableStandbyBarber] : workingRegularBarbers
     const visibleWorkingHours = assignedBarbers
       .map((item) => item.workingHour)
       .filter((workingHour): workingHour is BarberWorkingHour => Boolean(workingHour))
@@ -3223,8 +4092,8 @@ function getScheduleChairsForDate(
       return []
     }
 
-    if (canUseSubstitute) {
-      isSubstituteAssigned = true
+    if (canUseSubstitute && availableStandbyBarber) {
+      assignedStandbyBarberIds.add(availableStandbyBarber.barber.id)
     }
 
     return {
@@ -3243,9 +4112,10 @@ function getScheduleChairsForDate(
 
   const offDayBarbers = scheduleBarbers.filter((scheduleBarber) => !scheduleBarber.isWorkingToday)
   const offDayStatusChairs = chairConfigs.flatMap((chair) => {
-    const chairOffDayBarbers = chair.barberNames
-      .map((barberName) => offDayBarbers.find((scheduleBarber) => scheduleBarber.barber.fullName === barberName))
-      .filter((scheduleBarber): scheduleBarber is ScheduleBarber => Boolean(scheduleBarber))
+    const chairOffDayBarbers = sortScheduleBarbersForChair(
+      offDayBarbers.filter((scheduleBarber) => isChairBarber(scheduleBarber.barber, chair)),
+      chair,
+    )
 
     if (chairOffDayBarbers.length === 0) {
       return []
@@ -3265,22 +4135,25 @@ function getScheduleChairsForDate(
     }]
   })
 
-  const substituteOffDayChair = substituteBarber && !substituteBarber.isWorkingToday
-    ? [{
-      id: `off-${substituteBarber.barber.id}`,
-      title: substituteBarber.barber.fullName,
+  const primaryChairBarberIds = new Set(chairConfigs.flatMap((chair) => chair.barberIds))
+  const standbyBarberIds = new Set(chairConfigs.flatMap((chair) => chair.standbyBarberIds))
+  const standbyOffDayStatusChairs = offDayBarbers
+    .filter((scheduleBarber) => standbyBarberIds.has(scheduleBarber.barber.id)
+      && !primaryChairBarberIds.has(scheduleBarber.barber.id))
+    .map((scheduleBarber) => ({
+      id: `off-${scheduleBarber.barber.id}`,
+      title: scheduleBarber.barber.fullName,
       meta: 'หยุด',
-      subtitle: 'ไม่อยู่ร้านวันนี้',
+      subtitle: 'ช่างสำรองไม่อยู่ร้านวันนี้',
       order: 199,
       isShared: false,
       hasSubstitute: false,
       isWorkingToday: false,
       workingHours: [],
-      barbers: [substituteBarber],
-    }]
-    : []
+      barbers: [scheduleBarber],
+    }))
 
-  return [...activeChairs, ...offDayStatusChairs, ...substituteOffDayChair]
+  return [...activeChairs, ...offDayStatusChairs, ...standbyOffDayStatusChairs]
 }
 
 function getScheduleBoardGridStyle(scheduleChairs: ScheduleChair[]): CSSProperties {
@@ -3299,8 +4172,8 @@ function getScheduleBoardGridStyle(scheduleChairs: ScheduleChair[]): CSSProperti
 
 function sortBarbersByChair(barbers: Barber[]) {
   return [...barbers].sort((left, right) => {
-    const leftOrder = getBarberChairOrder(left.fullName)
-    const rightOrder = getBarberChairOrder(right.fullName)
+    const leftOrder = getBarberChairOrder(left)
+    const rightOrder = getBarberChairOrder(right)
 
     if (leftOrder !== rightOrder) {
       return leftOrder - rightOrder
@@ -3310,26 +4183,64 @@ function sortBarbersByChair(barbers: Barber[]) {
   })
 }
 
-function getBarberChairOrder(fullName: string) {
-  const chairOrder: Record<string, number> = {
-    'ช่างเค๊ก': 1,
-    'ช่างบั้ม': 2,
-    'ช่างนุค': 3,
-    'ช่างนุ้ย': 3,
-    'ช่างเปิ้ล': 4,
-    'ช่างเดียว': 5,
-    'ช่างเหน่ง': 99,
+function getBarberChairOrder(barber: Barber) {
+  const configuredChair = defaultChairConfigs.find((chair) => isChairBarber(barber, chair))
+
+  if (configuredChair) {
+    return configuredChair.order
   }
 
-  return chairOrder[fullName] ?? 50
+  if (isBarberMatch(barber, { names: ['ช่างเหน่ง'], emails: ['neng.barber@rodeobarber.local'] })) {
+    return 99
+  }
+
+  return 50
+}
+
+function isChairBarber(barber: Barber, chair: ChairConfig) {
+  if (chair.barberIds.includes(barber.id)) {
+    return true
+  }
+
+  return isBarberMatch(barber, {
+    names: chair.barberNames,
+    emails: chair.barberEmails,
+  })
+}
+
+function isStandbyChairBarber(barber: Barber, chair: ChairConfig) {
+  if (chair.standbyBarberIds.includes(barber.id)) {
+    return true
+  }
+
+  return isBarberMatch(barber, {
+    names: chair.standbyBarberNames,
+    emails: chair.standbyBarberEmails,
+  })
+}
+
+function normalizeIdentityValue(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function isBarberMatch(barber: Barber, config: { names: string[]; emails: string[] }) {
+  const barberEmail = normalizeIdentityValue(barber.email)
+
+  if (barberEmail && config.emails.some((email) => normalizeIdentityValue(email) === barberEmail)) {
+    return true
+  }
+
+  return config.names.includes(barber.fullName)
 }
 
 function getChairSubtitle(chair: ChairConfig, assignedBarbers: ScheduleBarber[]) {
-  const assignedBarberNames = assignedBarbers.map((item) => item.barber.fullName)
+  const hasStandbyBarber = assignedBarbers.some((item) => isStandbyChairBarber(item.barber, chair))
 
-  if (assignedBarberNames.includes('ช่างเหน่ง')) {
+  if (hasStandbyBarber) {
     return `แทน ${chair.barberNames.join(' / ')}`
   }
+
+  const assignedBarberNames = assignedBarbers.map((item) => item.barber.fullName)
 
   if (assignedBarberNames.includes('ช่างบั้ม')) {
     return 'ผมยาว'
@@ -3339,10 +4250,6 @@ function getChairSubtitle(chair: ChairConfig, assignedBarbers: ScheduleBarber[])
 }
 
 function getChairDisplayTitle(chair: ChairConfig, assignedBarbers: ScheduleBarber[]) {
-  if (chair.id === 'chair-3') {
-    return 'ช่างนุค / นุ้ย'
-  }
-
   return assignedBarbers.length > 0
     ? assignedBarbers.map((item) => item.barber.fullName).join(' / ')
     : chair.barberNames.join(' / ')
