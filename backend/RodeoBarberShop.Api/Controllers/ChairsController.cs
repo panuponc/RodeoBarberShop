@@ -46,6 +46,7 @@ public class ChairsController(ApplicationDbContext dbContext) : ControllerBase
                         && (assignment.EndDate == null || assignment.EndDate >= date)
                         && assignment.Barber.User.AccountStatus == AccountStatus.Active)
                     .OrderByDescending(assignment => assignment.IsPrimary)
+                    .ThenBy(assignment => assignment.Note == "ช่างหลัก" ? 0 : assignment.Note == "ช่างรอง" ? 1 : 2)
                     .ThenBy(assignment => assignment.Barber.User.FullName)
                     .Select(assignment => new ChairScheduleBarberResponse(
                         assignment.Id,

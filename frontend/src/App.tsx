@@ -3923,6 +3923,13 @@ function getConfiguredBarberOrder(
 
 function sortChairAssignmentsForDisplay(assignments: ChairAssignment[], chair: Chair) {
   return [...assignments].sort((left, right) => {
+    const leftRoleOrder = getAssignmentRoleOrder(left)
+    const rightRoleOrder = getAssignmentRoleOrder(right)
+
+    if (leftRoleOrder !== rightRoleOrder) {
+      return leftRoleOrder - rightRoleOrder
+    }
+
     const leftOrder = getConfiguredBarberOrder(chair.sortOrder, {
       id: left.barberId,
       fullName: left.barberName,
@@ -3936,19 +3943,39 @@ function sortChairAssignmentsForDisplay(assignments: ChairAssignment[], chair: C
       return leftOrder - rightOrder
     }
 
-    const leftRoleOrder = getAssignmentRoleOrder(left)
-    const rightRoleOrder = getAssignmentRoleOrder(right)
-
-    if (leftRoleOrder !== rightRoleOrder) {
-      return leftRoleOrder - rightRoleOrder
-    }
-
     return left.barberName.localeCompare(right.barberName, 'th')
   })
 }
 
 function sortChairScheduleBarbers(barbers: ChairScheduleBarber[], chair: ChairScheduleConfig) {
   return [...barbers].sort((left, right) => {
+    const leftRoleOrder = getAssignmentRoleOrder({
+      id: left.assignmentId,
+      chairId: chair.id,
+      chairName: chair.name,
+      barberId: left.barberId,
+      barberName: left.fullName,
+      startDate: left.startDate,
+      endDate: left.endDate,
+      isPrimary: left.isPrimary,
+      note: left.assignmentNote,
+    })
+    const rightRoleOrder = getAssignmentRoleOrder({
+      id: right.assignmentId,
+      chairId: chair.id,
+      chairName: chair.name,
+      barberId: right.barberId,
+      barberName: right.fullName,
+      startDate: right.startDate,
+      endDate: right.endDate,
+      isPrimary: right.isPrimary,
+      note: right.assignmentNote,
+    })
+
+    if (leftRoleOrder !== rightRoleOrder) {
+      return leftRoleOrder - rightRoleOrder
+    }
+
     const leftOrder = getConfiguredBarberOrder(chair.sortOrder, {
       id: left.barberId,
       email: left.email,

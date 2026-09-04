@@ -428,8 +428,9 @@ public class DevController(
             var chair = existingChairs.GetValueOrDefault(seed.Name)
                 ?? chairs.First(existingChair => existingChair.Name == seed.Name);
 
-            foreach (var barberEmail in seed.PrimaryBarberEmails)
+            for (var index = 0; index < seed.PrimaryBarberEmails.Count; index++)
             {
+                var barberEmail = seed.PrimaryBarberEmails[index];
                 if (!seededBarberByEmail.TryGetValue(barberEmail, out var barberId))
                 {
                     continue;
@@ -442,7 +443,9 @@ public class DevController(
                     BarberId = barberId,
                     StartDate = new DateOnly(2026, 1, 1),
                     IsPrimary = true,
-                    Note = seed.Note,
+                    Note = seed.PrimaryBarberEmails.Count > 1
+                        ? index == 0 ? "ช่างหลัก" : "ช่างรอง"
+                        : seed.Note,
                     CreatedAt = now,
                     UpdatedAt = now
                 });
