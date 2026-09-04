@@ -183,6 +183,52 @@ public class BarbersController(ApplicationDbContext dbContext) : ControllerBase
         return Ok(response);
     }
 
+    [Authorize(Roles = "Owner,Admin")]
+    [HttpPut("{id:guid}/standby-priority")]
+    public async Task<ActionResult<BarberResponse>> UpdateStandbyPriority(
+        Guid id,
+        UpdateStandbyPriorityRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.StandbyPriority is < 1 or > 99)
+        {
+            return BadRequest(new { message = "Standby priority must be between 1 and 99." });
+        }
+
+        var barber = await dbContext.BarberProfiles
+            .FirstOrDefaultAsync(barber => barber.Id == id, cancellationToken);
+
+        if (barber is null)
+        {
+            return NotFound();
+        }
+
+        if (request.StandbyPriority is not null)
+        {
+            var priorityInUse = await dbContext.BarberProfiles.AnyAsync(
+                otherBarber => otherBarber.Id != id
+                    && otherBarber.StandbyPriority == request.StandbyPriority,
+                cancellationToken);
+
+            if (priorityInUse)
+            {
+                return Conflict(new { message = "Standby priority is already used by another barber." });
+            }
+        }
+
+        barber.StandbyPriority = request.StandbyPriority;
+        barber.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = await BaseBarberQuery()
+            .Where(updatedBarber => updatedBarber.Id == id)
+            .Select(updatedBarber => ToResponse(updatedBarber))
+            .FirstAsync(cancellationToken);
+
+        return Ok(response);
+    }
+
     [Authorize(Roles = "FrontDeskStaff,Owner,Admin")]
     [HttpPut("{id:guid}/availability")]
     public async Task<ActionResult<BarberResponse>> UpdateAvailability(
@@ -312,6 +358,7 @@ public class BarbersController(ApplicationDbContext dbContext) : ControllerBase
             barber.User.PhoneNumber,
             barber.Specialty,
             barber.ExperienceYears,
+            barber.StandbyPriority,
             barber.Bio,
             barber.IsAvailable,
             barber.AcceptsBooking,

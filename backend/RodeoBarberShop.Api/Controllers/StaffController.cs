@@ -255,6 +255,7 @@ public class StaffController(ApplicationDbContext dbContext, IPasswordHasher pas
             user.Note,
             user.BarberProfile?.Specialty,
             user.BarberProfile?.ExperienceYears,
+            user.BarberProfile?.StandbyPriority,
             user.BarberProfile?.Bio,
             user.BarberProfile?.IsAvailable ?? false,
             user.BarberProfile?.AcceptsBooking ?? false,

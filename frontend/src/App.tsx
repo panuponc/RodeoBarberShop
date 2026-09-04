@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, FormEvent } from 'react'
+import type { CSSProperties, FormEvent, PointerEvent } from 'react'
 import './App.css'
 
 type AuthResponse = {
@@ -32,6 +32,7 @@ type Barber = {
   phoneNumber: string
   specialty: string | null
   experienceYears: number | null
+  standbyPriority: number | null
   bio: string | null
   isAvailable: boolean
   acceptsBooking: boolean
@@ -124,11 +125,11 @@ type ChairConfig = {
 }
 
 const defaultChairConfigs: ChairConfig[] = [
-  { id: 'chair-1', label: 'เก้าอี้ 1', note: 'ติดกระจก', order: 1, barberIds: [], barberNames: ['ช่างเค้ก'], barberEmails: ['cake.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: ['ช่างเหน่ง'], standbyBarberEmails: ['neng.barber@rodeobarber.local'] },
-  { id: 'chair-2', label: 'เก้าอี้ 2', note: 'เก้าอี้ประจำ', order: 2, barberIds: [], barberNames: ['ช่างบั้ม'], barberEmails: ['bum.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: ['ช่างเหน่ง'], standbyBarberEmails: ['neng.barber@rodeobarber.local'] },
-  { id: 'chair-3', label: 'เก้าอี้ 3', note: 'ช่างนุ้ยจองล่วงหน้า 1 วัน', order: 3, barberIds: [], barberNames: ['ช่างนุค', 'ช่างนุ้ย'], barberEmails: ['nook.barber@rodeobarber.local', 'nui.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: ['ช่างเหน่ง'], standbyBarberEmails: ['neng.barber@rodeobarber.local'] },
-  { id: 'chair-4', label: 'เก้าอี้ 4', note: 'เก้าอี้ประจำ', order: 4, barberIds: [], barberNames: ['ช่างเปิ้ล'], barberEmails: ['ple.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: ['ช่างเหน่ง'], standbyBarberEmails: ['neng.barber@rodeobarber.local'] },
-  { id: 'chair-5', label: 'เก้าอี้ 5', note: 'หน้าทีวี', order: 5, barberIds: [], barberNames: ['ช่างเดียว'], barberEmails: ['deaw.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: ['ช่างเหน่ง'], standbyBarberEmails: ['neng.barber@rodeobarber.local'] },
+  { id: 'chair-1', label: 'เก้าอี้ 1', note: 'ติดกระจก', order: 1, barberIds: [], barberNames: ['ช่างเค้ก'], barberEmails: ['cake.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: [], standbyBarberEmails: [] },
+  { id: 'chair-2', label: 'เก้าอี้ 2', note: 'เก้าอี้ประจำ', order: 2, barberIds: [], barberNames: ['ช่างบั้ม'], barberEmails: ['bum.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: [], standbyBarberEmails: [] },
+  { id: 'chair-3', label: 'เก้าอี้ 3', note: 'ช่างนุ้ยจองล่วงหน้า 1 วัน', order: 3, barberIds: [], barberNames: ['ช่างนุค', 'ช่างนุ้ย'], barberEmails: ['nook.barber@rodeobarber.local', 'nui.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: [], standbyBarberEmails: [] },
+  { id: 'chair-4', label: 'เก้าอี้ 4', note: 'เก้าอี้ประจำ', order: 4, barberIds: [], barberNames: ['ช่างเปิ้ล'], barberEmails: ['ple.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: [], standbyBarberEmails: [] },
+  { id: 'chair-5', label: 'เก้าอี้ 5', note: 'หน้าทีวี', order: 5, barberIds: [], barberNames: ['ช่างเดียว'], barberEmails: ['deaw.barber@rodeobarber.local'], standbyBarberIds: [], standbyBarberNames: [], standbyBarberEmails: [] },
 ]
 
 const scheduleTimelineStartHour = 10
@@ -222,6 +223,7 @@ type StaffAccount = {
   note: string | null
   specialty: string | null
   experienceYears: number | null
+  standbyPriority: number | null
   bio: string | null
   isAvailable: boolean
   acceptsBooking: boolean
@@ -359,7 +361,9 @@ function App() {
   const [chairs, setChairs] = useState<Chair[]>([])
   const [chairAssignments, setChairAssignments] = useState<ChairAssignment[]>([])
   const [sharedChairIds, setSharedChairIds] = useState<string[]>([])
+  const [isStandbyModalOpen, setIsStandbyModalOpen] = useState(false)
   const [standbyModalBarberId, setStandbyModalBarberId] = useState<string | null>(null)
+  const [standbyModalPriority, setStandbyModalPriority] = useState('1')
   const [standbyModalChairIds, setStandbyModalChairIds] = useState<string[]>([])
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
   const [selectedBarberId, setSelectedBarberId] = useState('')
@@ -370,7 +374,16 @@ function App() {
   const [isStaffBookingFormOpen, setIsStaffBookingFormOpen] = useState(false)
   const staffBookingFormRef = useRef<HTMLFormElement | null>(null)
   const scheduleDatePickerRef = useRef<HTMLDivElement | null>(null)
+  const scheduleBoardRef = useRef<HTMLDivElement | null>(null)
+  const scheduleScrollAreaRef = useRef<HTMLDivElement | null>(null)
+  const scheduleBoardDragRef = useRef({
+    isDragging: false,
+    pointerId: null as number | null,
+    scrollLeft: 0,
+    startX: 0,
+  })
   const [scheduleDate, setScheduleDate] = useState(getTodayDate())
+  const [scheduleViewportKey, setScheduleViewportKey] = useState(getScheduleViewportKey)
   const [isScheduleDatePickerOpen, setIsScheduleDatePickerOpen] = useState(false)
   const [scheduleCalendarMonth, setScheduleCalendarMonth] = useState(getMonthKey(getTodayDate()))
   const [staffBookingContext, setStaffBookingContext] = useState('')
@@ -428,10 +441,24 @@ function App() {
     [activeStandbyAssignments],
   )
   const standbyBarbers = useMemo(
-    () => standbyBarberIds
+    () => sortStandbyBarbers(standbyBarberIds
       .map((barberId) => barbers.find((barber) => barber.id === barberId))
-      .filter((barber): barber is Barber => Boolean(barber)),
+      .filter((barber): barber is Barber => Boolean(barber))),
     [barbers, standbyBarberIds],
+  )
+  const standbyPriorityByBarberId = useMemo(
+    () => getStandbyPriorityMap(standbyBarbers),
+    [standbyBarbers],
+  )
+  const selectedStandbyBarber = useMemo(
+    () => standbyModalBarberId ? barbers.find((barber) => barber.id === standbyModalBarberId) ?? null : null,
+    [barbers, standbyModalBarberId],
+  )
+  const selectedStandbyAssignments = useMemo(
+    () => standbyModalBarberId
+      ? activeStandbyAssignments.filter((assignment) => assignment.barberId === standbyModalBarberId)
+      : [],
+    [activeStandbyAssignments, standbyModalBarberId],
   )
   const staffPanelTitle =
     activeStaffPanel === 'queue' ? 'จัดการคิววันนี้' : activeStaffPanel === 'accounts' ? 'บัญชีรับเงินร้าน' : 'จัดการพนักงาน'
@@ -502,6 +529,36 @@ function selectScheduleDate(dateValue: string) {
     void refreshBarberQueue(barberScheduleDate)
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [barberScheduleDate])
+
+  useEffect(() => {
+    let animationFrameId = 0
+    const updateScheduleViewportKey = () => {
+      cancelAnimationFrame(animationFrameId)
+      animationFrameId = requestAnimationFrame(() => {
+        setScheduleViewportKey((current) => {
+          const next = getScheduleViewportKey()
+          return current === next ? current : next
+        })
+      })
+    }
+
+    updateScheduleViewportKey()
+    window.addEventListener('resize', updateScheduleViewportKey)
+
+    return () => {
+      cancelAnimationFrame(animationFrameId)
+      window.removeEventListener('resize', updateScheduleViewportKey)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (scheduleBoardRef.current) {
+      scheduleBoardRef.current.scrollLeft = 0
+    }
+    if (scheduleScrollAreaRef.current) {
+      scheduleScrollAreaRef.current.scrollTop = 0
+    }
+  }, [scheduleChairs.length, scheduleDate, scheduleViewportKey])
 
   useEffect(() => {
     if (!isScheduleDatePickerOpen) return undefined
@@ -739,6 +796,40 @@ function selectScheduleDate(dateValue: string) {
     setScheduleChairConfigs(mappedChairs.length > 0 ? mappedChairs : defaultChairConfigs)
   }
 
+  function startScheduleBoardDrag(event: PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || isInteractiveDragTarget(event.target)) return
+    if (event.currentTarget.scrollWidth <= event.currentTarget.clientWidth) return
+
+    scheduleBoardDragRef.current = {
+      isDragging: true,
+      pointerId: event.pointerId,
+      scrollLeft: event.currentTarget.scrollLeft,
+      startX: event.clientX,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    event.currentTarget.classList.add('dragging')
+  }
+
+  function moveScheduleBoardDrag(event: PointerEvent<HTMLDivElement>) {
+    const drag = scheduleBoardDragRef.current
+    if (!drag.isDragging || drag.pointerId !== event.pointerId) return
+
+    event.currentTarget.scrollLeft = drag.scrollLeft - (event.clientX - drag.startX)
+  }
+
+  function stopScheduleBoardDrag(event: PointerEvent<HTMLDivElement>) {
+    const drag = scheduleBoardDragRef.current
+    if (!drag.isDragging || drag.pointerId !== event.pointerId) return
+
+    scheduleBoardDragRef.current = {
+      isDragging: false,
+      pointerId: null,
+      scrollLeft: 0,
+      startX: 0,
+    }
+    event.currentTarget.classList.remove('dragging')
+  }
+
   async function refreshChairManagement() {
     try {
       const [chairResult, assignmentResult] = await Promise.all([
@@ -917,7 +1008,35 @@ function selectScheduleDate(dateValue: string) {
       .filter((assignment) => assignment.barberId === barberId)
       .map((assignment) => assignment.chairId)
 
+    setIsStandbyModalOpen(true)
     setStandbyModalBarberId(barberId)
+    setStandbyModalPriority((standbyPriorityByBarberId.get(barberId) ?? getNextStandbyPriority(standbyPriorityByBarberId)).toString())
+    setStandbyModalChairIds(assignedChairIds)
+  }
+
+  function openNewStandbyModal() {
+    setIsStandbyModalOpen(true)
+    setStandbyModalBarberId(null)
+    setStandbyModalPriority(getNextStandbyPriority(standbyPriorityByBarberId).toString())
+    setStandbyModalChairIds([])
+  }
+
+  function closeStandbyModal() {
+    setIsStandbyModalOpen(false)
+    setStandbyModalBarberId(null)
+    setStandbyModalPriority('1')
+    setStandbyModalChairIds([])
+  }
+
+  function selectStandbyBarber(barberId: string) {
+    const assignedChairIds = activeStandbyAssignments
+      .filter((assignment) => assignment.barberId === barberId)
+      .map((assignment) => assignment.chairId)
+
+    setStandbyModalBarberId(barberId || null)
+    setStandbyModalPriority(barberId
+      ? (standbyPriorityByBarberId.get(barberId) ?? getNextStandbyPriority(standbyPriorityByBarberId)).toString()
+      : getNextStandbyPriority(standbyPriorityByBarberId).toString())
     setStandbyModalChairIds(assignedChairIds)
   }
 
@@ -929,13 +1048,34 @@ function selectScheduleDate(dateValue: string) {
     ))
   }
 
+  function selectAllStandbyChairs() {
+    setStandbyModalChairIds(chairs.map((chair) => chair.id))
+  }
+
+  function clearStandbyChairs() {
+    setStandbyModalChairIds([])
+  }
+
   async function saveStandbyAssignments() {
-    if (!standbyModalBarberId) return
+    if (!standbyModalBarberId) {
+      setMessage('เลือกช่างที่จะตั้งเป็น Standby ก่อน')
+      return
+    }
 
     setIsBusy(true)
     setMessage('')
 
     try {
+      const updatedStandbyBarber = await api<Barber>(`/api/barbers/${standbyModalBarberId}/standby-priority`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          standbyPriority: standbyModalChairIds.length > 0 ? Number(standbyModalPriority) : null,
+        }),
+      })
+      setBarbers((current) => sortBarbersByChair(current.map((barber) => (
+        barber.id === updatedStandbyBarber.id ? updatedStandbyBarber : barber
+      ))))
+
       const currentAssignments = activeStandbyAssignments.filter((assignment) => assignment.barberId === standbyModalBarberId)
       const currentChairIds = new Set(currentAssignments.map((assignment) => assignment.chairId))
       const desiredChairIds = new Set(standbyModalChairIds)
@@ -956,13 +1096,43 @@ function selectScheduleDate(dateValue: string) {
         })),
       ])
 
-      setStandbyModalBarberId(null)
-      setStandbyModalChairIds([])
+      closeStandbyModal()
       await refreshChairManagement()
       await refreshScheduleChairConfigs(scheduleDate)
       setMessage('บันทึกช่างสำรองแล้ว')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'บันทึกช่างสำรองไม่สำเร็จ')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function removeStandbyAssignments() {
+    if (!standbyModalBarberId) return
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await Promise.all(
+        selectedStandbyAssignments.map((assignment) => api(`/api/chairs/assignments/${assignment.id}`, { method: 'DELETE' })),
+      )
+      const updatedStandbyBarber = await api<Barber>(`/api/barbers/${standbyModalBarberId}/standby-priority`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          standbyPriority: null,
+        }),
+      })
+      setBarbers((current) => sortBarbersByChair(current.map((barber) => (
+        barber.id === updatedStandbyBarber.id ? updatedStandbyBarber : barber
+      ))))
+
+      closeStandbyModal()
+      await refreshChairManagement()
+      await refreshScheduleChairConfigs(scheduleDate)
+      setMessage('เอาช่างออกจาก Standby แล้ว')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'เอาช่างออกจาก Standby ไม่สำเร็จ')
     } finally {
       setIsBusy(false)
     }
@@ -1611,13 +1781,19 @@ function selectScheduleDate(dateValue: string) {
     return (
       <main className="login-shell">
         <section className="login-panel">
-          <p className="eyebrow">Rodeo Barber Shop</p>
-          <h1>{authMode === 'login' ? 'Login' : 'Customer Signup'}</h1>
-          <p className="muted">
-            {authMode === 'login'
-              ? 'เข้าสู่ระบบครั้งเดียว ระบบจะพาไปหน้าลูกค้าหรือหน้าร้านตามสิทธิ์ของบัญชี'
-              : 'สมัครสมาชิกสำหรับลูกค้าเพื่อจองคิวออนไลน์'}
-          </p>
+          <div className="login-brand">
+            <span className="login-logo">Rodeo</span>
+            <small>Barber Shop</small>
+          </div>
+          <div className="login-heading">
+            <p className="eyebrow">{authMode === 'login' ? 'Welcome back' : 'Customer account'}</p>
+            <h1>{authMode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก'}</h1>
+            <p className="muted">
+              {authMode === 'login'
+                ? 'เข้าสู่ระบบเพื่อจัดการคิว จองบริการ หรือดูข้อมูลร้านตามสิทธิ์บัญชี'
+                : 'สร้างบัญชีลูกค้าเพื่อจองคิวออนไลน์และติดตามประวัติบริการ'}
+            </p>
+          </div>
 
           <form className="login-form" onSubmit={submitAuth}>
             {authMode === 'register' && (
@@ -1634,11 +1810,12 @@ function selectScheduleDate(dateValue: string) {
             )}
             <label>
               Email
-              <input value={email} onChange={(event) => setEmail(event.target.value)} />
+              <input autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} />
             </label>
             <label>
               Password
               <PasswordInput
+                buttonLabel={isAuthPasswordVisible ? 'ซ่อน' : 'ดู'}
                 isVisible={isAuthPasswordVisible}
                 onChange={setPassword}
                 onToggleVisibility={() => setIsAuthPasswordVisible((current) => !current)}
@@ -1646,7 +1823,7 @@ function selectScheduleDate(dateValue: string) {
                 value={password}
               />
             </label>
-            <button disabled={isBusy} type="submit">
+            <button className="login-submit" disabled={isBusy} type="submit">
               {isBusy ? 'กำลังดำเนินการ...' : authMode === 'login' ? 'Login' : 'Register'}
             </button>
           </form>
@@ -2211,7 +2388,7 @@ function selectScheduleDate(dateValue: string) {
                   <button className="secondary schedule-nav-button" aria-label="ถัดไป" onClick={() => setScheduleDate(addDays(scheduleDate, 1))} type="button">
                     →
                   </button>
-                  <button className="secondary" onClick={() => setScheduleDate(getTodayDate())} type="button">
+                  <button className="secondary schedule-today-button" onClick={() => setScheduleDate(getTodayDate())} type="button">
                     วันนี้
                   </button>
                 </div>
@@ -2243,19 +2420,28 @@ function selectScheduleDate(dateValue: string) {
               </div>
             </div>
 
-            <div className="schedule-board">
+            <div
+              className="schedule-board"
+              key={`${scheduleViewportKey}-${scheduleDate}-${scheduleChairs.length}`}
+              onPointerCancel={stopScheduleBoardDrag}
+              onPointerDown={startScheduleBoardDrag}
+              onPointerMove={moveScheduleBoardDrag}
+              onPointerUp={stopScheduleBoardDrag}
+              ref={scheduleBoardRef}
+              style={getScheduleBoardGridStyle(scheduleChairs)}
+            >
               {barbers.length === 0 ? (
                 <p className="empty-state">ยังไม่มีช่างที่เปิดรับจองออนไลน์</p>
               ) : (
-                <>
-                  <div className="schedule-fixed-grid" style={getScheduleBoardGridStyle(scheduleChairs)}>
+                <div className="schedule-board-content">
+                  <div className="schedule-fixed-grid">
                     <ScheduleTimeColumnHeader />
                     {scheduleChairs.map((chair) => (
                       <ChairScheduleHeader chair={chair} key={`${chair.id}-header`} onCreateBooking={openStaffBookingFormForChair} />
                     ))}
                   </div>
-                  <div className="schedule-scroll-area">
-                    <div className="schedule-scroll-grid" style={getScheduleBoardGridStyle(scheduleChairs)}>
+                  <div className="schedule-scroll-area" ref={scheduleScrollAreaRef}>
+                    <div className="schedule-scroll-grid">
                       <ScheduleTimeAxis />
                   {scheduleChairs.map((chair) => (
                     <ChairScheduleTimeline
@@ -2268,7 +2454,7 @@ function selectScheduleDate(dateValue: string) {
                   ))}
                     </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -2879,9 +3065,12 @@ function selectScheduleDate(dateValue: string) {
             </div>
 
             <div className="assignment-dashboard">
-              <section>
+              <section className="assignment-section chair-assignment-section">
                 <div className="section-heading-inline">
-                  <h3>Chair Assignments</h3>
+                  <div>
+                    <h3>Chair Assignments</h3>
+                    <small>เก้าอี้ประจำของช่างแต่ละคน</small>
+                  </div>
                   <small>{formatDateOnly(scheduleDate)}</small>
                 </div>
                 <div className="chair-card-grid">
@@ -2958,14 +3147,28 @@ function selectScheduleDate(dateValue: string) {
                 </div>
               </section>
 
-              <section>
+              <section className="assignment-section standby-assignment-section">
                 <div className="section-heading-inline">
-                  <h3>Standby Roster</h3>
-                  <small>{standbyBarbers.length} คน</small>
+                  <div>
+                    <h3>Standby Roster</h3>
+                    <small>ช่างสำรองสำหรับแทนเก้าอี้ว่าง</small>
+                  </div>
+                  {standbyBarbers.length > 0 && (
+                    <button className="secondary compact-action" disabled={isBusy} onClick={openNewStandbyModal} type="button">
+                      + เพิ่มช่างสำรอง
+                    </button>
+                  )}
                 </div>
                 <div className="standby-card-list">
                   {standbyBarbers.length === 0 ? (
-                    <p className="empty-state">ยังไม่มีช่างสำรอง</p>
+                    <div className="standby-empty-state">
+                      <span>0 คน</span>
+                      <strong>ยังไม่มีช่าง Standby</strong>
+                      <small>ถ้าวันไหนช่างประจำหยุด ระบบจะปล่อยเก้าอี้ว่างไว้จนกว่าจะเพิ่มช่างสำรอง</small>
+                      <button className="secondary compact-action" disabled={isBusy} onClick={openNewStandbyModal} type="button">
+                        + เพิ่มช่างสำรอง
+                      </button>
+                    </div>
                   ) : (
                     standbyBarbers.map((barber) => {
                       const assignedChairs = activeStandbyAssignments
@@ -2978,7 +3181,7 @@ function selectScheduleDate(dateValue: string) {
                             <strong>{barber.fullName}</strong>
                             <small>{assignedChairs.join(', ') || 'ยังไม่เลือกเก้าอี้'}</small>
                           </span>
-                          <b>Standby</b>
+                          <b>{formatStandbyPriority(standbyPriorityByBarberId.get(barber.id) ?? null)}</b>
                         </button>
                       )
                     })
@@ -3322,40 +3525,92 @@ function selectScheduleDate(dateValue: string) {
         )
       })()}
 
-      {standbyModalBarberId && (
+      {isStandbyModalOpen && (
         <div className="modal-backdrop" role="presentation">
           <section className="standby-modal">
             <div className="modal-header compact">
               <div>
                 <span className="eyebrow">Standby Roster</span>
-                <h2>{barbers.find((barber) => barber.id === standbyModalBarberId)?.fullName ?? 'ช่างสำรอง'}</h2>
+                <h2>{selectedStandbyBarber?.fullName ?? 'เพิ่มช่างสำรอง'}</h2>
               </div>
-              <button className="modal-close" onClick={() => setStandbyModalBarberId(null)} type="button">
+              <button className="modal-close" onClick={closeStandbyModal} type="button">
                 ×
               </button>
             </div>
-            <p className="muted">เลือกเก้าอี้ที่ช่างคนนี้สามารถเข้าแทนเมื่อช่างประจำหยุด</p>
+            <div className="standby-modal-body">
+              <p className="muted">กำหนดช่างสำรอง ลำดับการเข้าแทน และเก้าอี้ที่รับแทนได้ในหน้าจอเดียว</p>
+              <div className="standby-settings-grid">
+                <label className="standby-barber-select">
+                  เลือกช่างสำรอง
+                  <select value={standbyModalBarberId ?? ''} onChange={(event) => selectStandbyBarber(event.target.value)}>
+                    <option value="">เลือกช่าง</option>
+                    {barbers.map((barber) => (
+                      <option key={barber.id} value={barber.id}>
+                        {barber.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="standby-priority-picker">
+                  <span>ลำดับช่างสำรอง</span>
+                  <div>
+                    {Array.from({ length: 5 }, (_, index) => index + 1).map((priority) => {
+                      const isUsed = isStandbyPriorityUsedByOther(priority, standbyModalBarberId, standbyPriorityByBarberId)
+                      return (
+                        <button
+                          className={standbyModalPriority === priority.toString() ? 'active' : ''}
+                          disabled={isUsed}
+                          key={priority}
+                          onClick={() => setStandbyModalPriority(priority.toString())}
+                          title={isUsed ? 'ลำดับนี้ถูกใช้แล้ว' : `เลือกเป็นลำดับ ${priority}`}
+                          type="button"
+                        >
+                          {priority}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="standby-toolbar">
+                <span>{standbyModalChairIds.length} / {chairs.length} เก้าอี้</span>
+                <div>
+                  <button className="secondary compact-action" disabled={isBusy || chairs.length === 0} onClick={selectAllStandbyChairs} type="button">
+                    เลือกทั้งหมด
+                  </button>
+                  <button className="secondary compact-action" disabled={isBusy || standbyModalChairIds.length === 0} onClick={clearStandbyChairs} type="button">
+                    ล้างทั้งหมด
+                  </button>
+                </div>
+              </div>
+            </div>
             <div className="standby-chair-options">
               {chairs.map((chair) => (
-                <label className="standby-chair-option" key={chair.id}>
-                  <input
-                    checked={standbyModalChairIds.includes(chair.id)}
-                    onChange={() => toggleStandbyChair(chair.id)}
-                    type="checkbox"
-                  />
+                <button
+                  className={standbyModalChairIds.includes(chair.id) ? 'standby-chair-option selected' : 'standby-chair-option'}
+                  key={chair.id}
+                  onClick={() => toggleStandbyChair(chair.id)}
+                  type="button"
+                >
+                  <b>{standbyModalChairIds.includes(chair.id) ? '✓' : '+'}</b>
                   <span>
                     <strong>{chair.name}</strong>
                     <small>{chair.note ?? 'ไม่มีหมายเหตุ'}</small>
                   </span>
-                </label>
+                </button>
               ))}
             </div>
             <div className="modal-actions">
-              <button className="secondary" onClick={() => setStandbyModalBarberId(null)} type="button">
+              <button className="secondary" onClick={closeStandbyModal} type="button">
                 ยกเลิก
               </button>
+              {selectedStandbyAssignments.length > 0 && (
+                <button className="danger" disabled={isBusy} onClick={() => void removeStandbyAssignments()} type="button">
+                  เอาออกจาก Standby
+                </button>
+              )}
               <button disabled={isBusy} onClick={() => void saveStandbyAssignments()} type="button">
-                บันทึก Standby
+                บันทึกช่างสำรอง
               </button>
             </div>
           </section>
@@ -3366,12 +3621,14 @@ function selectScheduleDate(dateValue: string) {
 }
 
 function PasswordInput({
+  buttonLabel,
   isVisible,
   onChange,
   onToggleVisibility,
   placeholder,
   value,
 }: {
+  buttonLabel?: string
   isVisible: boolean
   onChange: (value: string) => void
   onToggleVisibility: () => void
@@ -3387,7 +3644,7 @@ function PasswordInput({
         onChange={(event) => onChange(event.target.value)}
       />
       <button className="secondary" onClick={onToggleVisibility} type="button">
-        {isVisible ? 'ซ่อน' : 'ดู'}
+        {buttonLabel ?? (isVisible ? 'ซ่อน' : 'ดู')}
       </button>
     </div>
   )
@@ -4016,6 +4273,72 @@ function sortScheduleBarbersForChair(barbers: ScheduleBarber[], chair: ChairConf
   })
 }
 
+function sortStandbyBarbers(barbers: Barber[]) {
+  return [...barbers].sort((left, right) => {
+    const leftPriority = left.standbyPriority ?? 99
+    const rightPriority = right.standbyPriority ?? 99
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority
+    }
+
+    return left.fullName.localeCompare(right.fullName, 'th')
+  })
+}
+
+function sortStandbyScheduleBarbers(barbers: ScheduleBarber[]) {
+  return [...barbers].sort((left, right) => {
+    const leftPriority = left.barber.standbyPriority ?? 99
+    const rightPriority = right.barber.standbyPriority ?? 99
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority
+    }
+
+    return left.barber.fullName.localeCompare(right.barber.fullName, 'th')
+  })
+}
+
+function getStandbyPriorityMap(standbyBarbers: Barber[]) {
+  const hasMissingPriority = standbyBarbers.some((barber) => !barber.standbyPriority)
+  const requestedPriorities = standbyBarbers
+    .map((barber) => barber.standbyPriority)
+    .filter((priority): priority is number => Boolean(priority))
+  const hasDuplicatePriority = new Set(requestedPriorities).size !== requestedPriorities.length
+  const shouldCompactPriorities = hasMissingPriority || hasDuplicatePriority
+
+  return new Map(standbyBarbers.map((barber, index) => [
+    barber.id,
+    shouldCompactPriorities ? index + 1 : barber.standbyPriority ?? index + 1,
+  ]))
+}
+
+function getNextStandbyPriority(priorityByBarberId: Map<string, number>) {
+  const usedPriorities = new Set(priorityByBarberId.values())
+
+  for (let priority = 1; priority <= 9; priority++) {
+    if (!usedPriorities.has(priority)) {
+      return priority
+    }
+  }
+
+  return 9
+}
+
+function isStandbyPriorityUsedByOther(
+  priority: number,
+  selectedBarberId: string | null,
+  priorityByBarberId: Map<string, number>,
+) {
+  return [...priorityByBarberId.entries()].some(([barberId, currentPriority]) => (
+    barberId !== selectedBarberId && currentPriority === priority
+  ))
+}
+
+function formatStandbyPriority(priority: number | null) {
+  return priority ? `ลำดับ ${priority}` : 'Standby'
+}
+
 function isSharedChair(chair: Chair, primaryAssignments: ChairAssignment[], sharedChairIds: string[]) {
   const defaultConfig = getDefaultChairConfigByOrder(chair.sortOrder)
 
@@ -4105,7 +4428,9 @@ function getScheduleChairsForDate(
       scheduleBarbers.filter((scheduleBarber) => isChairBarber(scheduleBarber.barber, chair)),
       chair,
     )
-    const standbyBarbers = scheduleBarbers.filter((scheduleBarber) => isStandbyChairBarber(scheduleBarber.barber, chair))
+    const standbyBarbers = sortStandbyScheduleBarbers(
+      scheduleBarbers.filter((scheduleBarber) => isStandbyChairBarber(scheduleBarber.barber, chair)),
+    )
     const workingRegularBarbers = regularBarbers.filter((item) => item.isWorkingToday)
     const availableStandbyBarber = standbyBarbers.find((item) => item.isWorkingToday && !assignedStandbyBarberIds.has(item.barber.id))
     const canUseSubstitute = workingRegularBarbers.length === 0
@@ -4183,7 +4508,13 @@ function getScheduleChairsForDate(
   return [...activeChairs, ...offDayStatusChairs, ...standbyOffDayStatusChairs]
 }
 
-function getScheduleBoardGridStyle(scheduleChairs: ScheduleChair[]): CSSProperties {
+type ScheduleBoardStyle = CSSProperties & {
+  '--schedule-board-columns': string
+  '--schedule-board-mobile-columns': string
+  '--schedule-board-mobile-width': string
+}
+
+function getScheduleBoardGridStyle(scheduleChairs: ScheduleChair[]): ScheduleBoardStyle {
   const columns = scheduleChairs.map((chair) => {
     if (chair.isWorkingToday) {
       return 'minmax(170px, 1fr)'
@@ -4191,10 +4522,46 @@ function getScheduleBoardGridStyle(scheduleChairs: ScheduleChair[]): CSSProperti
 
     return chair.isShared ? '112px' : '84px'
   })
+  const mobileColumns = scheduleChairs.map((chair) => {
+    if (chair.isWorkingToday) return '216px'
+
+    return chair.isShared ? '124px' : '104px'
+  })
+  const mobileColumnPixels = scheduleChairs.reduce((total, chair) => {
+    if (chair.isWorkingToday) return total + 216
+
+    return total + (chair.isShared ? 124 : 104)
+  }, 44)
+  const mobileGapPixels = scheduleChairs.length * 8
 
   return {
-    gridTemplateColumns: ['44px', ...columns].join(' '),
+    '--schedule-board-columns': ['44px', ...columns].join(' '),
+    '--schedule-board-mobile-columns': ['44px', ...mobileColumns].join(' '),
+    '--schedule-board-mobile-width': `${mobileColumnPixels + mobileGapPixels}px`,
   }
+}
+
+function isInteractiveDragTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement
+    && Boolean(target.closest('button, a, input, select, textarea, [role="button"]'))
+}
+
+function getScheduleViewportKey() {
+  if (typeof window === 'undefined') return 'desktop'
+
+  const width = window.innerWidth
+  const height = window.innerHeight
+  const isPhoneLandscape = width > height && height <= 520 && width <= 960
+  if (isPhoneLandscape) return 'phone-landscape'
+
+  if (width <= 420) return 'phone-tight'
+  if (width <= 720) return 'phone'
+  if (width <= 860) return 'small-tablet'
+  if (width <= 1040) return 'tablet'
+  if (width <= 1280) return 'wide-tablet'
+  if (width <= 1440) return 'narrow-desktop'
+
+  return 'desktop'
 }
 
 function sortBarbersByChair(barbers: Barber[]) {

@@ -142,7 +142,8 @@ public class DevController(
                 "เก้าอี้ 1 / ติดกระจก",
                 5,
                 "ตัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
-                new[] { 0, 3, 4, 5, 6 }),
+                new[] { 0, 3, 4, 5, 6 },
+                null),
             new RodeoBarberSeed(
                 "ช่างบั้ม",
                 "0810000002",
@@ -151,7 +152,8 @@ public class DevController(
                 "เก้าอี้ 2 / ผมยาว",
                 5,
                 "ตัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
-                new[] { 0, 1, 2, 4, 5, 6 }),
+                new[] { 0, 1, 2, 4, 5, 6 },
+                null),
             new RodeoBarberSeed(
                 "ช่างนุค",
                 "0810000003",
@@ -160,7 +162,8 @@ public class DevController(
                 "เก้าอี้ 3 / ใช้ร่วมกับช่างนุ้ย",
                 5,
                 "ผู้ชาย ตัดผมหญิง ทำสีแฟชั่น ดัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
-                new[] { 0, 1, 2, 3, 6 }),
+                new[] { 0, 1, 2, 3, 6 },
+                null),
             new RodeoBarberSeed(
                 "ช่างนุ้ย",
                 "0810000004",
@@ -169,7 +172,8 @@ public class DevController(
                 "เก้าอี้ 3 / จองล่วงหน้า 1 วัน",
                 5,
                 "ผู้ชาย ตัดผมหญิง ทำสีแฟชั่น ดัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
-                new[] { 0, 1, 2, 3, 6 }),
+                new[] { 0, 1, 2, 3, 6 },
+                null),
             new RodeoBarberSeed(
                 "ช่างเปิ้ล",
                 "0810000005",
@@ -178,7 +182,8 @@ public class DevController(
                 "เก้าอี้ 4",
                 5,
                 "ตัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
-                new[] { 0, 1, 2, 3, 4 }),
+                new[] { 0, 1, 2, 3, 4 },
+                null),
             new RodeoBarberSeed(
                 "ช่างเดียว",
                 "0810000006",
@@ -187,7 +192,8 @@ public class DevController(
                 "เก้าอี้ 5 / หน้าทีวี",
                 5,
                 "ตัดวอลลุ่ม ตัดฟองซ์ อัพ-ดาวน์แพร์ม",
-                new[] { 0, 1, 4, 5, 6 }),
+                new[] { 0, 1, 4, 5, 6 },
+                null),
             new RodeoBarberSeed(
                 "ช่างเหน่ง",
                 "0810000007",
@@ -196,7 +202,8 @@ public class DevController(
                 "ช่างแทน ไม่มีเก้าอี้ประจำ",
                 5,
                 "ช่างแทนประจำร้าน เข้าทำงานแทนช่างที่หยุด",
-                new[] { 1, 2, 3, 5, 6 }),
+                new[] { 1, 2, 3, 5, 6 },
+                1),
         };
 
         var responses = new List<SeedBarberResponse>();
@@ -334,6 +341,7 @@ public class DevController(
         var profile = user.BarberProfile!;
         profile.Specialty = seed.Specialty;
         profile.ExperienceYears = seed.ExperienceYears;
+        profile.StandbyPriority = seed.StandbyPriority;
         profile.Bio = seed.Bio;
         profile.IsAvailable = true;
         profile.AcceptsBooking = true;
@@ -485,7 +493,8 @@ public class DevController(
         string Specialty,
         int ExperienceYears,
         string Bio,
-        IReadOnlyList<int> WorkingDays);
+        IReadOnlyList<int> WorkingDays,
+        int? StandbyPriority);
 
     private sealed record RodeoChairSeed(
         string Name,

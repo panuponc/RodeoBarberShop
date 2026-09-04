@@ -15,6 +15,7 @@ public record StaffResponse(
     string? Note,
     string? Specialty,
     int? ExperienceYears,
+    int? StandbyPriority,
     string? Bio,
     bool IsAvailable,
     bool AcceptsBooking,

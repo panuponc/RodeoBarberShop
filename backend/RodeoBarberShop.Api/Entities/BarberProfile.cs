@@ -6,6 +6,7 @@ public class BarberProfile
     public Guid UserId { get; set; }
     public string? Specialty { get; set; }
     public int? ExperienceYears { get; set; }
+    public int? StandbyPriority { get; set; }
     public string? Bio { get; set; }
     public bool IsAvailable { get; set; } = true;
     public bool AcceptsBooking { get; set; } = true;

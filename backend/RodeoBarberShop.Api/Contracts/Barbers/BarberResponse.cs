@@ -9,6 +9,7 @@ public record BarberResponse(
     string PhoneNumber,
     string? Specialty,
     int? ExperienceYears,
+    int? StandbyPriority,
     string? Bio,
     bool IsAvailable,
     bool AcceptsBooking,

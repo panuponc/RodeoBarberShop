@@ -97,6 +97,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(profile => profile.UserId).HasColumnName("user_id").IsRequired();
             entity.Property(profile => profile.Specialty).HasColumnName("specialty");
             entity.Property(profile => profile.ExperienceYears).HasColumnName("experience_years");
+            entity.Property(profile => profile.StandbyPriority).HasColumnName("standby_priority");
             entity.Property(profile => profile.Bio).HasColumnName("bio");
             entity.Property(profile => profile.IsAvailable).HasColumnName("is_available").IsRequired();
             entity.Property(profile => profile.AcceptsBooking).HasColumnName("accepts_booking").IsRequired();

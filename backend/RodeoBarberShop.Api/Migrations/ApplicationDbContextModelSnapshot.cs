@@ -135,6 +135,10 @@ namespace RodeoBarberShop.Api.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("experience_years");
 
+                    b.Property<int?>("StandbyPriority")
+                        .HasColumnType("integer")
+                        .HasColumnName("standby_priority");
+
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("boolean")
                         .HasColumnName("is_available");
