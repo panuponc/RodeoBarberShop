@@ -88,11 +88,21 @@ All protected APIs require JWT authentication and role-based authorization.
 
 | Method | Endpoint | Roles | Description |
 |--------|----------|-------|-------------|
-| GET | /api/payments/booking/{bookingId} | Staff, Owner, Admin | Get booking payment summary |
-| POST | /api/payments | Staff, Owner, Admin | Record payment |
-| GET | /api/payments/{id} | Staff, Owner, Admin | Get payment detail |
+| GET | /api/payments/booking/{bookingId} | Barber, Staff, Owner, Admin | Get booking payment summary and shop QR |
+| POST | /api/payments | Barber, Staff, Owner, Admin | Record verified payment and complete booking |
+| GET | /api/payments/{id} | Customer, Barber, Staff, Owner, Admin | Get payment detail |
 | POST | /api/payments/{id}/void | Owner, Admin | Void payment |
-| GET | /api/payments/{id}/receipt | Staff, Owner, Admin | Get receipt data |
+| POST | /api/payments/{id}/correct | Barber, Owner, Admin | Correct an accidental confirmation and reopen payment collection |
+| GET | /api/payments/{id}/receipt | Customer, Barber, Staff, Owner, Admin | Get receipt data |
+| GET | /api/payments/booking/{bookingId}/receipt | Customer, Barber, Staff, Owner, Admin | Get receipt by booking |
+
+Barbers can collect payment and access receipts only for bookings assigned to their own barber profile. Customers can only read their own payment/receipt. General voiding and managing shop payment accounts remain owner/admin functions.
+
+Correction requires `{ "reason": "..." }` (3-500 trimmed characters). A barber can correct only their own assigned booking's payment that they personally received; owner/admin can correct staff payments. The original Paid payment becomes Voided, the booking returns to WaitingPayment/Unpaid, and a QueueEvent records the reason, actor, time and original payment ID/number. This does not refund money. The original receipt becomes invalid; the next collection creates a new payment and receipt. Only one Paid payment is allowed per booking. Repeating a correction for the old payment ID returns 409, including after a replacement payment. Receipt responses expose `canCorrectPayment` to control the correction action.
+
+The barber workflow is: complete service -> waiting for payment -> shop QR or cash -> manually verify funds received -> confirm payment -> completed booking and receipt. QR generation does not verify a bank transfer automatically. The receiver's user ID and the completed queue event are recorded with the payment. A barber cannot bypass payment confirmation by directly changing the queue status to Completed.
+
+Payment regression checks: `dotnet test backend/RodeoBarberShop.Api.Tests/RodeoBarberShop.Api.Tests.csproj`. These tests use an isolated in-memory database, not Supabase.
 
 ## Shop APIs
 

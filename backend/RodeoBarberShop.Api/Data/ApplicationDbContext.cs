@@ -151,7 +151,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(booking => booking.DiscountAmount).HasColumnName("discount_amount").HasPrecision(10, 2).IsRequired();
             entity.Property(booking => booking.TotalAmount).HasColumnName("total_amount").HasPrecision(10, 2).IsRequired();
             entity.Property(booking => booking.BookingStatus).HasColumnName("booking_status").HasMaxLength(30).HasConversion<string>().IsRequired();
-            entity.Property(booking => booking.PaymentStatus).HasColumnName("payment_status").HasMaxLength(30).HasConversion<string>().IsRequired();
+            entity.Property(booking => booking.PaymentStatus).HasColumnName("payment_status").HasMaxLength(30).HasConversion<string>().IsRequired().IsConcurrencyToken();
             entity.Property(booking => booking.CustomerNote).HasColumnName("customer_note");
             entity.Property(booking => booking.CancelReason).HasColumnName("cancel_reason");
             entity.Property(booking => booking.CancelledAt).HasColumnName("cancelled_at");
@@ -391,7 +391,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(payment => payment.PaymentAccountId).HasColumnName("payment_account_id");
             entity.Property(payment => payment.PaymentNumber).HasColumnName("payment_number").HasMaxLength(30).IsRequired();
             entity.Property(payment => payment.PaymentMethod).HasColumnName("payment_method").HasMaxLength(30).HasConversion<string>().IsRequired();
-            entity.Property(payment => payment.PaymentStatus).HasColumnName("payment_status").HasMaxLength(30).HasConversion<string>().IsRequired();
+            entity.Property(payment => payment.PaymentStatus).HasColumnName("payment_status").HasMaxLength(30).HasConversion<string>().IsRequired().IsConcurrencyToken();
             entity.Property(payment => payment.SubtotalAmount).HasColumnName("subtotal_amount").HasPrecision(10, 2).IsRequired();
             entity.Property(payment => payment.DiscountAmount).HasColumnName("discount_amount").HasPrecision(10, 2).IsRequired();
             entity.Property(payment => payment.TotalAmount).HasColumnName("total_amount").HasPrecision(10, 2).IsRequired();
@@ -401,13 +401,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(payment => payment.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(payment => payment.UpdatedAt).HasColumnName("updated_at").IsRequired();
 
-            entity.HasIndex(payment => payment.BookingId).IsUnique();
+            entity.HasIndex(payment => payment.BookingId).IsUnique().HasFilter("payment_status = 'Paid'");
             entity.HasIndex(payment => payment.PaymentNumber).IsUnique();
             entity.HasIndex(payment => payment.PaymentAccountId);
 
             entity.HasOne(payment => payment.Booking)
-                .WithOne(booking => booking.Payment)
-                .HasForeignKey<Payment>(payment => payment.BookingId)
+                .WithMany(booking => booking.Payments)
+                .HasForeignKey(payment => payment.BookingId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(payment => payment.PaymentAccount)

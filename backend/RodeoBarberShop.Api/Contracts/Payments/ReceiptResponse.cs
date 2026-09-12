@@ -14,4 +14,5 @@ public record ReceiptResponse(
     decimal SubtotalAmount,
     decimal DiscountAmount,
     decimal TotalAmount,
-    IReadOnlyList<PaymentBookingServiceResponse> Services);
+    IReadOnlyList<PaymentBookingServiceResponse> Services,
+    bool CanCorrectPayment);

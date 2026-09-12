@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using RodeoBarberShop.Api.Contracts.Payments;
 using RodeoBarberShop.Api.Data;
 using RodeoBarberShop.Api.Entities;
@@ -16,7 +17,7 @@ public class PaymentsController(
     ApplicationDbContext dbContext,
     IThaiQrPaymentService thaiQrPaymentService) : ControllerBase
 {
-    [Authorize(Roles = "FrontDeskStaff,Owner,Admin")]
+    [Authorize(Roles = "Barber,FrontDeskStaff,Owner,Admin")]
     [HttpGet("booking/{bookingId:guid}")]
     public async Task<ActionResult<PaymentSummaryResponse>> GetBookingPaymentSummary(
         Guid bookingId,
@@ -30,15 +31,26 @@ public class PaymentsController(
             return NotFound();
         }
 
+        if (!CanManageBookingPayment(booking))
+        {
+            return Forbid();
+        }
+
+        if (User.IsInRole(UserRole.Barber.ToString())
+            && booking.BookingStatus is not (BookingStatus.WaitingPayment or BookingStatus.Completed))
+        {
+            return BadRequest(new { message = "Complete the service before collecting payment." });
+        }
+
         var paymentAccount = await GetPaymentAccountForQr(null, cancellationToken);
-        var qr = paymentAccount is null
+        var qr = paymentAccount is null || booking.PaymentStatus == PaymentStatus.Paid
             ? null
             : thaiQrPaymentService.CreatePromptPayQr(paymentAccount, booking.TotalAmount);
 
         return Ok(ToSummaryResponse(booking, paymentAccount, qr));
     }
 
-    [Authorize(Roles = "FrontDeskStaff,Owner,Admin")]
+    [Authorize(Roles = "Barber,FrontDeskStaff,Owner,Admin")]
     [HttpPost]
     public async Task<ActionResult<PaymentResponse>> CreatePayment(
         CreatePaymentRequest request,
@@ -50,7 +62,8 @@ public class PaymentsController(
             return Unauthorized();
         }
 
-        if (!Enum.TryParse<PaymentMethod>(request.PaymentMethod, ignoreCase: true, out var paymentMethod))
+        if (!Enum.TryParse<PaymentMethod>(request.PaymentMethod, ignoreCase: true, out var paymentMethod)
+            || !Enum.IsDefined(paymentMethod))
         {
             return BadRequest(new { message = "Payment method is invalid." });
         }
@@ -63,7 +76,12 @@ public class PaymentsController(
             return NotFound();
         }
 
-        if (booking.Payment is not null && booking.Payment.PaymentStatus == PaymentStatus.Paid)
+        if (!CanManageBookingPayment(booking))
+        {
+            return Forbid();
+        }
+
+        if (booking.Payments.Any(payment => payment.PaymentStatus == PaymentStatus.Paid) || booking.PaymentStatus == PaymentStatus.Paid)
         {
             return Conflict(new { message = "Booking has already been paid." });
         }
@@ -106,7 +124,28 @@ public class PaymentsController(
         booking.UpdatedAt = now;
 
         dbContext.Payments.Add(payment);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.QueueEvents.Add(new QueueEvent
+        {
+            Id = Guid.NewGuid(),
+            BookingId = booking.Id,
+            FromStatus = BookingStatus.WaitingPayment,
+            ToStatus = BookingStatus.Completed,
+            ChangedByUserId = receivedByUserId.Value,
+            Note = $"Payment confirmed: {payment.PaymentNumber}",
+            CreatedAt = now
+        });
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            return Conflict(new { message = "Payment already exists. Refresh the booking before continuing." });
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { message = "Payment status changed. Refresh the booking before continuing." });
+        }
 
         var response = await PaymentQuery()
             .Where(existingPayment => existingPayment.Id == payment.Id)
@@ -116,7 +155,45 @@ public class PaymentsController(
         return CreatedAtAction(nameof(GetPayment), new { id = payment.Id }, response);
     }
 
-    [Authorize(Roles = "Customer,FrontDeskStaff,Owner,Admin")]
+    [Authorize(Roles = "Barber,Owner,Admin")]
+    [HttpPost("{id:guid}/correct")]
+    public async Task<ActionResult<PaymentResponse>> CorrectPayment(Guid id, CorrectPaymentRequest request, CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null) return Unauthorized();
+        var reason = request.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length < 3 || reason.Length > 500)
+            return BadRequest(new { message = "Please provide a correction reason (3-500 characters)." });
+
+        var payment = await PaymentQuery().FirstOrDefaultAsync(payment => payment.Id == id, cancellationToken);
+        if (payment is null) return NotFound();
+        if (!CanCorrectPayment(payment)) return Forbid();
+        if (payment.PaymentStatus != PaymentStatus.Paid || payment.Booking.PaymentStatus != PaymentStatus.Paid
+            || payment.Booking.BookingStatus != BookingStatus.Completed)
+            return Conflict(new { message = "This payment is no longer available for correction. Refresh the booking." });
+
+        var now = DateTimeOffset.UtcNow;
+        payment.PaymentStatus = PaymentStatus.Voided;
+        payment.UpdatedAt = now;
+        payment.Booking.PaymentStatus = PaymentStatus.Unpaid;
+        payment.Booking.BookingStatus = BookingStatus.WaitingPayment;
+        payment.Booking.UpdatedAt = now;
+        dbContext.QueueEvents.Add(new QueueEvent
+        {
+            Id = Guid.NewGuid(), BookingId = payment.BookingId,
+            FromStatus = BookingStatus.Completed, ToStatus = BookingStatus.WaitingPayment,
+            ChangedByUserId = userId.Value, CreatedAt = now,
+            Note = System.Text.Json.JsonSerializer.Serialize(new { action = "PaymentCorrection", paymentId = payment.Id, paymentNumber = payment.PaymentNumber, reason })
+        });
+        try { await dbContext.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { message = "Payment status changed. Refresh the booking before continuing." });
+        }
+        return Ok(ToResponse(payment));
+    }
+
+    [Authorize(Roles = "Customer,Barber,FrontDeskStaff,Owner,Admin")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PaymentResponse>> GetPayment(Guid id, CancellationToken cancellationToken)
     {
@@ -158,12 +235,16 @@ public class PaymentsController(
         payment.Booking.PaymentStatus = PaymentStatus.Voided;
         payment.Booking.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try { await dbContext.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { message = "Payment status changed. Refresh the booking before continuing." });
+        }
 
         return Ok(ToResponse(payment));
     }
 
-    [Authorize(Roles = "Customer,FrontDeskStaff,Owner,Admin")]
+    [Authorize(Roles = "Customer,Barber,FrontDeskStaff,Owner,Admin")]
     [HttpGet("{id:guid}/receipt")]
     public async Task<ActionResult<ReceiptResponse>> GetReceipt(Guid id, CancellationToken cancellationToken)
     {
@@ -180,6 +261,9 @@ public class PaymentsController(
             return Forbid();
         }
 
+        if (payment.PaymentStatus != PaymentStatus.Paid)
+            return Conflict(new { message = "This receipt has been voided and is no longer valid." });
+
         var shop = await dbContext.ShopSettings
             .AsNoTracking()
             .OrderBy(setting => setting.CreatedAt)
@@ -188,12 +272,12 @@ public class PaymentsController(
         return Ok(ToReceiptResponse(payment, shop));
     }
 
-    [Authorize(Roles = "Customer,FrontDeskStaff,Owner,Admin")]
+    [Authorize(Roles = "Customer,Barber,FrontDeskStaff,Owner,Admin")]
     [HttpGet("booking/{bookingId:guid}/receipt")]
     public async Task<ActionResult<ReceiptResponse>> GetBookingReceipt(Guid bookingId, CancellationToken cancellationToken)
     {
         var payment = await PaymentQuery()
-            .FirstOrDefaultAsync(payment => payment.BookingId == bookingId, cancellationToken);
+            .FirstOrDefaultAsync(payment => payment.BookingId == bookingId && payment.PaymentStatus == PaymentStatus.Paid, cancellationToken);
 
         if (payment is null)
         {
@@ -220,7 +304,7 @@ public class PaymentsController(
             .Include(booking => booking.Barber)
             .ThenInclude(barber => barber!.User)
             .Include(booking => booking.BookingServices)
-            .Include(booking => booking.Payment);
+            .Include(booking => booking.Payments);
     }
 
     private IQueryable<Payment> PaymentQuery()
@@ -256,6 +340,17 @@ public class PaymentsController(
 
     private bool CanAccessPayment(Payment payment)
     {
+        if (User.IsInRole(UserRole.Customer.ToString()))
+        {
+            var currentUserId = GetCurrentUserId();
+            return currentUserId is not null && payment.Booking.CustomerId == currentUserId.Value;
+        }
+
+        return CanManageBookingPayment(payment.Booking);
+    }
+
+    private bool CanManageBookingPayment(Booking booking)
+    {
         if (User.IsInRole(UserRole.FrontDeskStaff.ToString())
             || User.IsInRole(UserRole.Owner.ToString())
             || User.IsInRole(UserRole.Admin.ToString()))
@@ -265,7 +360,16 @@ public class PaymentsController(
 
         var currentUserId = GetCurrentUserId();
 
-        return currentUserId is not null && payment.Booking.CustomerId == currentUserId.Value;
+        return User.IsInRole(UserRole.Barber.ToString())
+            && currentUserId is not null
+            && booking.Barber?.UserId == currentUserId.Value;
+    }
+
+    private bool CanCorrectPayment(Payment payment)
+    {
+        return User.IsInRole(UserRole.Owner.ToString()) || User.IsInRole(UserRole.Admin.ToString())
+            || (User.IsInRole(UserRole.Barber.ToString()) && CanManageBookingPayment(payment.Booking)
+                && GetCurrentUserId() == payment.ReceivedByUserId);
     }
 
     private Guid? GetCurrentUserId()
@@ -324,7 +428,7 @@ public class PaymentsController(
             payment.UpdatedAt);
     }
 
-    private static ReceiptResponse ToReceiptResponse(Payment payment, ShopSetting? shop)
+    private ReceiptResponse ToReceiptResponse(Payment payment, ShopSetting? shop)
     {
         return new ReceiptResponse(
             payment.Id,
@@ -333,7 +437,7 @@ public class PaymentsController(
             shop?.ShopName ?? "Rodeo Barber Shop",
             shop?.Address,
             shop?.PhoneNumber,
-            payment.Booking.Customer?.FullName,
+            payment.Booking.Customer?.FullName ?? payment.Booking.GuestName,
             payment.Booking.Barber?.User.FullName,
             payment.PaidAt,
             payment.PaymentMethod.ToString(),
@@ -343,7 +447,8 @@ public class PaymentsController(
             payment.Booking.BookingServices
                 .OrderBy(bookingService => bookingService.ServiceName)
                 .Select(ToServiceResponse)
-                .ToList());
+                .ToList(),
+            CanCorrectPayment(payment) && payment.PaymentStatus == PaymentStatus.Paid && payment.Booking.BookingStatus == BookingStatus.Completed);
     }
 
     private static PaymentBookingServiceResponse ToServiceResponse(BookingService bookingService)

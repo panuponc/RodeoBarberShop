@@ -270,7 +270,7 @@ erDiagram
 
     bookings ||--o{ queue_events : has
     bookings ||--o{ barber_assignment_events : has
-    bookings ||--o| payments : has_payment
+    bookings ||--o{ payments : has_payment_history
     bookings ||--o{ notifications : related_to
 
     promotions ||--o{ promotion_services : includes
@@ -287,6 +287,7 @@ erDiagram
 - A booking contains one or more booking service rows.
 - Booking service rows store service name, price, and duration snapshots.
 - A booking should have only one active paid payment record.
+- A corrected payment is retained as Voided. A filtered unique index on payments.booking_id where payment_status = 'Paid' permits replacement payments without losing history. Correction reasons and actors are recorded in queue_events.
 - Queue changes and barber assignment changes are stored as event history.
 - Promotions can apply to multiple services.
 - Notifications can target a specific user or a role.

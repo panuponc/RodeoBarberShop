@@ -110,6 +110,20 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
             return NotFound();
         }
 
+        if (User.IsInRole(UserRole.Barber.ToString()))
+        {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null || booking.Barber?.UserId != currentUserId.Value)
+            {
+                return Forbid();
+            }
+
+            if (newStatus == BookingStatus.Completed)
+            {
+                return BadRequest(new { message = "Confirm payment to complete this booking." });
+            }
+        }
+
         var validationError = ValidateStatusTransition(booking.BookingStatus, newStatus);
         if (validationError is not null)
         {

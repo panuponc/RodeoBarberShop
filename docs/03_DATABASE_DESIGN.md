@@ -451,7 +451,7 @@ Stores temporary OTP records for guest booking verification.
 | services -> booking_services | One-to-many |
 | bookings -> queue_events | One-to-many |
 | bookings -> barber_assignment_events | One-to-many |
-| bookings -> payments | One-to-one active payment |
+| bookings -> payments | One-to-many history; at most one active Paid payment (filtered unique index) |
 | promotions -> promotion_services | One-to-many |
 | services -> promotion_services | One-to-many |
 | users -> notifications | One-to-many |

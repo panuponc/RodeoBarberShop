@@ -68,6 +68,8 @@ Barbers can:
 - View today's assigned queue
 - View waiting customers
 - View customer and service details
+- Complete service and collect payment for their own assigned bookings, including days without front desk staff
+- Show the shop's PromptPay QR or accept cash, manually verify receipt of funds, and issue/view receipts
 - Edit their own profile
 - Submit leave requests
 
@@ -368,7 +370,7 @@ Refunded
 13. Customers cannot edit appointment date and time directly.
 14. Walk-in customers can be added by front desk staff.
 15. Staff must check barber availability before assigning or changing a barber.
-16. Payment can be recorded only once for a completed service bill.
+16. A service bill can have only one active Paid payment. Accidental confirmations can be corrected with an audit reason; retain the original as Voided and reopen payment collection. Barbers may correct only their own confirmations for their assigned bookings.
 17. Barbers can submit leave requests.
 18. Owners can approve or reject barber leave requests.
 19. The system must show bookings affected by approved barber leave.
