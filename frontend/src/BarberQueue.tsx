@@ -9,6 +9,8 @@ import '@fontsource/prompt/latin-500.css'
 import '@fontsource/prompt/latin-600.css'
 import '@fontsource/outfit/latin-600.css'
 import './BarberQueue.css'
+import { BookingWorkSummary } from './BookingWorkSummary'
+import { CustomerPhoneLink } from './CustomerPhoneLink'
 
 type Props = {
   fullName: string
@@ -81,8 +83,8 @@ export function BarberQueue({ fullName, profile, bookings, date, onDateChange, o
           <span className={`bq-badge ${booking.bookingStatus === 'InService' || booking.bookingStatus === 'Completed' ? 'bq-badge-green' : ''}`}>{statusLabels[booking.bookingStatus] || booking.bookingStatus}</span>
         </div>
         <div className="bq-booking-time"><Clock3 size={14} /><time dateTime={booking.startAt}>{time(booking.startAt)} - {time(booking.endAt)}</time>{highlighted && <span>{inService ? 'กำลังให้บริการ' : 'คิวถัดไป'}</span>}</div>
-        <h3>{booking.customerName || 'ลูกค้าหน้าร้าน'}</h3>
-        <p className="bq-services">{booking.services.map((service) => `${service.serviceName}${service.quantity > 1 ? ` × ${service.quantity}` : ''}`).join(' + ') || 'ไม่ระบุบริการ'} <span>({duration} นาที)</span></p>
+        <div className="bq-customer-heading"><h3>{booking.customerName || 'ลูกค้าหน้าร้าน'}</h3>{!closedStatuses.has(booking.bookingStatus) && <CustomerPhoneLink booking={booking} />}</div>
+        {booking.services.some(service => service.addedDuringService) ? <BookingWorkSummary booking={booking} /> : <p className="bq-services">{booking.services.map((service) => `${service.serviceName}${service.quantity > 1 ? ` × ${service.quantity}` : ''}`).join(' + ') || 'ไม่ระบุบริการ'} <span>({duration} นาที)</span></p>}
         <div className="bq-booking-price"><strong>{money(booking.totalAmount)}</strong>{booking.paymentStatus === 'Paid' && <span className="bq-paid"><CircleCheck size={13} /> ชำระแล้ว</span>}</div>
         <div className={`bq-card-actions${action || canCheckout || hasReceipt ? '' : ' bq-card-actions-single'}`}>
           {(canCheckout || hasReceipt) && <button className={canCheckout ? 'bq-primary' : 'bq-confirm'} disabled={isBusy || isLoading} onClick={() => onCheckout(booking)} type="button">{canCheckout ? <QrCode size={16} /> : <ReceiptText size={16} />}{canCheckout ? 'รับชำระเงิน' : 'ดูใบเสร็จ'}</button>}
@@ -129,7 +131,15 @@ export function BarberQueue({ fullName, profile, bookings, date, onDateChange, o
 
           {showCurrent && !isLoading && !error && <section className="bq-shift" aria-label="สถานะการทำงาน">
             <div className="bq-shift-heading"><Scissors size={16} /><h2>สถานะการทำงาน</h2><span className={`bq-badge ${inService ? 'bq-badge-green' : ''}`}>{inService ? 'กำลังให้บริการ' : profile?.isAvailable ? 'พร้อมรับงาน' : 'พักงาน'}</span></div>
-            <div className="bq-shift-body"><span className="bq-shift-symbol">{inService ? <Scissors size={21} /> : <Clock3 size={21} />}</span><div><p>{inService ? 'คิวที่กำลังให้บริการ' : upcoming ? 'นัดหมายถัดไป' : 'ไม่มีคิวรอให้บริการ'}</p><strong>{inService ? inService.customerName || 'ลูกค้าหน้าร้าน' : upcoming ? `${time(upcoming.startAt)} - ${time(upcoming.endAt)} น.` : working.length ? `รอชำระเงิน ${working.length} คิว` : completed.length ? 'ครบทุกคิวแล้ว' : 'ยังไม่มีนัดหมาย'}</strong></div></div>
+            {inService ? (
+              <button className="bq-shift-body bq-shift-open" type="button" disabled={isBusy} onClick={() => onSelect(inService)} aria-label={`ดูรายละเอียดคิวที่กำลังให้บริการ ${inService.customerName || 'ลูกค้าหน้าร้าน'}`} aria-haspopup="dialog">
+                <span className="bq-shift-symbol"><Scissors size={21} /></span>
+                <span className="bq-shift-copy"><span>คิวที่กำลังให้บริการ</span><strong>{inService.customerName || 'ลูกค้าหน้าร้าน'}</strong></span>
+                <ArrowRight className="bq-shift-arrow" size={19} aria-hidden="true" />
+              </button>
+            ) : (
+              <div className="bq-shift-body"><span className="bq-shift-symbol"><Clock3 size={21} /></span><div><p>{upcoming ? 'นัดหมายถัดไป' : 'ไม่มีคิวรอให้บริการ'}</p><strong>{upcoming ? `${time(upcoming.startAt)} - ${time(upcoming.endAt)} น.` : working.length ? `รอชำระเงิน ${working.length} คิว` : completed.length ? 'ครบทุกคิวแล้ว' : 'ยังไม่มีนัดหมาย'}</strong></div></div>
+            )}
           </section>}
           <nav className="bq-desktop-nav" aria-label="เมนูช่างบนคอมพิวเตอร์">
             <button aria-current={view === 'queue' ? 'page' : undefined} onClick={() => setView('queue')} type="button"><ListOrdered size={18} />คิวให้บริการ</button>

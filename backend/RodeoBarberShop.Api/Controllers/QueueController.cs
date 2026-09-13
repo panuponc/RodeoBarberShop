@@ -186,6 +186,69 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
         return Ok(new UpdateQueueStatusResponse(ToResponse(booking), ToResponse(queueEvent)));
     }
 
+    [HttpPost("{bookingId:guid}/services")]
+    [Authorize(Roles = "Barber")]
+    public async Task<ActionResult<QueueBookingResponse>> AddServices(Guid bookingId, AddQueueServicesRequest request, CancellationToken cancellationToken)
+    {
+        if (request.ServiceIds is not { Count: > 0 and <= 20 } || request.ServiceIds.Distinct().Count() != request.ServiceIds.Count)
+            return BadRequest(new { message = "เลือกบริการเพิ่มอย่างน้อย 1 รายการ และไม่ซ้ำกัน" });
+
+        await using var transaction = await BookingWriteLock.BeginAsync(dbContext, cancellationToken);
+        var booking = await QueueBookingQuery().FirstOrDefaultAsync(b => b.Id == bookingId, cancellationToken);
+        if (booking is null) return NotFound();
+        if (!User.IsInRole("Barber") || GetCurrentUserId() is not Guid userId || booking.Barber?.UserId != userId)
+            return Forbid();
+        if (booking.BookingStatus != BookingStatus.InService || booking.PaymentStatus != PaymentStatus.Unpaid)
+            return Conflict(new { message = "เพิ่มบริการได้เฉพาะคิวที่กำลังให้บริการและยังไม่ชำระเงิน" });
+        if (booking.EndAt != request.ExpectedEndAt || booking.TotalAmount != request.ExpectedTotalAmount)
+            return Conflict(new { message = "ข้อมูลคิวเปลี่ยนแล้ว กรุณาปิดรายละเอียดและรีเฟรชก่อนลองใหม่" });
+        if (booking.BookingServices.Any(s => request.ServiceIds.Contains(s.ServiceId)))
+            return Conflict(new { message = "มีบริการนี้ในคิวแล้ว กรุณารีเฟรชเพื่อตรวจสอบ" });
+        var services = await dbContext.Services.Where(s => request.ServiceIds.Contains(s.Id) && s.IsActive).ToListAsync(cancellationToken);
+        if (services.Count != request.ServiceIds.Count)
+            return BadRequest(new { message = "บางบริการปิดใช้งานแล้ว กรุณาเลือกใหม่" });
+        var allowed = await dbContext.BarberServices.Where(s => s.BarberId == booking.BarberId).Select(s => s.ServiceId).ToListAsync(cancellationToken);
+        if (allowed.Count > 0 && services.Any(s => !allowed.Contains(s.Id)))
+            return BadRequest(new { message = "ช่างไม่รองรับบริการที่เลือก" });
+        var addedAmount = services.Sum(s => s.Price);
+        if (addedAmount != request.ExpectedAddedAmount)
+            return Conflict(new { message = "ราคาบริการเปลี่ยนแล้ว กรุณาปิดและเปิดรายการบริการใหม่" });
+        var duration = services.Sum(s => s.DurationMinutes);
+        if (duration != request.ExpectedAddedMinutes)
+            return Conflict(new { message = "ระยะเวลาบริการเปลี่ยนแล้ว กรุณาปิดและเปิดรายการบริการใหม่" });
+        var end = booking.EndAt.AddMinutes(duration);
+        var localStart = booking.StartAt.ToOffset(ShopUtcOffset);
+        var localEnd = end.ToOffset(ShopUtcOffset);
+        var hours = await dbContext.BarberWorkingHours.FirstOrDefaultAsync(h => h.BarberId == booking.BarberId && h.DayOfWeek == (int)localStart.DayOfWeek && h.IsWorkingDay, cancellationToken);
+        if (hours is null || localStart.Date != localEnd.Date || localEnd.TimeOfDay > hours.EndTime.ToTimeSpan())
+            return Conflict(new { message = "เวลาเพิ่มเกินเวลางานของช่าง ไม่สามารถเพิ่มบริการนี้ได้" });
+
+        var resourceIds = new List<Guid> { booking.BarberId!.Value };
+        if (booking.Barber.User.FullName is "ช่างนุค" or "ช่างนุ้ย")
+            resourceIds = await dbContext.BarberProfiles.Where(b => b.User.FullName == "ช่างนุค" || b.User.FullName == "ช่างนุ้ย").Select(b => b.Id).ToListAsync(cancellationToken);
+        var overlaps = await dbContext.Bookings.AnyAsync(b => b.Id != booking.Id && b.BarberId.HasValue && resourceIds.Contains(b.BarberId.Value)
+            && b.BookingStatus != BookingStatus.Cancelled && b.BookingStatus != BookingStatus.NoShow && b.BookingStatus != BookingStatus.Completed
+            && b.StartAt < end && b.EndAt > booking.StartAt, cancellationToken);
+        if (overlaps) return Conflict(new { message = "เวลาเพิ่มชนกับคิวอื่น กรุณาเลือกบริการที่ใช้เวลาน้อยลง" });
+
+        var now = DateTimeOffset.UtcNow;
+        foreach (var service in services)
+        {
+            var added = new BookingService { Id = Guid.NewGuid(), BookingId = booking.Id, ServiceId = service.Id, ServiceName = service.Name, UnitPrice = service.Price, DurationMinutes = service.DurationMinutes, Quantity = 1, LineTotal = service.Price, AddedDuringService = true, AddedByUserId = userId, CreatedAt = now };
+            booking.BookingServices.Add(added);
+            dbContext.BookingServices.Add(added);
+        }
+        booking.EndAt = end;
+        booking.EstimatedDurationMinutes += duration;
+        booking.SubtotalAmount += addedAmount;
+        booking.TotalAmount = booking.SubtotalAmount - booking.DiscountAmount;
+        booking.UpdatedAt = now;
+        dbContext.QueueEvents.Add(new QueueEvent { Id = Guid.NewGuid(), BookingId = booking.Id, FromStatus = booking.BookingStatus, ToStatus = booking.BookingStatus, ChangedByUserId = userId, Note = $"Added services: {string.Join(", ", services.Select(s => s.Name))}; +{duration} min; +{addedAmount:0.00}", CreatedAt = now });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+        return Ok(ToResponse(booking));
+    }
+
     private IQueryable<Booking> QueueBookingQuery()
     {
         return dbContext.Bookings
@@ -223,15 +286,20 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
             booking.CancelReason,
             booking.CancelledAt,
             booking.BookingServices
-                .OrderBy(bookingService => bookingService.ServiceName)
+                .OrderBy(bookingService => bookingService.AddedDuringService)
+                .ThenBy(bookingService => bookingService.CreatedAt)
+                .ThenBy(bookingService => bookingService.ServiceName)
                 .Select(bookingService => new QueueBookingServiceResponse(
                     bookingService.ServiceId,
                     bookingService.ServiceName,
                     bookingService.UnitPrice,
                     bookingService.DurationMinutes,
                     bookingService.Quantity,
-                    bookingService.LineTotal))
-                .ToList());
+                    bookingService.LineTotal,
+                    bookingService.AddedDuringService,
+                    bookingService.CreatedAt))
+                .ToList(),
+            booking.Customer is not null ? booking.Customer.PhoneNumber : booking.GuestPhoneNumber);
     }
 
     private static QueueEventResponse ToResponse(QueueEvent queueEvent)

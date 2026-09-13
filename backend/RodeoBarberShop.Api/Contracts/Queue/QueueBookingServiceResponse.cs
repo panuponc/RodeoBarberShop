@@ -6,4 +6,6 @@ public record QueueBookingServiceResponse(
     decimal UnitPrice,
     int DurationMinutes,
     int Quantity,
-    decimal LineTotal);
+    decimal LineTotal,
+    bool AddedDuringService = false,
+    DateTimeOffset? CreatedAt = null);

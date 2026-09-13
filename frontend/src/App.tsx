@@ -3,6 +3,9 @@ import type { CSSProperties, FormEvent, PointerEvent } from 'react'
 import './App.css'
 import { BarberQueue } from './BarberQueue'
 import { BarberCheckout } from './BarberCheckout'
+import { BarberAddServices } from './BarberAddServices'
+import { BookingWorkSummary } from './BookingWorkSummary'
+import { CustomerPhoneLink } from './CustomerPhoneLink'
 import { CalendarDays, ChevronLeft, ChevronRight, LogOut, RefreshCw, Users, Wallet, X } from 'lucide-react'
 import './StaffQueue.css'
 import { SheetBackdrop, SheetHandle } from './SheetBackdrop'
@@ -161,12 +164,15 @@ type BookingService = {
   durationMinutes: number
   quantity: number
   lineTotal: number
+  addedDuringService?: boolean
+  createdAt?: string | null
 }
 
 export type Booking = {
   id: string
   bookingNumber: string
   customerName: string | null
+  customerPhoneNumber?: string | null
   barberId: string | null
   barberName: string | null
   startAt: string
@@ -2098,11 +2104,18 @@ function selectScheduleDate(dateValue: string) {
               </dl>
 
               <section className="booking-detail-services">
+                <CustomerPhoneLink booking={selectedBooking} showNumber />
                 <div className="booking-detail-section-title">
                   <h3>บริการที่ต้องทำ</h3>
                   <span>{selectedBooking.services.length} รายการ</span>
                 </div>
                 <ServiceList services={selectedBooking.services} />
+                {selectedBooking.bookingStatus === 'InService' && selectedBooking.paymentStatus === 'Unpaid' && (
+                  <BarberAddServices key={selectedBooking.id} booking={selectedBooking} api={api} busy={isBusy} onBusy={setIsBusy} onSaved={(updated) => {
+                    setSelectedBooking(updated)
+                    setBarberQueue(current => current.map(booking => booking.id === updated.id ? updated : booking))
+                  }} />
+                )}
               </section>
 
               {selectedBooking.cancelReason && (
@@ -3793,7 +3806,7 @@ function ChairScheduleTimeline({
                   >
                   <span className="schedule-time">{formatTime(booking.startAt)} - {formatTime(booking.endAt)}</span>
                   <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
-                  <small>{booking.services.map((service) => service.serviceName).join(' + ')}</small>
+                  <BookingWorkSummary booking={booking} compact />
                   <span className={`schedule-card-status status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
                 </button>
               )

@@ -36,6 +36,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         CreateBookingRequest request,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await BookingWriteLock.BeginAsync(dbContext, cancellationToken);
         var customerId = GetCurrentUserId();
         if (customerId is null)
         {
@@ -140,6 +141,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             .Select(existingBooking => ToResponse(existingBooking))
             .FirstAsync(cancellationToken);
 
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return CreatedAtAction(nameof(GetBooking), new { id = booking.Id }, response);
     }
 
@@ -149,6 +151,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         CreateStaffBookingRequest request,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await BookingWriteLock.BeginAsync(dbContext, cancellationToken);
         if (string.IsNullOrWhiteSpace(request.GuestName))
         {
             return BadRequest(new { message = "Guest name is required." });
@@ -279,6 +282,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             .Select(existingBooking => ToResponse(existingBooking))
             .FirstAsync(cancellationToken);
 
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return CreatedAtAction(nameof(GetBooking), new { id = booking.Id }, response);
     }
 

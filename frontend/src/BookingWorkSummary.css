@@ -1,0 +1,16 @@
+.work-summary { display: grid; gap: 0; margin-top: 10px; min-width: 0; text-align: left; }
+.work-summary-caption { color: #a8b3c3; font-size: 10px; margin-bottom: 5px; }
+.work-segment { display: grid; gap: 5px; padding: 10px 0 10px 12px; border-left: 2px solid #e5c378; min-width: 0; }
+.work-segment + .work-segment { border-top: 1px solid #34383d; }
+.work-segment-added { border-left-color: #41dfb9; }
+.work-segment-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; color: #e5c378; font-size: 11px; font-weight: 500; }
+.work-segment-added .work-segment-heading { color: #41dfb9; }
+.work-segment-time { color: #f4f4f5; font-variant-numeric: tabular-nums; }
+.work-segment-name { color: #d9dfe7; font-size: 12px; font-weight: 400; overflow-wrap: anywhere; white-space: normal; line-height: 1.6; }
+.work-summary-plain { display: block; color: #a8b3c3; font-size: 12px; overflow-wrap: anywhere; }
+.schedule-card:has(.work-summary-compact) { grid-template-rows: auto auto minmax(0, 1fr); }
+.schedule-card .work-summary-compact { margin-top: 4px; gap: 0; align-content: start; min-height: 0; overflow: hidden; }
+.work-summary-compact .work-segment { padding: 6px 0 6px 8px; gap: 2px; }
+.work-summary-compact .work-segment-heading { gap: 2px 7px; font-size: 10px; }
+.work-summary-compact .work-segment-name { font-size: 10px; line-height: 1.5; }
+.schedule-card .work-summary-plain { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

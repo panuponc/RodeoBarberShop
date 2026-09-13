@@ -15,4 +15,5 @@ public record QueueBookingResponse(
     string PaymentStatus,
     string? CancelReason,
     DateTimeOffset? CancelledAt,
-    IReadOnlyList<QueueBookingServiceResponse> Services);
+    IReadOnlyList<QueueBookingServiceResponse> Services,
+    string? CustomerPhoneNumber = null);
