@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { ArrowRight, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Clock3, History, ListOrdered, LogOut, Play, QrCode, ReceiptText, RefreshCw, Scissors, UserRound } from 'lucide-react'
 import type { Barber, Booking } from './App'
 import '@fontsource/prompt/thai-400.css'
@@ -23,6 +23,7 @@ type Props = {
   onCheckout: (booking: Booking) => void
   onRefresh: () => void
   onProfile: () => void
+  onLeave: () => void
   onLogout: () => void
   isBusy: boolean
   isLoading: boolean
@@ -42,10 +43,9 @@ const actionLabels: Record<string, string> = {
 }
 const closedStatuses = new Set(['Completed', 'Cancelled', 'NoShow'])
 
-export function BarberQueue({ fullName, profile, bookings, date, onDateChange, onSelect, onAdvance, onCheckout, onRefresh, onProfile, onLogout, isBusy, isLoading, error, statusLabels }: Props) {
+export function BarberQueue({ fullName, profile, bookings, date, onDateChange, onSelect, onAdvance, onCheckout, onRefresh, onProfile, onLeave, onLogout, isBusy, isLoading, error, statusLabels }: Props) {
   const [filter, setFilter] = useState('all')
   const [view, setView] = useState<'queue' | 'history'>('queue')
-  const dateInput = useRef<HTMLInputElement>(null)
   const sorted = [...bookings].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
   const active = sorted.filter((booking) => !closedStatuses.has(booking.bookingStatus))
   const history = sorted.filter((booking) => closedStatuses.has(booking.bookingStatus))
@@ -63,11 +63,6 @@ export function BarberQueue({ fullName, profile, bookings, date, onDateChange, o
     const target = new Date(`${date}T12:00:00`)
     target.setDate(target.getDate() + offset)
     onDateChange(localDate(target))
-  }
-
-  function openCalendar() {
-    dateInput.current?.focus()
-    try { dateInput.current?.showPicker() } catch { /* The focused native input remains usable where showPicker is unavailable. */ }
   }
 
   function renderBooking(booking: Booking) {
@@ -124,7 +119,7 @@ export function BarberQueue({ fullName, profile, bookings, date, onDateChange, o
 
           <div className="bq-datebar" aria-label="เลือกวันให้บริการ">
             <button className="bq-icon" title="วันก่อนหน้า" aria-label="วันก่อนหน้า" onClick={() => changeDate(-1)} type="button"><ChevronLeft size={18} /></button>
-            <label className="bq-date"><CalendarDays size={16} /><span>{dateLabel(date)}</span><input ref={dateInput} aria-label="วันที่ให้บริการ" type="date" value={date} onChange={(event) => { if (event.target.value) onDateChange(event.target.value) }} /></label>
+            <label className="bq-date"><CalendarDays size={16} /><span>{dateLabel(date)}</span><input aria-label="วันที่ให้บริการ" type="date" value={date} onChange={(event) => { if (event.target.value) onDateChange(event.target.value) }} /></label>
             <button className="bq-icon" title="วันถัดไป" aria-label="วันถัดไป" onClick={() => changeDate(1)} type="button"><ChevronRight size={18} /></button>
             <button className="bq-today" onClick={() => { onDateChange(localDate(new Date())); setView('queue') }} type="button">วันนี้</button>
           </div>
@@ -144,6 +139,7 @@ export function BarberQueue({ fullName, profile, bookings, date, onDateChange, o
           <nav className="bq-desktop-nav" aria-label="เมนูช่างบนคอมพิวเตอร์">
             <button aria-current={view === 'queue' ? 'page' : undefined} onClick={() => setView('queue')} type="button"><ListOrdered size={18} />คิวให้บริการ</button>
             <button aria-current={view === 'history' ? 'page' : undefined} onClick={() => setView('history')} type="button"><History size={18} />ประวัติของวันที่เลือก</button>
+            <button onClick={onLeave} type="button"><CalendarDays size={18} />ขอลา / ติดตามผล</button>
           </nav>
         </div>
 
@@ -161,8 +157,8 @@ export function BarberQueue({ fullName, profile, bookings, date, onDateChange, o
 
       <nav className="bq-bottom-nav" aria-label="เมนูช่าง">
         <button aria-current={view === 'queue' ? 'page' : undefined} onClick={() => setView('queue')} type="button"><ListOrdered size={20} /><span>{showCurrent ? 'คิววันนี้' : 'คิวตามวัน'}</span></button>
-        <button onClick={openCalendar} type="button"><CalendarDays size={20} /><span>เลือกวัน</span></button>
         <button aria-current={view === 'history' ? 'page' : undefined} onClick={() => setView('history')} type="button"><History size={20} /><span>ประวัติคิว</span></button>
+        <button onClick={onLeave} type="button"><CalendarDays size={20} /><span>ขอลา</span></button>
         <button onClick={onProfile} type="button"><UserRound size={20} /><span>โปรไฟล์</span></button>
       </nav>
     </>

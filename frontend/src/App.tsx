@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent, PointerEvent } from 'react'
 import './App.css'
 import { BarberQueue } from './BarberQueue'
 import { BarberCheckout } from './BarberCheckout'
+import { BarberLeave } from './BarberLeave'
 import { BarberAddServices } from './BarberAddServices'
 import { BookingWorkSummary } from './BookingWorkSummary'
 import { CustomerPhoneLink } from './CustomerPhoneLink'
@@ -303,6 +304,7 @@ function App() {
   const [queue, setQueue] = useState<Booking[]>([])
   const [barberQueue, setBarberQueue] = useState<Booking[]>([])
   const [barberCheckoutBooking, setBarberCheckoutBooking] = useState<Booking | null>(null)
+  const [isBarberLeaveOpen, setIsBarberLeaveOpen] = useState(false)
   const [barberQueueError, setBarberQueueError] = useState('')
   const [isBarberQueueLoading, setIsBarberQueueLoading] = useState(true)
   const barberQueueRequest = useRef(0)
@@ -1838,6 +1840,7 @@ function selectScheduleDate(dateValue: string) {
 
   function logout() {
     setBarberCheckoutBooking(null)
+    setIsBarberLeaveOpen(false)
     setAuth(null)
     setQueue([])
     setBarberQueue([])
@@ -1941,6 +1944,7 @@ function selectScheduleDate(dateValue: string) {
           onCheckout={openBarberCheckout}
           onRefresh={() => refreshBarberQueue(barberScheduleDate)}
           onProfile={() => setIsBarberProfileEditing(true)}
+          onLeave={() => setIsBarberLeaveOpen(true)}
           onLogout={logout}
           isBusy={isBusy}
           isLoading={isBarberQueueLoading}
@@ -1948,6 +1952,7 @@ function selectScheduleDate(dateValue: string) {
           statusLabels={statusLabels}
         />
 
+        {isBarberLeaveOpen && <BarberLeave api={api} onClose={() => setIsBarberLeaveOpen(false)} />}
         {barberCheckoutBooking && (
           <BarberCheckout
             key={barberCheckoutBooking.id}
