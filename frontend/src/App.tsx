@@ -3,6 +3,10 @@ import type { CSSProperties, FormEvent, PointerEvent } from 'react'
 import './App.css'
 import { BarberQueue } from './BarberQueue'
 import { BarberCheckout } from './BarberCheckout'
+import { CalendarDays, ChevronLeft, ChevronRight, LogOut, RefreshCw, Users, Wallet, X } from 'lucide-react'
+import './StaffQueue.css'
+import { SheetBackdrop, SheetHandle } from './SheetBackdrop'
+import './StaffNavigation.css'
 
 type AuthResponse = {
   fullName: string
@@ -288,6 +292,7 @@ function App() {
   const [phoneNumber, setPhoneNumber] = useState('')
   const [message, setMessage] = useState('')
   const [isBusy, setIsBusy] = useState(false)
+  const [isRefreshingStaffQueue, setIsRefreshingStaffQueue] = useState(false)
 
   const [queue, setQueue] = useState<Booking[]>([])
   const [barberQueue, setBarberQueue] = useState<Booking[]>([])
@@ -320,6 +325,11 @@ function App() {
   const [qrTestAccountId, setQrTestAccountId] = useState('')
   const [isQrTestOpen, setIsQrTestOpen] = useState(false)
   const [activeStaffPanel, setActiveStaffPanel] = useState<'queue' | 'accounts' | 'staff'>('queue')
+
+  function navigateStaffPanel(panel: typeof activeStaffPanel) {
+    setActiveStaffPanel(panel)
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
   const [accountForm, setAccountForm] = useState({
     accountName: 'Rodeo PromptPay',
     accountType: 'PromptPayPhone',
@@ -384,9 +394,9 @@ function App() {
   const [customerReceipt, setCustomerReceipt] = useState<Receipt | null>(null)
   const [isStaffBookingFormOpen, setIsStaffBookingFormOpen] = useState(false)
   const staffBookingFormRef = useRef<HTMLFormElement | null>(null)
+  const staffDetailBodyRef = useRef<HTMLDivElement | null>(null)
   const scheduleDatePickerRef = useRef<HTMLDivElement | null>(null)
   const scheduleBoardRef = useRef<HTMLDivElement | null>(null)
-  const scheduleScrollAreaRef = useRef<HTMLDivElement | null>(null)
   const scheduleBoardDragRef = useRef({
     isDragging: false,
     pointerId: null as number | null,
@@ -491,6 +501,17 @@ function App() {
     setIsScheduleDatePickerOpen((current) => !current)
   }
 
+  useEffect(() => {
+    const body = staffDetailBodyRef.current
+    if (!body || (!isCancelBookingOpen && !paymentSummary)) return
+    const section = body.querySelector<HTMLElement>(isCancelBookingOpen ? '.cancel-booking-box' : '.payment-box')
+    if (!section) return
+    body.scrollTo({
+      top: body.scrollTop + section.getBoundingClientRect().top - body.getBoundingClientRect().top - 12,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    })
+  }, [isCancelBookingOpen, paymentSummary])
+
 function selectScheduleDate(dateValue: string) {
     setScheduleDate(dateValue)
     setScheduleCalendarMonth(getMonthKey(dateValue))
@@ -557,9 +578,7 @@ function selectScheduleDate(dateValue: string) {
   useEffect(() => {
     if (scheduleBoardRef.current) {
       scheduleBoardRef.current.scrollLeft = 0
-    }
-    if (scheduleScrollAreaRef.current) {
-      scheduleScrollAreaRef.current.scrollTop = 0
+      scheduleBoardRef.current.scrollTop = 0
     }
   }, [scheduleChairs.length, scheduleDate, scheduleViewportKey])
 
@@ -756,6 +775,16 @@ function selectScheduleDate(dateValue: string) {
     }
   }
 
+  async function refreshStaffQueue() {
+    if (isRefreshingStaffQueue) return
+    setIsRefreshingStaffQueue(true)
+    try {
+      await Promise.all([refreshQueue(scheduleDate), refreshBarbers(), refreshServices()])
+    } finally {
+      setIsRefreshingStaffQueue(false)
+    }
+  }
+
   async function refreshBarbers() {
     try {
       const result = await api<Barber[]>('/api/barbers')
@@ -800,6 +829,7 @@ function selectScheduleDate(dateValue: string) {
   }
 
   function startScheduleBoardDrag(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== 'mouse') return
     if (event.button !== 0 || isInteractiveDragTarget(event.target)) return
     if (event.currentTarget.scrollWidth <= event.currentTarget.clientWidth) return
 
@@ -1924,24 +1954,22 @@ function selectScheduleDate(dateValue: string) {
         )}
 
         {isBarberProfileEditing && (
-          <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeBarberProfileEditor()
-            }
-          }}>
+          <SheetBackdrop onClose={closeBarberProfileEditor} busy={isBusy} protectEdits>{(closeSheet) => (
             <article className="detail-panel barber-profile-modal" role="dialog" aria-modal="true" aria-labelledby="barber-profile-title">
+              <SheetHandle />
               <div className="booking-detail-header">
                 <div>
                   <span className="modal-eyebrow">ตั้งค่าช่าง</span>
                   <h2 id="barber-profile-title">โปรไฟล์ของฉัน</h2>
                   <small className="booking-number-chip">{barberProfile?.email ?? auth.email}</small>
                 </div>
-                <button className="icon-button" aria-label="ปิดโปรไฟล์" onClick={closeBarberProfileEditor} type="button">
+                <button className="icon-button" aria-label="ปิดโปรไฟล์" disabled={isBusy} onClick={closeSheet} type="button">
                   ×
                 </button>
               </div>
 
-              <form className="barber-profile-form barber-profile-modal-form" onSubmit={saveBarberProfile}>
+              <form className="barber-profile-form barber-profile-modal-form sheet-form" onSubmit={saveBarberProfile}>
+                <div className="sheet-body">
                 <div className="barber-profile-form-grid">
                   <label>
                     ชื่อที่แสดง
@@ -2015,8 +2043,9 @@ function selectScheduleDate(dateValue: string) {
                   </label>
                 </div>
 
+                </div>
                 <div className="modal-action-row">
-                  <button className="secondary" onClick={closeBarberProfileEditor} type="button">
+                  <button className="secondary" disabled={isBusy} onClick={closeSheet} type="button">
                     ยกเลิก
                   </button>
                   <button disabled={isBusy} type="submit">
@@ -2025,16 +2054,13 @@ function selectScheduleDate(dateValue: string) {
                 </div>
               </form>
             </article>
-          </div>
+          )}</SheetBackdrop>
         )}
 
         {selectedBooking && (
-          <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeBookingDetail()
-            }
-          }}>
+          <SheetBackdrop onClose={closeBookingDetail} busy={isBusy}>{(closeSheet) => (
             <article className={`detail-panel booking-detail-modal status-modal-${selectedBooking.bookingStatus}`} role="dialog" aria-modal="true" aria-labelledby="barber-booking-detail-title">
+              <SheetHandle />
               <div className="booking-detail-header">
                 <div>
                   <span className="modal-eyebrow">รายละเอียดคิวของฉัน</span>
@@ -2045,12 +2071,13 @@ function selectScheduleDate(dateValue: string) {
                   <span className={`status-pill status-${selectedBooking.bookingStatus}`}>
                     {statusLabels[selectedBooking.bookingStatus]}
                   </span>
-                  <button className="icon-button" aria-label="ปิดรายละเอียดคิว" onClick={closeBookingDetail} type="button">
+                  <button className="icon-button" aria-label="ปิดรายละเอียดคิว" disabled={isBusy} onClick={closeSheet} type="button">
                     ×
                   </button>
                 </div>
               </div>
 
+              <div className="sheet-body">
               <dl className="booking-detail-grid">
                 <div>
                   <dt>เวลา</dt>
@@ -2089,6 +2116,7 @@ function selectScheduleDate(dateValue: string) {
                 </section>
               )}
 
+              </div>
               <div className="booking-detail-actions barber-booking-actions">
                 {selectedBooking.bookingStatus === 'WaitingPayment' && (
                   <button className="status-next-button" disabled={isBusy} onClick={() => openBarberCheckout(selectedBooking)} type="button">
@@ -2116,13 +2144,13 @@ function selectScheduleDate(dateValue: string) {
                   </button>
                 )}
                 {!nextStatus[selectedBooking.bookingStatus] && !previousStatus[selectedBooking.bookingStatus] && (
-                  <button className="secondary" onClick={closeBookingDetail} type="button">
+                  <button className="secondary" onClick={closeSheet} type="button">
                     ปิดรายละเอียด
                   </button>
                 )}
               </div>
             </article>
-          </div>
+          )}</SheetBackdrop>
         )}
       </main>
     )
@@ -2241,29 +2269,30 @@ function selectScheduleDate(dateValue: string) {
   }
 
   return (
-    <main className="backoffice-shell">
+    <main className={`backoffice-shell staff-navigation-shell${activeStaffPanel === 'queue' ? ' staff-queue-workspace' : ''}`}>
       <aside className="backoffice-sidebar">
         <div className="brand-block">
           <strong>Rodeo</strong>
           <span>Barber Shop</span>
         </div>
 
-        <nav className="side-nav">
-          <button className={activeStaffPanel === 'queue' ? 'active' : ''} onClick={() => setActiveStaffPanel('queue')} type="button">
-            <span>⌂</span>
+        <nav className="side-nav" aria-label="เมนูหลักหลังร้าน">
+          <button aria-current={activeStaffPanel === 'queue' ? 'page' : undefined} className={activeStaffPanel === 'queue' ? 'active' : ''} onClick={() => navigateStaffPanel('queue')} type="button">
+            <CalendarDays size={18} aria-hidden="true" />
             คิววันนี้
           </button>
           <button
             className={activeStaffPanel === 'accounts' ? 'active' : ''}
-            onClick={() => setActiveStaffPanel('accounts')}
+            aria-current={activeStaffPanel === 'accounts' ? 'page' : undefined}
+            onClick={() => navigateStaffPanel('accounts')}
             type="button"
           >
-            <span>฿</span>
+            <Wallet size={18} aria-hidden="true" />
             บัญชีรับเงิน
           </button>
           {canManageStaff && (
-            <button className={activeStaffPanel === 'staff' ? 'active' : ''} onClick={() => setActiveStaffPanel('staff')} type="button">
-              <span>◎</span>
+            <button aria-current={activeStaffPanel === 'staff' ? 'page' : undefined} className={activeStaffPanel === 'staff' ? 'active' : ''} onClick={() => navigateStaffPanel('staff')} type="button">
+              <Users size={18} aria-hidden="true" />
               พนักงาน
             </button>
           )}
@@ -2279,7 +2308,7 @@ function selectScheduleDate(dateValue: string) {
       <section className="backoffice-main">
         <header className="backoffice-header">
           <div>
-            <p className="eyebrow">Back Office</p>
+            <p className="eyebrow"><span className="staff-mobile-brand">Rodeo</span><span className="staff-desktop-label">Back Office</span></p>
             <h1>{staffPanelTitle}</h1>
           </div>
           <div className="backoffice-user">
@@ -2288,8 +2317,8 @@ function selectScheduleDate(dateValue: string) {
               <strong>{auth.fullName}</strong>
               <small>เข้าสู่ระบบเป็น {auth.role}</small>
             </div>
-            <button className="secondary" onClick={logout} type="button">
-              Logout
+            <button className="secondary staff-logout" aria-label="ออกจากระบบ" title="ออกจากระบบ" onClick={logout} type="button">
+              <LogOut size={18} aria-hidden="true" />
             </button>
           </div>
         </header>
@@ -2301,7 +2330,7 @@ function selectScheduleDate(dateValue: string) {
               <div className="schedule-toolbar-actions">
                 <div className="schedule-date-controls">
                   <button className="secondary schedule-nav-button" aria-label="ก่อนหน้า" onClick={() => setScheduleDate(addDays(scheduleDate, -1))} type="button">
-                    ←
+                    <ChevronLeft size={18} />
                   </button>
                   <div className="schedule-date-picker-wrap" ref={scheduleDatePickerRef}>
                     <button
@@ -2354,19 +2383,15 @@ function selectScheduleDate(dateValue: string) {
                     )}
                   </div>
                   <button className="secondary schedule-nav-button" aria-label="ถัดไป" onClick={() => setScheduleDate(addDays(scheduleDate, 1))} type="button">
-                    →
+                    <ChevronRight size={18} />
                   </button>
                   <button className="secondary schedule-today-button" onClick={() => setScheduleDate(getTodayDate())} type="button">
                     วันนี้
                   </button>
                 </div>
                 <div className="schedule-primary-actions">
-                  <button className="secondary" disabled={isBusy} onClick={() => {
-                    void refreshQueue(scheduleDate)
-                    void refreshBarbers()
-                    void refreshServices()
-                  }} type="button">
-                    Refresh
+                  <button className="secondary staff-refresh" aria-label={isRefreshingStaffQueue ? 'กำลังรีเฟรชคิว' : 'รีเฟรชคิว'} title={isRefreshingStaffQueue ? 'กำลังรีเฟรชคิว' : 'รีเฟรชคิว'} aria-busy={isRefreshingStaffQueue} disabled={isBusy || isRefreshingStaffQueue} onClick={() => void refreshStaffQueue()} type="button">
+                    <RefreshCw size={18} />
                   </button>
                   <button className="primary-action" onClick={() => {
                     const defaultBookingDate = clampDateToToday(scheduleDate)
@@ -2408,7 +2433,7 @@ function selectScheduleDate(dateValue: string) {
                       <ChairScheduleHeader chair={chair} key={`${chair.id}-header`} onCreateBooking={openStaffBookingFormForChair} />
                     ))}
                   </div>
-                  <div className="schedule-scroll-area" ref={scheduleScrollAreaRef}>
+                  <div className="schedule-scroll-area">
                     <div className="schedule-scroll-grid">
                       <ScheduleTimeAxis />
                   {scheduleChairs.map((chair) => (
@@ -2428,22 +2453,20 @@ function selectScheduleDate(dateValue: string) {
           </div>
 
           {isStaffBookingFormOpen && (
-            <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
-              if (event.target === event.currentTarget) {
-                closeStaffBookingForm()
-              }
-            }}>
-              <form className="staff-booking-form booking-modal" onSubmit={createStaffBooking} ref={staffBookingFormRef}>
+            <SheetBackdrop onClose={closeStaffBookingForm} busy={isBusy} protectEdits>{(closeSheet) => (
+              <form className="staff-booking-form booking-modal" role="dialog" aria-modal="true" aria-labelledby="staff-booking-title" onSubmit={createStaffBooking} ref={staffBookingFormRef}>
+                <SheetHandle />
                 <div className="booking-modal-header">
                   <div>
                     <p className="eyebrow">เพิ่มการจองคิว</p>
-                    <h3>จองคิวหน้าร้าน</h3>
+                    <h3 id="staff-booking-title">จองคิวหน้าร้าน</h3>
                   </div>
-                  <button className="icon-button" aria-label="ปิดฟอร์มจองคิว" onClick={closeStaffBookingForm} type="button">
-                    ×
+                  <button className="icon-button" aria-label="ปิดฟอร์มจองคิว" disabled={isBusy} onClick={closeSheet} type="button">
+                    <X size={18} />
                   </button>
                 </div>
 
+                <div className="sheet-body">
                 {staffBookingContext && (
                   <div className="staff-booking-context">
                     <span>กำลังเพิ่มคิวให้</span>
@@ -2602,8 +2625,9 @@ function selectScheduleDate(dateValue: string) {
                   )}
                 </section>
 
+                </div>
                 <div className="action-row">
-                  <button className="secondary" onClick={closeStaffBookingForm} type="button">
+                  <button className="secondary" disabled={isBusy} onClick={closeSheet} type="button">
                     ยกเลิก
                   </button>
                   <button disabled={isBusy} type="submit">
@@ -2611,7 +2635,7 @@ function selectScheduleDate(dateValue: string) {
                   </button>
                 </div>
               </form>
-            </div>
+            )}</SheetBackdrop>
           )}
 
           <aside className="detail-panel schedule-detail-panel">
@@ -2638,12 +2662,9 @@ function selectScheduleDate(dateValue: string) {
           </aside>
 
           {selectedBooking && (
-            <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
-              if (event.target === event.currentTarget) {
-                closeBookingDetail()
-              }
-            }}>
+            <SheetBackdrop onClose={closeBookingDetail} busy={isBusy} dismissible={!isCancelBookingOpen}>{(closeSheet) => (
               <article className={`detail-panel booking-detail-modal status-modal-${selectedBooking.bookingStatus}`} role="dialog" aria-modal="true" aria-labelledby="booking-detail-title">
+                <SheetHandle />
                 <div className="booking-detail-header">
                   <div>
                     <span className="modal-eyebrow">รายละเอียดคิว</span>
@@ -2654,12 +2675,13 @@ function selectScheduleDate(dateValue: string) {
                     <span className={`status-pill status-${selectedBooking.bookingStatus}`}>
                       {statusLabels[selectedBooking.bookingStatus]}
                     </span>
-                    <button className="icon-button" aria-label="ปิดรายละเอียดคิว" onClick={closeBookingDetail} type="button">
-                      ×
+                    <button className="icon-button" aria-label="ปิดรายละเอียดคิว" disabled={isBusy} onClick={closeSheet} type="button">
+                      <X size={18} />
                     </button>
                   </div>
                 </div>
 
+                <div className="sheet-body" ref={staffDetailBodyRef}>
                 <dl className="booking-detail-grid">
                   <div>
                     <dt>ช่าง</dt>
@@ -2731,39 +2753,6 @@ function selectScheduleDate(dateValue: string) {
                   </section>
                 )}
 
-                <div className="booking-detail-actions">
-                  {previousStatus[selectedBooking.bookingStatus] && (
-                    <button
-                      className="secondary status-back-button"
-                      disabled={isBusy}
-                      onClick={() => moveStatus(selectedBooking, previousStatus[selectedBooking.bookingStatus])}
-                      type="button"
-                    >
-                      ย้อนกลับเป็น {statusLabels[previousStatus[selectedBooking.bookingStatus]]}
-                    </button>
-                  )}
-                  {nextStatus[selectedBooking.bookingStatus] && (
-                    <button className="status-next-button" disabled={isBusy} onClick={() => moveStatus(selectedBooking)} type="button">
-                      เปลี่ยนเป็น {statusLabels[nextStatus[selectedBooking.bookingStatus]]}
-                    </button>
-                  )}
-                  {selectedBooking.bookingStatus === 'WaitingPayment' && (
-                    <button className="status-next-button" disabled={isBusy} onClick={() => loadPaymentSummary(selectedBooking)} type="button">
-                      แสดง QR
-                    </button>
-                  )}
-                  {cancellableStatuses.includes(selectedBooking.bookingStatus) && (
-                    <button
-                      className="danger cancel-booking-button"
-                      disabled={isBusy}
-                      onClick={() => setIsCancelBookingOpen((current) => !current)}
-                      type="button"
-                    >
-                      ยกเลิกคิว
-                    </button>
-                  )}
-                </div>
-
                 {isCancelBookingOpen && selectedBooking.bookingStatus !== 'Cancelled' && (
                   <section className="cancel-booking-box">
                     <div>
@@ -2810,8 +2799,28 @@ function selectScheduleDate(dateValue: string) {
                 )}
 
                 {staffReceipt && <ReceiptBox receipt={staffReceipt} />}
+                </div>
+                <div className="booking-detail-actions">
+                  {previousStatus[selectedBooking.bookingStatus] && (
+                    <button className="secondary status-back-button" disabled={isBusy} onClick={() => moveStatus(selectedBooking, previousStatus[selectedBooking.bookingStatus])} type="button">
+                      ย้อนกลับเป็น {statusLabels[previousStatus[selectedBooking.bookingStatus]]}
+                    </button>
+                  )}
+                  {nextStatus[selectedBooking.bookingStatus] && (
+                    <button className="status-next-button" disabled={isBusy} onClick={() => moveStatus(selectedBooking)} type="button">
+                      เปลี่ยนเป็น {statusLabels[nextStatus[selectedBooking.bookingStatus]]}
+                    </button>
+                  )}
+                  {selectedBooking.bookingStatus === 'WaitingPayment' && (
+                    <button className="status-next-button" disabled={isBusy} onClick={() => loadPaymentSummary(selectedBooking)} type="button">แสดง QR</button>
+                  )}
+                  {cancellableStatuses.includes(selectedBooking.bookingStatus) && (
+                    <button className="danger cancel-booking-button" disabled={isBusy} onClick={() => setIsCancelBookingOpen((current) => !current)} type="button">ยกเลิกคิว</button>
+                  )}
+                  <button className="secondary" disabled={isBusy} onClick={closeSheet} type="button">ปิดหน้าต่าง</button>
+                </div>
               </article>
-            </div>
+            )}</SheetBackdrop>
           )}
         </section>
       ) : activeStaffPanel === 'accounts' ? (

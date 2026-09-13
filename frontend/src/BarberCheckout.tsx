@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Banknote, Check, CircleCheck, QrCode, RefreshCw, X } from 'lucide-react'
 import type { Booking, PaymentSummary, Receipt } from './App'
+import { SheetBackdrop, SheetHandle } from './SheetBackdrop'
 
 type Props = {
   booking: Booking
@@ -29,6 +30,7 @@ export function BarberCheckout({ booking, api, onClose, onPaid, onCorrected }: P
   const submittingRef = useRef(false)
   const request = useRef<AbortController | null>(null)
   const panel = useRef<HTMLElement>(null)
+  const closeSheet = useRef<() => void>(() => {})
   const confirmationTitle = useRef<HTMLHeadingElement>(null)
   const receivedButton = useRef<HTMLButtonElement>(null)
   const confirmingRef = useRef(confirming)
@@ -107,7 +109,7 @@ export function BarberCheckout({ booking, api, onClose, onPaid, onCorrected }: P
       if (event.key === 'Escape' && !submittingRef.current) {
         if (confirmingRef.current) setConfirming(false)
         else if (correctingRef.current) setCorrecting(false)
-        else actions.current.onClose()
+        else closeSheet.current()
       }
       if (event.key !== 'Tab') return
       const focusable = Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex="0"]') ?? [])
@@ -205,14 +207,17 @@ export function BarberCheckout({ booking, api, onClose, onPaid, onCorrected }: P
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !submittingRef.current) onClose() }}>
+    <SheetBackdrop onClose={onClose} busy={submitting} dismissible={!confirming && !correcting} manageFocus={false}>{(dismiss) => {
+      closeSheet.current = dismiss
+      return (
       <article className="detail-panel bq-checkout-modal" role="dialog" aria-modal="true" aria-labelledby="bq-checkout-title" aria-describedby={confirming ? 'bq-confirm-prompt' : undefined} tabIndex={-1} ref={panel}>
+        <SheetHandle />
         <div className="booking-detail-header">
           <div><span className="modal-eyebrow">{correcting ? 'กลับไปรอชำระเงิน' : paid ? 'รับชำระเรียบร้อย' : 'จบบริการ / รับชำระเงิน'}</span><h2 id="bq-checkout-title">{correcting ? 'แก้ไขการรับเงินผิด' : paid ? 'ใบเสร็จรับเงิน' : booking.customerName || 'ลูกค้าหน้าร้าน'}</h2><small className="booking-number-chip">เลขจอง {booking.bookingNumber}</small></div>
-          <button className="icon-button" type="button" aria-label="ปิดหน้าชำระเงิน" title="ปิด" disabled={submitting} onClick={onClose}><X size={18} /></button>
+          <button className="icon-button" type="button" aria-label="ปิดหน้าชำระเงิน" title="ปิด" disabled={submitting} onClick={dismiss}><X size={18} /></button>
         </div>
-        <form onSubmit={correcting ? correctPayment : confirm}>
-          <div className="bq-checkout-body">
+        <form className="sheet-form" onSubmit={correcting ? correctPayment : confirm}>
+          <div className="bq-checkout-body sheet-body">
             {paid && receipt && !correcting && <div className="bq-payment-success" role="status"><CircleCheck size={20} /><span>รับเงินแล้ว · จบคิวเรียบร้อย</span></div>}
             {loading && <div className="bq-checkout-loading" role="status"><RefreshCw size={22} className="bq-spinning" />กำลังโหลด{paid ? 'ใบเสร็จ' : 'ข้อมูลชำระเงิน'}</div>}
             {error && <div className="bq-error" role="alert"><p>{error}</p><button type="button" disabled={loading || submitting} onClick={() => void load()}>ตรวจสถานะอีกครั้ง</button></div>}
@@ -251,7 +256,7 @@ export function BarberCheckout({ booking, api, onClose, onPaid, onCorrected }: P
               <button key="confirm-correction" type="submit" disabled={submitting || loading || reason.trim().length < 3}>{submitting ? 'กำลังแก้ไข...' : 'ยืนยันกลับไปรอชำระ'}</button>
             </> : paid ? <>
               {receipt?.canCorrectPayment && <button key="correct" ref={correctionButton} className="secondary" type="button" disabled={loading || submitting} onClick={() => { setReason(''); setCorrecting(true) }}>แก้ไขการรับเงินผิด</button>}
-              <button key="done" type="button" onClick={onClose} disabled={submitting}>กลับไปหน้าคิว</button>
+              <button key="done" type="button" onClick={dismiss} disabled={submitting}>กลับไปหน้าคิว</button>
             </> : confirming ? <>
               <button key="back" className="secondary" type="button" disabled={submitting} onClick={() => setConfirming(false)}>กลับไปตรวจสอบ</button>
               <button key="confirm" type="submit" disabled={loading || submitting || !summary}><Check size={17} />{submitting ? 'กำลังบันทึก...' : 'ยืนยันและจบคิว'}</button>
@@ -259,6 +264,7 @@ export function BarberCheckout({ booking, api, onClose, onPaid, onCorrected }: P
           </div>
         </form>
       </article>
-    </div>
+      )
+    }}</SheetBackdrop>
   )
 }
