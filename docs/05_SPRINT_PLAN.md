@@ -135,10 +135,13 @@ Goal: Complete advanced management, dashboard, notification, promotion, and repo
 
 ### Sprint 13: Barber Leave Management
 
-Implementation checkpoint (2026-09-13):
+Implementation checkpoint (2026-09-14, branch `feature/barber-leave-management`):
 - Implemented: barber request submission and own request history via `/api/leaves` and `/api/leaves/my`, with pending/approved overlap validation.
-- Remaining: Owner/Admin review UI and approve/reject APIs, affected booking workflow, and approved-leave enforcement in availability and booking validation.
-- Pending requests do not change booking availability. This sprint is not complete.
+- Implemented: Owner/Admin request list, affected booking preview, approve/reject with reviewer identity and notes. Approval rechecks affected booking IDs; rejection requires a reason.
+- Implemented: approved leave blocks overlapping availability, customer/staff booking creation, and service extensions into leave. Pending/rejected requests do not block booking availability.
+- Existing bookings are not automatically changed. The review view links to their date in the queue for manual handling; automatic reassignment/rescheduling is not implemented.
+- Verified: 56 isolated backend tests, frontend build/lint, mocked Owner and barber browser workflows at mobile/tablet/desktop sizes, and read-only development API authorization checks.
+- Remaining before merge/sign-off: user acceptance of the affected-booking handling workflow and real PostgreSQL concurrent approval/booking validation in an isolated test environment. This checkpoint does not claim final Sprint 13 acceptance.
 
 - Barber leave request
 - Owner approval

@@ -4,6 +4,7 @@ import './App.css'
 import { BarberQueue } from './BarberQueue'
 import { BarberCheckout } from './BarberCheckout'
 import { BarberLeave } from './BarberLeave'
+import { OwnerLeaves } from './OwnerLeaves'
 import { BarberAddServices } from './BarberAddServices'
 import { BookingWorkSummary } from './BookingWorkSummary'
 import { CustomerPhoneLink } from './CustomerPhoneLink'
@@ -332,7 +333,7 @@ function App() {
   const [qrTestAmount, setQrTestAmount] = useState('100')
   const [qrTestAccountId, setQrTestAccountId] = useState('')
   const [isQrTestOpen, setIsQrTestOpen] = useState(false)
-  const [activeStaffPanel, setActiveStaffPanel] = useState<'queue' | 'accounts' | 'staff'>('queue')
+  const [activeStaffPanel, setActiveStaffPanel] = useState<'queue' | 'accounts' | 'staff' | 'leaves'>('queue')
 
   function navigateStaffPanel(panel: typeof activeStaffPanel) {
     setActiveStaffPanel(panel)
@@ -490,7 +491,7 @@ function App() {
     [activeStandbyAssignments, standbyModalBarberId],
   )
   const staffPanelTitle =
-    activeStaffPanel === 'queue' ? 'จัดการคิววันนี้' : activeStaffPanel === 'accounts' ? 'บัญชีรับเงินร้าน' : 'จัดการพนักงาน'
+    activeStaffPanel === 'queue' ? 'จัดการคิววันนี้' : activeStaffPanel === 'accounts' ? 'บัญชีรับเงินร้าน' : activeStaffPanel === 'leaves' ? 'คำขอลาช่าง' : 'จัดการพนักงาน'
   const queueSummary = {
     total: queue.length,
     confirmed: queue.filter((booking) => booking.bookingStatus === 'Confirmed' || booking.bookingStatus === 'WaitingService').length,
@@ -2287,7 +2288,7 @@ function selectScheduleDate(dateValue: string) {
   }
 
   return (
-    <main className={`backoffice-shell staff-navigation-shell${activeStaffPanel === 'queue' ? ' staff-queue-workspace' : ''}`}>
+    <main className={`backoffice-shell staff-navigation-shell${activeStaffPanel === 'queue' || activeStaffPanel === 'leaves' ? ' staff-queue-workspace' : ''}`}>
       <aside className="backoffice-sidebar">
         <div className="brand-block">
           <strong>Rodeo</strong>
@@ -2314,6 +2315,7 @@ function selectScheduleDate(dateValue: string) {
               พนักงาน
             </button>
           )}
+          {canManageStaff && <button aria-current={activeStaffPanel === 'leaves' ? 'page' : undefined} className={activeStaffPanel === 'leaves' ? 'active' : ''} onClick={() => navigateStaffPanel('leaves')} type="button"><CalendarDays size={18} aria-hidden="true" />คำขอลา</button>}
         </nav>
 
         <div className="shop-card">
@@ -2341,7 +2343,9 @@ function selectScheduleDate(dateValue: string) {
           </div>
         </header>
 
-        {activeStaffPanel === 'queue' ? (
+        {activeStaffPanel === 'leaves' ? (
+          canManageStaff && <OwnerLeaves api={api} onQueue={date => { setScheduleDate(date); navigateStaffPanel('queue') }} />
+        ) : activeStaffPanel === 'queue' ? (
         <section className="schedule-layout">
           <div className="schedule-board-panel">
             <div className="schedule-toolbar">

@@ -419,10 +419,14 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             .ToListAsync(cancellationToken);
 
         var slots = new List<AvailabilitySlotResponse>();
+        var approvedLeaves = await dbContext.LeaveRequests.AsNoTracking()
+            .Where(l => l.BarberId == barberId && l.Status == LeaveStatus.Approved && l.StartAt < dayEndUtc && l.EndAt > dayStartUtc)
+            .Select(l => new { l.StartAt, l.EndAt }).ToListAsync(cancellationToken);
         for (var startAt = dayStart; startAt.AddMinutes(durationMinutes) <= dayEnd; startAt = startAt.AddMinutes(slotIntervalMinutes))
         {
             var endAt = startAt.AddMinutes(durationMinutes);
-            var overlaps = existingBookings.Any(booking => startAt < booking.EndAt && endAt > booking.StartAt);
+            var overlaps = existingBookings.Any(booking => startAt < booking.EndAt && endAt > booking.StartAt)
+                || approvedLeaves.Any(leave => startAt < leave.EndAt && endAt > leave.StartAt);
 
             slots.Add(new AvailabilitySlotResponse(startAt, endAt, !overlaps));
         }
@@ -452,6 +456,8 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         }
 
         var requestedStartAtLocal = requestedStartAt.ToOffset(ShopUtcOffset);
+        if (await dbContext.LeaveRequests.AnyAsync(l => l.BarberId == barberId && l.Status == LeaveStatus.Approved && l.StartAt < endAtUtc && l.EndAt > startAtUtc, cancellationToken))
+            return "ช่างลาช่วงเวลานี้ กรุณาเลือกเวลาอื่น";
         var requestedEndAtLocal = requestedStartAtLocal.Add(endAtUtc - startAtUtc);
         var bookingDate = DateOnly.FromDateTime(requestedStartAtLocal.DateTime);
         if (requestedStartAtLocal.Minute != 0 || requestedStartAtLocal.Second != 0 || requestedStartAtLocal.Millisecond != 0)

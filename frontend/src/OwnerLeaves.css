@@ -1,0 +1,23 @@
+.owner-leaves.bq-workspace { min-height: 0; padding: 0; background: transparent; }
+.owner-leave-toolbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.owner-leave-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.owner-leaves .owner-leave-filters button { min-height: 44px; padding: 8px 10px; border: 1px solid #2c323d; border-radius: 8px; background: #171a20; color: #a8b3c3; font-size: 11px; }
+.owner-leaves .owner-leave-filters button[aria-pressed=true] { color: #e5c378; border-color: #635535; background: #2b261c; }
+.owner-leave-list { display: grid; gap: 12px; }
+.owner-leaves .owner-leave-card { display: grid; gap: 10px; padding: 16px; width: 100%; min-width: 0; text-align: left; border: 1px solid #2c323d; border-radius: 8px; background: #171a20; color: #a8b3c3; font-size: 12px; box-shadow: none; }
+.owner-leave-card-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+.owner-leave-card-heading strong { font-size: 15px; }
+.owner-leave-impact { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #e5c378; }
+.owner-leave-notice { color: #41dfb9; margin: 0 0 16px !important; }
+.owner-leave-body { padding: 18px var(--bq-dialog-padding); }
+.owner-leave-body > p { margin-bottom: 14px; overflow-wrap: anywhere; }
+.owner-leave-reason { white-space: pre-wrap; }
+.owner-leave-meta { color: #a8b3c3; font-size: 11px; }
+.owner-leave-body h3 { margin: 20px 0 10px; }
+.owner-leave-booking { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid #2c323d; font-size: 12px; }
+.owner-leave-booking strong { overflow-wrap: anywhere; }
+.owner-leaves .owner-leave-booking button { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 8px 10px; font-size: 12px; border-radius: 8px; }
+.owner-leave-review { margin-top: 16px; border-top: 1px solid #2c323d; }
+.owner-leave-review label { display: block; margin-top: 12px; font-size: 12px; }
+.owner-leaves .owner-leave-review textarea { width: 100%; min-width: 0; padding: 12px; font: inherit; font-size: 16px; background: #101318; color: #f4f4f5; border: 1px solid #2c323d; border-radius: 8px; resize: vertical; }
+@media (min-width: 900px) { .owner-leave-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

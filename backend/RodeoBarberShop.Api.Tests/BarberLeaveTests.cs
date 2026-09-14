@@ -14,6 +14,21 @@ namespace RodeoBarberShop.Api.Tests;
 public class BarberLeaveTests
 {
     [Fact]
+    public async Task ThaiOffsetRequestStoresUtcAndDetectsSamePeriodSentAsUtc()
+    {
+        using var f = new Fixture();
+        var start = f.Request().StartAt.ToOffset(TimeSpan.FromHours(7));
+        var request = new CreateLeaveRequest("Personal", start, start.AddHours(2), "Thai time request");
+        Assert.Equal(201, Assert.IsType<ObjectResult>((await f.Controller().Create(request, default)).Result).StatusCode);
+        var stored = Assert.Single(f.Db.LeaveRequests);
+        Assert.Equal(TimeSpan.Zero, stored.StartAt.Offset);
+        Assert.Equal(TimeSpan.Zero, stored.EndAt.Offset);
+        Assert.Equal(start.ToUniversalTime(), stored.StartAt);
+        Assert.IsType<ConflictObjectResult>((await f.Controller().Create(request with { StartAt = start.ToUniversalTime(), EndAt = start.AddHours(2).ToUniversalTime() }, default)).Result);
+        Assert.Single(f.Db.LeaveRequests);
+    }
+
+    [Fact]
     public async Task SubmitPendingAndOnlyReadOwnRequests()
     {
         using var f = new Fixture();
