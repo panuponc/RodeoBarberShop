@@ -9,4 +9,10 @@ public record ChairScheduleBarberResponse(
     bool IsPrimary,
     string? AssignmentNote,
     DateOnly StartDate,
-    DateOnly? EndDate);
+    DateOnly? EndDate)
+{
+    public DateTimeOffset? BookableFrom { get; init; }
+    public DateTimeOffset? BookableUntil { get; init; }
+    public DateTimeOffset? ShopOpenAt { get; init; }
+    public DateTimeOffset? ShopCloseAt { get; init; }
+}

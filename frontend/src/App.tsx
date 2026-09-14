@@ -5,6 +5,8 @@ import { BarberQueue } from './BarberQueue'
 import { BarberCheckout } from './BarberCheckout'
 import { BarberLeave } from './BarberLeave'
 import { OwnerLeaves } from './OwnerLeaves'
+import { scheduleAvailability } from './scheduleAvailability'
+import { BookingClosureDialog } from './BookingClosureDialog'
 import { BarberAddServices } from './BarberAddServices'
 import { BookingWorkSummary } from './BookingWorkSummary'
 import { CustomerPhoneLink } from './CustomerPhoneLink'
@@ -63,6 +65,10 @@ type BarberSchedule = {
 }
 
 type ChairScheduleBarber = {
+  shopOpenAt?: string | null
+  shopCloseAt?: string | null
+  bookableFrom?: string | null
+  bookableUntil?: string | null
   assignmentId: string
   barberId: string
   fullName: string
@@ -82,9 +88,10 @@ type ChairScheduleConfig = {
   isActive: boolean
   barbers: ChairScheduleBarber[]
   leaves?: ScheduleLeave[]
+  bookingClosures?: ScheduleLeave[]
 }
 
-type ScheduleLeave = { id: string; barberId: string; startAt: string; endAt: string }
+type ScheduleLeave = { id: string; barberId: string; startAt: string; endAt: string; isClosure?: boolean }
 
 type Chair = {
   id: string
@@ -420,6 +427,8 @@ function App() {
   })
   const [scheduleDate, setScheduleDate] = useState(getTodayDate())
   const [scheduleLeaves, setScheduleLeaves] = useState<{ date: string; items: ScheduleLeave[] }>({ date: '', items: [] })
+  const [scheduleWindows, setScheduleWindows] = useState<{ date: string; items: ChairScheduleBarber[] }>({ date: '', items: [] })
+  const [closureChair, setClosureChair] = useState<ScheduleChair | null>(null)
   const visibleScheduleLeaves = scheduleLeaves.date === scheduleDate ? scheduleLeaves.items : []
   const [scheduleViewportKey, setScheduleViewportKey] = useState(getScheduleViewportKey)
   const [isScheduleDatePickerOpen, setIsScheduleDatePickerOpen] = useState(false)
@@ -854,7 +863,8 @@ function selectScheduleDate(dateValue: string) {
 
   async function refreshScheduleChairConfigs(targetDate = scheduleDate) {
     const result = await api<ChairScheduleConfig[]>(`/api/chairs/schedule?date=${targetDate}`)
-    setScheduleLeaves({ date: targetDate, items: [...new Map(result.flatMap((chair) => chair.leaves ?? []).map((leave) => [leave.id, leave])).values()] })
+    setScheduleWindows({ date: targetDate, items: result.flatMap(chair => chair.barbers) })
+    setScheduleLeaves({ date: targetDate, items: [...new Map(result.flatMap((chair) => [...(chair.leaves ?? []), ...(chair.bookingClosures ?? []).map(c=>({...c,isClosure:true}))]).map((leave) => [leave.id, leave])).values()] })
     const mappedChairs = result
       .filter((chair) => chair.isActive)
       .map((chair) => {
@@ -2504,7 +2514,7 @@ function selectScheduleDate(dateValue: string) {
                   <div className="schedule-fixed-grid">
                     <ScheduleTimeColumnHeader />
                     {scheduleChairs.map((chair) => (
-                      <ChairScheduleHeader chair={chair} date={scheduleDate} leaves={visibleScheduleLeaves.filter((leave) => chair.barbers.some(({ barber }) => barber.id === leave.barberId))} key={`${chair.id}-header`} onCreateBooking={openStaffBookingFormForChair} />
+                      <ChairScheduleHeader chair={chair} windows={scheduleWindows.date === scheduleDate ? scheduleWindows.items.filter(w => chair.barbers.some(({barber}) => barber.id === w.barberId)) : []} date={scheduleDate} leaves={visibleScheduleLeaves.filter((leave) => chair.barbers.some(({ barber }) => barber.id === leave.barberId))} key={`${chair.id}-header`} onManageBooking={setClosureChair} onCreateBooking={openStaffBookingFormForChair} />
                     ))}
                   </div>
                   <div className="schedule-scroll-area">
@@ -2528,6 +2538,7 @@ function selectScheduleDate(dateValue: string) {
             </div>
           </div>
 
+          {closureChair && <BookingClosureDialog date={scheduleDate} api={api} barbers={closureChair.barbers.map(b=>b.barber)} closures={visibleScheduleLeaves.filter(l=>l.isClosure)} bookings={queue} onClose={()=>setClosureChair(null)} onSaved={()=>{setClosureChair(null);void refreshStaffQueue()}} />}
           {isStaffBookingFormOpen && (
             <SheetBackdrop onClose={closeStaffBookingForm} busy={isBusy} protectEdits>{(closeSheet) => (
               <form className="staff-booking-form booking-modal" role="dialog" aria-modal="true" aria-labelledby="staff-booking-title" onSubmit={createStaffBooking} ref={staffBookingFormRef}>
@@ -3749,6 +3760,7 @@ function ScheduleTimeAxis() {
 }
 
 function scheduleLeaveLabel(leave: ScheduleLeave, date: string) {
+  if (leave.isClosure) return `ปิดรับจอง ถึง ${formatTime(leave.endAt)}`
   const dayStart = new Date(`${date}T00:00:00+07:00`).getTime()
   const start = Math.max(0, (new Date(leave.startAt).getTime() - dayStart) / 60000)
   const end = Math.min(1440, (new Date(leave.endAt).getTime() - dayStart) / 60000)
@@ -3758,15 +3770,31 @@ function scheduleLeaveLabel(leave: ScheduleLeave, date: string) {
 
 function ChairScheduleHeader({
   chair,
+  windows,
   date,
   leaves,
   onCreateBooking,
+  onManageBooking,
 }: {
   chair: ScheduleChair
+  windows: ChairScheduleBarber[]
   date: string
   leaves: ScheduleLeave[]
   onCreateBooking: (chair: ScheduleChair) => void
+  onManageBooking: (chair: ScheduleChair) => void
 }) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 15000); return () => window.clearInterval(timer) }, [])
+  const availability = scheduleAvailability(windows, leaves, date, now)
+  const manageableBarbers = chair.barbers.filter(({ barber }) => {
+    const window = windows.find(w => w.barberId === barber.id)
+    if (date < getTodayDate() || !window?.bookableFrom || !window.bookableUntil
+      || (date === getTodayDate() && (now < Date.parse(window.bookableFrom) || now >= Date.parse(window.bookableUntil)))) return false
+    const start = date === getTodayDate() ? now : Date.parse(window.bookableFrom)
+    const closed = leaves.some(l => l.isClosure && l.barberId === barber.id && Date.parse(l.endAt) > start)
+    const onLeave = leaves.some(l => !l.isClosure && l.barberId === barber.id && Date.parse(l.startAt) <= start && (date === getTodayDate() ? Date.parse(l.endAt) > start : Date.parse(l.endAt) >= Date.parse(window.bookableUntil!)))
+    return closed || !onLeave
+  })
   const headerClassName = [
     'barber-column-header',
     chair.isWorkingToday ? '' : 'off-day',
@@ -3776,9 +3804,13 @@ function ChairScheduleHeader({
 
   return (
     <header className={headerClassName}>
-      <div className="barber-avatar-wrap">
+      <div className={`barber-avatar-wrap${manageableBarbers.length ? ' can-manage-booking' : ''}`}>
+        {manageableBarbers.length > 0 ? <button className="barber-avatar-control" type="button" title={`จัดการรับจอง ${chair.title}`} aria-label={`จัดการรับจอง ${chair.title}`} onClick={() => onManageBooking({ ...chair, barbers: manageableBarbers })}>
+          <span className="barber-avatar">{getInitials(chair.title)}</span>
+        </button> :
         <div className="barber-avatar">{getInitials(chair.title)}</div>
-        <span className={leaves.length ? 'availability-dot on-leave' : chair.isWorkingToday ? 'availability-dot available' : 'availability-dot'} />
+        }
+        <span className={`availability-dot state-${availability.color}`} title={availability.label} aria-label={availability.label} />
       </div>
       <div>
         <strong>{chair.title}</strong>
@@ -3927,7 +3959,7 @@ function ChairScheduleTimeline({
                   >
                   <span className="schedule-time">{formatTime(booking.startAt)} - {formatTime(booking.endAt)}</span>
                   <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
-                  {leaves.some((leave) => leave.barberId === booking.barberId && new Date(leave.startAt) < new Date(booking.endAt) && new Date(leave.endAt) > new Date(booking.startAt)) && <span className="schedule-leave-conflict">คิวทับช่วงลา</span>}
+                  {leaves.some((leave) => leave.barberId === booking.barberId && new Date(leave.startAt) < new Date(booking.endAt) && new Date(leave.endAt) > new Date(booking.startAt)) && <span className="schedule-leave-conflict">{leaves.some(leave => leave.isClosure && leave.barberId === booking.barberId && new Date(leave.startAt) < new Date(booking.endAt) && new Date(leave.endAt) > new Date(booking.startAt)) ? 'คิวทับช่วงปิดรับจอง' : 'คิวทับช่วงลา'}</span>}
                   <BookingWorkSummary booking={booking} compact />
                   <span className={`schedule-card-status status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
                 </button>

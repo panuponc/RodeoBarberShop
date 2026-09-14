@@ -63,13 +63,35 @@ public class ChairsController(ApplicationDbContext dbContext) : ControllerBase
 
         var dayStart = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime();
         var dayEnd = dayStart.AddDays(1);
+        var shop = await dbContext.ShopSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var holiday = await dbContext.ShopHolidays.AnyAsync(h => (h.HolidayType == HolidayType.Weekly && h.DayOfWeek == (int)date.DayOfWeek) || (h.HolidayType == HolidayType.Special && h.HolidayDate == date), cancellationToken);
+        var hours = await dbContext.BarberWorkingHours.AsNoTracking().Where(h => h.DayOfWeek == (int)date.DayOfWeek && h.IsWorkingDay && h.Barber.IsAvailable && h.Barber.AcceptsBooking).ToListAsync(cancellationToken);
+        ChairScheduleBarberResponse WithWindow(ChairScheduleBarberResponse barber)
+        {
+            if (!holiday && shop is not null)
+                barber = barber with {
+                    ShopOpenAt = new DateTimeOffset(date.ToDateTime(shop.OpeningTime), TimeSpan.FromHours(7)),
+                    ShopCloseAt = new DateTimeOffset(date.ToDateTime(shop.ClosingTime), TimeSpan.FromHours(7))
+                };
+            var hour = hours.FirstOrDefault(h => h.BarberId == barber.BarberId);
+            if (holiday || hour is null) return barber;
+            var start = shop is not null && shop.OpeningTime > hour.StartTime ? shop.OpeningTime : hour.StartTime;
+            var end = shop is not null && shop.ClosingTime < hour.EndTime ? shop.ClosingTime : hour.EndTime;
+            if (end <= start) return barber;
+            return barber with { BookableFrom = new DateTimeOffset(date.ToDateTime(start), TimeSpan.FromHours(7)), BookableUntil = new DateTimeOffset(date.ToDateTime(end), TimeSpan.FromHours(7)) };
+        }
         var leaves = await dbContext.LeaveRequests.AsNoTracking()
             .Where(leave => (leave.Status == LeaveStatus.Approved || leave.Status == LeaveStatus.CancellationPending) && leave.StartAt < dayEnd && leave.EndAt > dayStart)
             .OrderBy(leave => leave.StartAt)
             .Select(leave => new ScheduleLeaveResponse(leave.Id, leave.BarberId, leave.StartAt, leave.EndAt))
             .ToListAsync(cancellationToken);
+        var closures = await dbContext.BarberBookingClosures.AsNoTracking()
+            .Where(c => c.ReopenedAt == null && c.StartAt < dayEnd && c.EndAt > dayStart)
+            .Select(c => new ScheduleLeaveResponse(c.Id, c.BarberId, c.StartAt, c.EndAt)).ToListAsync(cancellationToken);
         return Ok(chairs.Select(chair => chair with
         {
+            Barbers = chair.Barbers.Select(WithWindow).ToList(),
+            BookingClosures = closures.Where(c => chair.Barbers.Any(b => b.BarberId == c.BarberId)).ToList(),
             Leaves = leaves.Where(leave => chair.Barbers.Any(barber => barber.BarberId == leave.BarberId)).ToList()
         }).ToList());
     }

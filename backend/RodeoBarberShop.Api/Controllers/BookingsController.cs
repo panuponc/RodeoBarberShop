@@ -405,6 +405,16 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
 
         var dayStart = new DateTimeOffset(date.ToDateTime(workingHour.StartTime), ShopUtcOffset);
         var dayEnd = new DateTimeOffset(date.ToDateTime(workingHour.EndTime), ShopUtcOffset);
+        var shop = await dbContext.ShopSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        if (shop is not null)
+        {
+            var opening = new DateTimeOffset(date.ToDateTime(shop.OpeningTime), ShopUtcOffset);
+            var closing = new DateTimeOffset(date.ToDateTime(shop.ClosingTime), ShopUtcOffset);
+            if (opening > dayStart) dayStart = opening;
+            if (closing < dayEnd) dayEnd = closing;
+        }
+        if (!await dbContext.BarberProfiles.AnyAsync(b => b.Id == barberId && b.IsAvailable && b.AcceptsBooking && b.User.AccountStatus == AccountStatus.Active, cancellationToken))
+            return Ok(Array.Empty<AvailabilitySlotResponse>());
         var dayStartUtc = dayStart.ToUniversalTime();
         var dayEndUtc = dayEnd.ToUniversalTime();
         var resourceBarberIds = await GetBookingResourceBarberIds(barberId, cancellationToken);
@@ -419,6 +429,10 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             .ToListAsync(cancellationToken);
 
         var slots = new List<AvailabilitySlotResponse>();
+        var closures = await dbContext.BarberBookingClosures.AsNoTracking()
+            .Where(c => c.BarberId == barberId && c.ReopenedAt == null && c.StartAt < dayEndUtc && c.EndAt > dayStartUtc)
+            .Select(c => new { c.StartAt, c.EndAt }).ToListAsync(cancellationToken);
+        existingBookings.AddRange(closures);
         var approvedLeaves = await dbContext.LeaveRequests.AsNoTracking()
             .Where(l => l.BarberId == barberId && (l.Status == LeaveStatus.Approved || l.Status == LeaveStatus.CancellationPending) && l.StartAt < dayEndUtc && l.EndAt > dayStartUtc)
             .Select(l => new { l.StartAt, l.EndAt }).ToListAsync(cancellationToken);
@@ -470,10 +484,15 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         }
 
         var requestedStartAtLocal = requestedStartAt.ToOffset(ShopUtcOffset);
+        if (await dbContext.BarberBookingClosures.AnyAsync(c => c.BarberId == barberId && c.ReopenedAt == null && c.StartAt < endAtUtc && c.EndAt > startAtUtc, cancellationToken))
+            return "ร้านปิดรับจองช่างในช่วงนี้ กรุณาเลือกช่างหรือเวลาอื่น";
         if (await dbContext.LeaveRequests.AnyAsync(l => l.BarberId == barberId && (l.Status == LeaveStatus.Approved || l.Status == LeaveStatus.CancellationPending) && l.StartAt < endAtUtc && l.EndAt > startAtUtc, cancellationToken))
             return "ช่างลาช่วงเวลานี้ กรุณาเลือกเวลาอื่น";
         var requestedEndAtLocal = requestedStartAtLocal.Add(endAtUtc - startAtUtc);
         var bookingDate = DateOnly.FromDateTime(requestedStartAtLocal.DateTime);
+        var shop = await dbContext.ShopSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        if (requestedStartAtLocal.Date != requestedEndAtLocal.Date || (shop is not null && (requestedStartAtLocal.TimeOfDay < shop.OpeningTime.ToTimeSpan() || requestedEndAtLocal.TimeOfDay > shop.ClosingTime.ToTimeSpan())))
+            return "เวลาที่เลือกอยู่นอกเวลาเปิดร้าน";
         if (requestedStartAtLocal.Minute != 0 || requestedStartAtLocal.Second != 0 || requestedStartAtLocal.Millisecond != 0)
         {
             return "Booking start time must be on the hour.";

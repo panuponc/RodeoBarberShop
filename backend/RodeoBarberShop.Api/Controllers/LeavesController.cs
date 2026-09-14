@@ -12,8 +12,21 @@ namespace RodeoBarberShop.Api.Controllers;
 [ApiController]
 [Route("api/leaves")]
 [Authorize(Roles = "Barber,Owner,Admin")]
-public class LeavesController(ApplicationDbContext db) : ControllerBase
+public class LeavesController(ApplicationDbContext db, TimeProvider? timeProvider = null) : ControllerBase
 {
+    private DateTimeOffset Now => (timeProvider ?? TimeProvider.System).GetUtcNow();
+
+
+    [HttpGet("request-window")]
+    [Authorize(Roles = "Barber")]
+    public async Task<IActionResult> RequestWindow(CancellationToken cancellationToken)
+    {
+        var barberId = await CurrentBarber(cancellationToken);
+        if (barberId is null) return Forbid();
+        var today = new DateTimeOffset(Now.ToOffset(TimeSpan.FromHours(7)).Date, TimeSpan.FromHours(7));
+        var canRequestToday = await HasRemainingWork(barberId.Value, today, today.AddDays(1), cancellationToken);
+        return Ok(new { earliestStartDate = DateOnly.FromDateTime(today.Date).AddDays(canRequestToday ? 0 : 1).ToString("yyyy-MM-dd"), canRequestToday });
+    }
     private async Task<Guid?> CurrentBarber(CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)) return null;
@@ -43,7 +56,7 @@ public class LeavesController(ApplicationDbContext db) : ControllerBase
         var reason = request.Reason?.Trim();
         if (string.IsNullOrEmpty(reason) || reason.Length > 1000)
             return BadRequest(new { message = "กรุณาระบุเหตุผลไม่เกิน 1,000 ตัวอักษร" });
-        var now = DateTimeOffset.UtcNow;
+        var now = Now;
         var today = new DateTimeOffset(now.ToOffset(TimeSpan.FromHours(7)).Date, TimeSpan.FromHours(7));
         if (request.StartAt < today || request.EndAt <= request.StartAt || request.EndAt - request.StartAt > TimeSpan.FromDays(366))
             return BadRequest(new { message = "วันลาเริ่มได้ตั้งแต่วันนี้ เวลาสิ้นสุดต้องหลังเวลาเริ่ม และช่วงลาไม่เกิน 366 วัน" });
@@ -51,6 +64,11 @@ public class LeavesController(ApplicationDbContext db) : ControllerBase
         // PostgreSQL timestamptz parameters must be UTC, including query predicates.
         var startAtUtc = request.StartAt.ToUniversalTime();
         var endAtUtc = request.EndAt.ToUniversalTime();
+        var firstDayEnd = today.AddDays(1).ToUniversalTime();
+        if (startAtUtc < firstDayEnd && !await HasRemainingWork(barberId.Value, startAtUtc, endAtUtc < firstDayEnd ? endAtUtc : firstDayEnd, cancellationToken))
+            return BadRequest(new { message = "วันนี้ไม่เหลือเวลาทำงานในช่วงที่ขอลาแล้ว กรุณาเลือกวันหรือเวลาใหม่" });
+        if (!await HasRemainingWork(barberId.Value, startAtUtc, endAtUtc, cancellationToken))
+            return BadRequest(new { message = "ช่วงที่เลือกไม่มีเวลาทำงานที่สามารถลาได้ กรุณาเลือกวันหรือเวลาใหม่" });
         // Serialize overlap checks so rapid retries cannot create duplicate pending requests.
         await using var transaction = db.Database.IsRelational() ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
         if (transaction is not null)
@@ -115,8 +133,8 @@ public class LeavesController(ApplicationDbContext db) : ControllerBase
             return Conflict(new { message = "คำขอนี้ได้รับการพิจารณาแล้ว กรุณาโหลดข้อมูลล่าสุด" });
         if (approve)
         {
-            if (leave.EndAt <= DateTimeOffset.UtcNow)
-                return Conflict(new { message = "ช่วงลานี้สิ้นสุดแล้ว ไม่สามารถอนุมัติได้" });
+            if (!await HasRemainingWork(leave.BarberId, leave.StartAt, leave.EndAt, cancellationToken))
+                return Conflict(new { message = "ช่วงลานี้ไม่เหลือเวลาทำงานแล้ว ไม่สามารถอนุมัติได้" });
             var affectedIds = await AffectedQuery(leave).Select(b => b.Id).ToListAsync(cancellationToken);
             if (request.AffectedBookingIds is null || !affectedIds.ToHashSet().SetEquals(request.AffectedBookingIds))
                 return Conflict(new { message = "รายการคิวที่กระทบเปลี่ยนแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนอนุมัติ" });
@@ -136,6 +154,35 @@ public class LeavesController(ApplicationDbContext db) : ControllerBase
     private IQueryable<Booking> AffectedQuery(LeaveRequest leave) => db.Bookings.AsNoTracking().Where(b => b.BarberId == leave.BarberId
         && b.StartAt < leave.EndAt && b.EndAt > leave.StartAt
         && b.BookingStatus != BookingStatus.Cancelled && b.BookingStatus != BookingStatus.NoShow && b.BookingStatus != BookingStatus.Completed);
+
+    private async Task<bool> HasRemainingWork(Guid barberId, DateTimeOffset start, DateTimeOffset end, CancellationToken cancellationToken)
+    {
+        var now = Now;
+        if (end <= now) return false;
+        var offset = TimeSpan.FromHours(7);
+        var first = DateOnly.FromDateTime((start > now ? start : now).ToOffset(offset).Date);
+        var last = DateOnly.FromDateTime(end.AddTicks(-1).ToOffset(offset).Date);
+        var hours = await db.BarberWorkingHours.AsNoTracking().Where(h => h.BarberId == barberId && h.IsWorkingDay).ToListAsync(cancellationToken);
+        var shop = await db.ShopSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var holidays = await db.ShopHolidays.AsNoTracking().ToListAsync(cancellationToken);
+        for (var date = first; date <= last; date = date.AddDays(1))
+        {
+            if (holidays.Any(h => (h.HolidayType == HolidayType.Weekly && h.DayOfWeek == (int)date.DayOfWeek)
+                || (h.HolidayType == HolidayType.Special && h.HolidayDate == date))) continue;
+            foreach (var hour in hours.Where(h => h.DayOfWeek == (int)date.DayOfWeek))
+            {
+                var opening = shop is not null && shop.OpeningTime > hour.StartTime ? shop.OpeningTime : hour.StartTime;
+                var closing = shop is not null && shop.ClosingTime < hour.EndTime ? shop.ClosingTime : hour.EndTime;
+                var workStart = new DateTimeOffset(date.ToDateTime(opening), offset);
+                var workEnd = new DateTimeOffset(date.ToDateTime(closing), offset);
+                var overlapStart = start > workStart ? start : workStart;
+                if (now > overlapStart) overlapStart = now;
+                var overlapEnd = end < workEnd ? end : workEnd;
+                if (overlapStart < overlapEnd) return true;
+            }
+        }
+        return false;
+    }
 
     private async Task<Guid?> Reviewer(CancellationToken cancellationToken)
     {

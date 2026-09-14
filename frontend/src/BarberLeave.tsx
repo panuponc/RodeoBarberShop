@@ -33,6 +33,8 @@ export function BarberLeave({ api, onClose }: Props) {
   const [cancelNote, setCancelNote] = useState('')
   const [leaveType, setLeaveType] = useState('Personal')
   const [start, setStart] = useState(shopToday)
+  const [earliestStart, setEarliestStart] = useState(shopToday)
+  const [windowReady, setWindowReady] = useState(false)
   const [end, setEnd] = useState(shopToday)
   const [allDay, setAllDay] = useState(true)
   const [multipleDays, setMultipleDays] = useState(false)
@@ -44,6 +46,9 @@ export function BarberLeave({ api, onClose }: Props) {
   useEffect(() => { apiRef.current = api }, [api])
   useEffect(() => {
     let active = true
+    apiRef.current<{ earliestStartDate: string }>('/api/leaves/request-window').then(result => {
+      if (active) { setEarliestStart(result.earliestStartDate); setStart(result.earliestStartDate); setEnd(result.earliestStartDate); setWindowReady(true) }
+    }).catch(() => { if (active) setError('ตรวจสอบวันที่ขอลาไม่สำเร็จ กรุณาปิดแล้วเปิดใหม่') })
     apiRef.current<Leave[]>('/api/leaves/my').then(result => { if (active) setLeaves(result) }).catch(error => { if (active) setError(error instanceof Error ? error.message : 'โหลดคำขอไม่สำเร็จ') }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [])
@@ -58,7 +63,7 @@ export function BarberLeave({ api, onClose }: Props) {
     if (savingRef.current) return
     setError(''); setNotice('')
     const lastDate = multipleDays ? end : start
-    if (!start || !lastDate || start < shopToday() || lastDate < start) { setError('กรุณาเลือกวันลาตั้งแต่วันนี้ และวันสุดท้ายไม่ก่อนวันเริ่ม'); return }
+    if (!windowReady || !start || !lastDate || start < earliestStart || lastDate < start) { setError('กรุณาเลือกวันลาที่ยังมีเวลาทำงาน และวันสุดท้ายไม่ก่อนวันเริ่ม'); return }
     // Full days end at the next midnight (exclusive), in the shop's time zone.
     const startAt = `${start}T${allDay ? '00:00' : startTime}:00+07:00`
     const endAt = `${allDay ? nextDate(lastDate) : lastDate}T${allDay ? '00:00' : endTime}:00+07:00`
@@ -96,7 +101,8 @@ export function BarberLeave({ api, onClose }: Props) {
       {formOpen && <form id="barber-leave-form" className="bq-leave-form" onSubmit={submit}>
         <label>ประเภทการลา<select value={leaveType} onChange={event => setLeaveType(event.target.value)} disabled={saving}>{Object.entries(types).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></label>
         <fieldset className="bq-leave-mode"><legend>ช่วงลา</legend>{[{value:true,label:'เต็มวัน'},{value:false,label:'ระบุเวลา'}].map(option => <label key={option.label}><input type="radio" name="leave-period" checked={allDay === option.value} onChange={() => setAllDay(option.value)} disabled={saving} /><span>{option.label}</span></label>)}</fieldset>
-        <label htmlFor="leave-start">{multipleDays ? 'วันเริ่มลา' : 'วันที่ลา'}</label><input id="leave-start" type="date" required min={shopToday()} value={start} onChange={event => { setStart(event.target.value); if (event.target.value > end) setEnd(event.target.value) }} disabled={saving} />
+        <label htmlFor="leave-start">{multipleDays ? 'วันเริ่มลา' : 'วันที่ลา'}</label><input id="leave-start" type="date" required min={earliestStart} value={start} onChange={event => { setStart(event.target.value); if (event.target.value > end) setEnd(event.target.value) }} disabled={saving} />
+        {earliestStart > shopToday() && <p>วันนี้ไม่มีเวลาทำงานเหลือแล้ว เลือกวันลาได้ตั้งแต่พรุ่งนี้</p>}
         <label className="bq-leave-multiple"><input type="checkbox" checked={multipleDays} onChange={event => setMultipleDays(event.target.checked)} disabled={saving} />ลาหลายวัน</label>
         {multipleDays && <label>วันสุดท้ายที่ลา<input type="date" required min={start || shopToday()} value={end} onChange={event => setEnd(event.target.value)} disabled={saving} /></label>}
         {!allDay && <div className="bq-leave-times"><label>ตั้งแต่<input type="time" required value={startTime} onChange={event => setStartTime(event.target.value)} disabled={saving} /></label><label>ถึง<input type="time" required value={endTime} onChange={event => setEndTime(event.target.value)} disabled={saving} /></label></div>}
@@ -132,7 +138,7 @@ export function BarberLeave({ api, onClose }: Props) {
       </> : formOpen ? <>
         <button className="secondary" type="button" disabled={saving} onClick={() => { setFormOpen(false); setReason(''); setStart(shopToday()); setEnd(shopToday()); setMultipleDays(false); setAllDay(true); setStartTime('10:00'); setEndTime('18:00'); setError('') }}>ยกเลิก</button>
         <button type="submit" form="barber-leave-form" disabled={saving || !reason.trim()}>{saving ? 'กำลังส่งคำขอ' : 'ส่งคำขอลา'}</button>
-      </> : <button type="button" onClick={() => { setFormOpen(true); setError(''); setNotice('') }}><Plus size={18} aria-hidden="true" />ขอลา</button>}
+      </> : <button type="button" disabled={!windowReady} onClick={() => { setStart(earliestStart); setEnd(earliestStart); setFormOpen(true); setError(''); setNotice('') }}><Plus size={18} aria-hidden="true" />ขอลา</button>}
     </footer>
   </article>}</SheetBackdrop>
 }

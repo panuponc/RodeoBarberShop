@@ -19,6 +19,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<BarberChairAssignment> BarberChairAssignments => Set<BarberChairAssignment>();
     public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
     public DbSet<LeaveEvent> LeaveEvents => Set<LeaveEvent>();
+    public DbSet<BarberBookingClosure> BarberBookingClosures => Set<BarberBookingClosure>();
     public DbSet<PaymentAccount> PaymentAccounts => Set<PaymentAccount>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Promotion> Promotions => Set<Promotion>();
@@ -45,6 +46,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         ConfigureNotifications(modelBuilder);
         ConfigureEvents(modelBuilder);
         ConfigureEmailOtps(modelBuilder);
+        modelBuilder.Entity<BarberBookingClosure>(entity =>
+        {
+            entity.ToTable("barber_booking_closures");
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Reason).HasMaxLength(1000).IsRequired();
+            entity.HasOne<BarberProfile>().WithMany().HasForeignKey(c => c.BarberId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(c => c.ClosedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(c => c.ReopenedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(c => new { c.BarberId, c.StartAt, c.EndAt });
+        });
         modelBuilder.Entity<LeaveEvent>(entity =>
         {
             entity.ToTable("leave_events");

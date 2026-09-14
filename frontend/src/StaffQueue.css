@@ -79,6 +79,24 @@
 .staff-queue-workspace .barber-column-header.off-day { background: #14161a; }
 .staff-queue-workspace .barber-column-header.has-approved-leave { border-color: #8d6670; }
 .staff-queue-workspace .availability-dot.on-leave { background: #e9a8b5; }
+.staff-queue-workspace .availability-dot.state-green { background: #25c49a; }
+.staff-queue-workspace .availability-dot.state-red { background: #ee798c; }
+.staff-queue-workspace .availability-dot.state-black { background: #08090b; box-shadow: 0 0 0 1px #7d8794; }
+.staff-queue-workspace .barber-column-header { grid-template-columns: 44px minmax(0, 1fr) auto; }
+.staff-queue-workspace .barber-avatar-wrap { width: 44px; height: 44px; display: grid; place-items: center; }
+.staff-queue-workspace .barber-avatar-control { width: 44px; height: 44px; min-height: 44px; display: grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 50%; background: transparent; box-shadow: none; transition: background-color 160ms ease, border-color 160ms ease; }
+.staff-queue-workspace .barber-avatar-control .barber-avatar { pointer-events: none; }
+.staff-queue-workspace .can-manage-booking .availability-dot { pointer-events: none; }
+.staff-queue-workspace .barber-avatar-control:focus-visible { outline: 2px solid var(--sq-gold); outline-offset: 2px; }
+.staff-queue-workspace .barber-avatar-control:active { background: #302a1d; }
+@media (hover: hover) { .staff-queue-workspace .barber-avatar-control:hover { border-color: #8a7343; background: #29261e; } }
+@media (prefers-reduced-motion: reduce) { .staff-queue-workspace .barber-avatar-control { transition: none; } }
+.booking-closure-body { display: grid; gap: 14px; padding: 18px; }
+.booking-closure-body label { display: grid; gap: 6px; }
+.staff-queue-workspace .booking-closure-body :is(select,textarea) { width: 100%; min-height: 44px; box-sizing: border-box; padding: 10px; background: #101318; border: 1px solid #343b46; border-radius: 8px; color: #f4f4f4; font-size: 16px; }
+.booking-closure-body p { font-size: 13px; color: #b3bdcb; }
+.booking-closure-customer { display: flex; justify-content: space-between; gap: 12px; padding-block: 8px; border-bottom: 1px solid #303641; }
+.booking-closure-form .booking-detail-actions > p { grid-column: 1 / -1; }
 .staff-queue-workspace .schedule-leave-summary { grid-column: 1 / -1; display: grid; gap: 3px; color: #f0bdc7; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .staff-queue-workspace .schedule-leave-band { position: absolute; inset-inline: 0; z-index: 1; padding: 5px 8px; overflow: hidden; box-sizing: border-box; border-block: 1px dashed #996673; border-left: 3px solid #d49bab; background: repeating-linear-gradient(135deg, #30232b 0px, #30232b 7px, #272128 7px, #272128 14px); color: #f0bdc7; pointer-events: none; font-size: 11px; }
 .staff-queue-workspace .schedule-leave-band :is(span, small) { display: block; }
