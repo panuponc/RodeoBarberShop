@@ -30,8 +30,8 @@ public class BarberBookingClosuresController(ApplicationDbContext db, TimeProvid
         var closing = shop is not null && shop.ClosingTime < hours.EndTime ? shop.ClosingTime : hours.EndTime;
         var start = new DateTimeOffset(day.ToDateTime(opening), TimeSpan.FromHours(7)).ToUniversalTime();
         var end = new DateTimeOffset(day.ToDateTime(closing), TimeSpan.FromHours(7)).ToUniversalTime();
-        if (end <= start || (day == today && (now < start || now >= end))) return null;
-        return (day == today ? now : start, end);
+        if (end <= start || now >= end) return null;
+        return (now > start ? now : start, end);
     }
     private async Task<Guid?> Staff(CancellationToken ct)
     {
@@ -52,7 +52,7 @@ public class BarberBookingClosuresController(ApplicationDbContext db, TimeProvid
         var window = await WorkingWindow(barberId, day, now, ct);
         if (window is null) return BadRequest(new { message = "วันที่เลือกเป็นวันหยุด ย้อนหลัง หรือไม่มีเวลางานที่จัดการได้" });
         var start = window.Value.Start; var end = window.Value.End;
-        var isToday = day == DateOnly.FromDateTime(now.ToOffset(TimeSpan.FromHours(7)).Date);
+        var isToday = start <= now;
         if (await db.LeaveRequests.AnyAsync(l => l.BarberId == barberId && (l.Status == LeaveStatus.Approved || l.Status == LeaveStatus.CancellationPending) && l.StartAt <= start && (isToday ? l.EndAt > start : l.EndAt >= end), ct))
             return Conflict(new { message = "ช่างอยู่ในช่วงลาที่ปิดรับจองแล้ว" });
         if (await db.BarberBookingClosures.AnyAsync(c => c.BarberId == barberId && c.ReopenedAt == null && c.StartAt < end && c.EndAt > start, ct))

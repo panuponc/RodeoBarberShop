@@ -160,6 +160,8 @@ Implementation checkpoint (2026-09-14, branch `feature/barber-leave-management`)
 - Affected booking list
 - Staff action for affected bookings
 
+- Scope correction (2026-09-15): staff may close/reopen today's bookings before opening while working time remains. Pre-opening closures cover the scheduled shift; during work they start immediately. Past dates, ended shifts, holidays and disabled booking flags remain blocked. This supersedes the current-working-hours restriction above. Existing appointments remain unchanged.
+
 ### Sprint 14: Notifications
 
 - Internal website notification storage

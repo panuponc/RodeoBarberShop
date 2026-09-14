@@ -51,10 +51,18 @@ public class BarberBookingClosureTests
         Assert.IsType<BadRequestObjectResult>(await afterClosing.Close(barber.Id,new("Too late"),default));
         Assert.IsType<BadRequestObjectResult>(await afterClosing.Reopen(barber.Id,closure.Id,default));
         var beforeOpening = new BarberBookingClosuresController(db,new Clock(now.AddHours(-3))) { ControllerContext=context };
-        Assert.IsType<BadRequestObjectResult>(await beforeOpening.Close(barber.Id,new("Too early"),default));
+        Assert.Equal(201, Assert.IsType<ObjectResult>(await beforeOpening.Close(barber.Id,new("Absent before opening"),default)).StatusCode);
+        var morningClosure = db.BarberBookingClosures.Single(c => c.ReopenedAt == null);
+        Assert.Equal(now.AddHours(-2), morningClosure.StartAt);
+        Assert.Equal(now.AddHours(9), morningClosure.EndAt);
+        Assert.All(await Slots(date), s => Assert.False(s.IsAvailable));
+        Assert.Equal(BookingStatus.Confirmed, existing.BookingStatus);
+        Assert.IsType<ConflictObjectResult>(await beforeOpening.Close(barber.Id,new("Duplicate"),default));
+        Assert.IsType<OkObjectResult>(await beforeOpening.Reopen(barber.Id,morningClosure.Id,default));
+        Assert.True((await Slots(date)).First().IsAvailable);
         var tomorrow = date.AddDays(1);
         Assert.Equal(201, Assert.IsType<ObjectResult>(await controller.Close(barber.Id,new("Tomorrow", tomorrow),default)).StatusCode);
-        var futureClosure = db.BarberBookingClosures.Single(c => c.Id != closure.Id);
+        var futureClosure = db.BarberBookingClosures.Single(c => c.ReopenedAt == null);
         Assert.Equal(new DateTimeOffset(tomorrow.ToDateTime(new TimeOnly(10,0)),TimeSpan.FromHours(7)),futureClosure.StartAt);
         Assert.False((await Slots(tomorrow)).First().IsAvailable);
         Assert.IsType<OkObjectResult>(await afterClosing.Reopen(barber.Id,futureClosure.Id,default));
@@ -69,7 +77,7 @@ public class BarberBookingClosureTests
         Assert.IsType<BadRequestObjectResult>(await controller.Close(barber.Id,new("Holiday"),default));
         db.ShopHolidays.Remove(holiday);barber.AcceptsBooking=false;await db.SaveChangesAsync();
         Assert.IsType<BadRequestObjectResult>(await controller.Close(barber.Id,new("Disabled"),default));
-        Assert.Equal(2,db.BarberBookingClosures.Count());
+        Assert.Equal(3,db.BarberBookingClosures.Count());
         staff.Role=UserRole.Barber;await db.SaveChangesAsync();
         Assert.IsType<ForbidResult>(await controller.Close(barber.Id,new("Forbidden"),default));
     }

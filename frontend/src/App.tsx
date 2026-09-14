@@ -5,7 +5,7 @@ import { BarberQueue } from './BarberQueue'
 import { BarberCheckout } from './BarberCheckout'
 import { BarberLeave } from './BarberLeave'
 import { OwnerLeaves } from './OwnerLeaves'
-import { scheduleAvailability } from './scheduleAvailability'
+import { hasRemainingBookingWindow, scheduleAvailability } from './scheduleAvailability'
 import { BookingClosureDialog } from './BookingClosureDialog'
 import { BarberAddServices } from './BarberAddServices'
 import { BookingWorkSummary } from './BookingWorkSummary'
@@ -2794,6 +2794,7 @@ function selectScheduleDate(dateValue: string) {
                 </div>
 
                 <div className="sheet-body" ref={staffDetailBodyRef}>
+                <CustomerPhoneLink key={selectedBooking.id} booking={selectedBooking} showNumber />
                 <dl className="booking-detail-grid">
                   <div>
                     <dt>ช่าง</dt>
@@ -2912,11 +2913,14 @@ function selectScheduleDate(dateValue: string) {
 
                 {staffReceipt && <ReceiptBox receipt={staffReceipt} />}
                 </div>
-                <div className="booking-detail-actions">
+                <div className="booking-detail-actions staff-booking-detail-actions">
                   {previousStatus[selectedBooking.bookingStatus] && (
                     <button className="secondary status-back-button" disabled={isBusy} onClick={() => moveStatus(selectedBooking, previousStatus[selectedBooking.bookingStatus])} type="button">
                       ย้อนกลับเป็น {statusLabels[previousStatus[selectedBooking.bookingStatus]]}
                     </button>
+                  )}
+                  {cancellableStatuses.includes(selectedBooking.bookingStatus) && (
+                    <button className="danger cancel-booking-button" disabled={isBusy} onClick={() => setIsCancelBookingOpen((current) => !current)} type="button">ยกเลิกคิว</button>
                   )}
                   {nextStatus[selectedBooking.bookingStatus] && (
                     <button className="status-next-button" disabled={isBusy} onClick={() => moveStatus(selectedBooking)} type="button">
@@ -2926,10 +2930,6 @@ function selectScheduleDate(dateValue: string) {
                   {selectedBooking.bookingStatus === 'WaitingPayment' && (
                     <button className="status-next-button" disabled={isBusy} onClick={() => loadPaymentSummary(selectedBooking)} type="button">แสดง QR</button>
                   )}
-                  {cancellableStatuses.includes(selectedBooking.bookingStatus) && (
-                    <button className="danger cancel-booking-button" disabled={isBusy} onClick={() => setIsCancelBookingOpen((current) => !current)} type="button">ยกเลิกคิว</button>
-                  )}
-                  <button className="secondary" disabled={isBusy} onClick={closeSheet} type="button">ปิดหน้าต่าง</button>
                 </div>
               </article>
             )}</SheetBackdrop>
@@ -3786,13 +3786,18 @@ function ChairScheduleHeader({
   const [now, setNow] = useState(Date.now)
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 15000); return () => window.clearInterval(timer) }, [])
   const availability = scheduleAvailability(windows, leaves, date, now)
+  const bookableBarbers = chair.barbers.filter(({ barber, isWorkingToday }) => {
+    const window = windows.find(w => w.barberId === barber.id)
+    return isWorkingToday && window && hasRemainingBookingWindow(window, leaves, now)
+  })
   const manageableBarbers = chair.barbers.filter(({ barber }) => {
     const window = windows.find(w => w.barberId === barber.id)
     if (date < getTodayDate() || !window?.bookableFrom || !window.bookableUntil
-      || (date === getTodayDate() && (now < Date.parse(window.bookableFrom) || now >= Date.parse(window.bookableUntil)))) return false
-    const start = date === getTodayDate() ? now : Date.parse(window.bookableFrom)
+      || (date === getTodayDate() && now >= Date.parse(window.bookableUntil))) return false
+    const isWorkingNow = date === getTodayDate() && now >= Date.parse(window.bookableFrom)
+    const start = isWorkingNow ? now : Date.parse(window.bookableFrom)
     const closed = leaves.some(l => l.isClosure && l.barberId === barber.id && Date.parse(l.endAt) > start)
-    const onLeave = leaves.some(l => !l.isClosure && l.barberId === barber.id && Date.parse(l.startAt) <= start && (date === getTodayDate() ? Date.parse(l.endAt) > start : Date.parse(l.endAt) >= Date.parse(window.bookableUntil!)))
+    const onLeave = leaves.some(l => !l.isClosure && l.barberId === barber.id && Date.parse(l.startAt) <= start && (isWorkingNow ? Date.parse(l.endAt) > start : Date.parse(l.endAt) >= Date.parse(window.bookableUntil!)))
     return closed || !onLeave
   })
   const headerClassName = [
@@ -3828,7 +3833,9 @@ function ChairScheduleHeader({
         </small>
       </div>
       {chair.isWorkingToday && (
-        <button className="schedule-add-booking" onClick={() => onCreateBooking(chair)} type="button">
+        <button className="schedule-add-booking" disabled={!bookableBarbers.length}
+          title={!bookableBarbers.length ? 'ไม่มีช่วงเปิดรับจองเหลือในวันที่เลือก' : undefined}
+          onClick={() => { if (bookableBarbers.length) onCreateBooking({ ...chair, barbers: bookableBarbers }) }} type="button">
           + จอง
         </button>
       )}
@@ -3945,6 +3952,11 @@ function ChairScheduleTimeline({
             {activeBookings.map((booking) => {
               const placement = getBookingTimelinePlacement(booking)
               const hasCancelledHistory = cancelledBookings.some((cancelledBooking) => isSameTimelineSlot(booking, cancelledBooking))
+              const blockingPeriods = leaves.filter(leave => leave.barberId === booking.barberId
+                && new Date(leave.startAt) < new Date(booking.endAt) && new Date(leave.endAt) > new Date(booking.startAt))
+              const conflictLabel = blockingPeriods.length
+                ? blockingPeriods.some(leave => leave.isClosure) ? 'คิวทับช่วงปิดรับจอง' : 'คิวทับช่วงลา'
+                : ''
 
               return (
                 <button
@@ -3959,9 +3971,11 @@ function ChairScheduleTimeline({
                   >
                   <span className="schedule-time">{formatTime(booking.startAt)} - {formatTime(booking.endAt)}</span>
                   <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
-                  {leaves.some((leave) => leave.barberId === booking.barberId && new Date(leave.startAt) < new Date(booking.endAt) && new Date(leave.endAt) > new Date(booking.startAt)) && <span className="schedule-leave-conflict">{leaves.some(leave => leave.isClosure && leave.barberId === booking.barberId && new Date(leave.startAt) < new Date(booking.endAt) && new Date(leave.endAt) > new Date(booking.startAt)) ? 'คิวทับช่วงปิดรับจอง' : 'คิวทับช่วงลา'}</span>}
                   <BookingWorkSummary booking={booking} compact />
-                  <span className={`schedule-card-status status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
+                  <span className="schedule-card-footer">
+                    {conflictLabel && <span className="schedule-leave-conflict" title={conflictLabel}>{conflictLabel}</span>}
+                    <span className={`schedule-card-status status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
+                  </span>
                 </button>
               )
             })}
@@ -4860,6 +4874,10 @@ function getMinimumStaffBookingDateTime(dateValue = getTodayDate()) {
   const nextAvailableDate = formatLocalDateInputValue(nextAvailableSlot)
   const nextAvailableHour = nextAvailableSlot.getHours()
   const lastBookingStartHour = bookingStartHours.at(-1) ?? scheduleTimelineStartHour
+
+  if (nextAvailableDate === today && nextAvailableHour < scheduleTimelineStartHour) {
+    return `${today}T${String(scheduleTimelineStartHour).padStart(2, '0')}:00`
+  }
 
   if (nextAvailableDate > today || nextAvailableHour > lastBookingStartHour) {
     return `${addDays(today, 1)}T10:00`
