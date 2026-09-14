@@ -18,6 +18,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Chair> Chairs => Set<Chair>();
     public DbSet<BarberChairAssignment> BarberChairAssignments => Set<BarberChairAssignment>();
     public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
+    public DbSet<LeaveEvent> LeaveEvents => Set<LeaveEvent>();
     public DbSet<PaymentAccount> PaymentAccounts => Set<PaymentAccount>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Promotion> Promotions => Set<Promotion>();
@@ -44,6 +45,19 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         ConfigureNotifications(modelBuilder);
         ConfigureEvents(modelBuilder);
         ConfigureEmailOtps(modelBuilder);
+        modelBuilder.Entity<LeaveEvent>(entity =>
+        {
+            entity.ToTable("leave_events");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.LeaveRequestId).HasColumnName("leave_request_id");
+            entity.Property(e => e.ActorUserId).HasColumnName("actor_user_id");
+            entity.Property(e => e.Action).HasColumnName("action").HasMaxLength(40).IsRequired();
+            entity.Property(e => e.Note).HasColumnName("note").HasMaxLength(1000);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.HasOne(e => e.LeaveRequest).WithMany(l => l.Events).HasForeignKey(e => e.LeaveRequestId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => new { e.LeaveRequestId, e.CreatedAt });
+        });
     }
 
     private static void ConfigureUsers(ModelBuilder modelBuilder)

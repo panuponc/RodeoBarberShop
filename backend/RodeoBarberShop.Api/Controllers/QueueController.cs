@@ -217,7 +217,7 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
         if (duration != request.ExpectedAddedMinutes)
             return Conflict(new { message = "ระยะเวลาบริการเปลี่ยนแล้ว กรุณาปิดและเปิดรายการบริการใหม่" });
         var end = booking.EndAt.AddMinutes(duration);
-        if (await dbContext.LeaveRequests.AnyAsync(l => l.BarberId == booking.BarberId && l.Status == LeaveStatus.Approved && l.StartAt < end && l.EndAt > booking.EndAt, cancellationToken))
+        if (await dbContext.LeaveRequests.AnyAsync(l => l.BarberId == booking.BarberId && (l.Status == LeaveStatus.Approved || l.Status == LeaveStatus.CancellationPending) && l.StartAt < end && l.EndAt > booking.EndAt, cancellationToken))
             return Conflict(new { message = "เวลาเพิ่มทับช่วงลาที่อนุมัติแล้ว" });
         var localStart = booking.StartAt.ToOffset(ShopUtcOffset);
         var localEnd = end.ToOffset(ShopUtcOffset);

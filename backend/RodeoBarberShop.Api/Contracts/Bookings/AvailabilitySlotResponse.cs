@@ -3,4 +3,5 @@ namespace RodeoBarberShop.Api.Contracts.Bookings;
 public record AvailabilitySlotResponse(
     DateTimeOffset StartAt,
     DateTimeOffset EndAt,
-    bool IsAvailable);
+    bool IsAvailable,
+    int MaxDurationMinutes = 0);

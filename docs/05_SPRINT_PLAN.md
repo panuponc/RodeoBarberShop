@@ -140,7 +140,10 @@ Implementation checkpoint (2026-09-14, branch `feature/barber-leave-management`)
 - Implemented: Owner/Admin request list, affected booking preview, approve/reject with reviewer identity and notes. Approval rechecks affected booking IDs; rejection requires a reason.
 - Implemented: approved leave blocks overlapping availability, customer/staff booking creation, and service extensions into leave. Pending/rejected requests do not block booking availability.
 - Existing bookings are not automatically changed. The review view links to their date in the queue for manual handling; automatic reassignment/rescheduling is not implemented.
-- Verified: 56 isolated backend tests, frontend build/lint, mocked Owner and barber browser workflows at mobile/tablet/desktop sizes, and read-only development API authorization checks.
+- Implemented: barber withdrawal of own pending request and cancellation request for approved leave. `CancellationPending` continues blocking availability, new bookings and extensions, and remains visible in the timeline until Owner/Admin confirms cancellation. Rejection returns it to Approved. Ended leave cannot be cancelled retroactively.
+- Added migration `20260914043326_AddLeaveEvents` (applied to Development): append-only application history in `leave_events` records actor, action, note and timestamp. Original approval fields remain intact; earlier requests keep their existing review information without fabricated history.
+- Implemented: staff booking form disables services exceeding the continuous free window and shows booking errors inside the sheet; schedule headers/timeline display approved leave and retained conflicting bookings.
+- Verified: 64 isolated backend tests, frontend build/lint, mocked Owner/barber cancellation workflows and responsive transitions, and read-only PostgreSQL-backed development API authorization/history checks. Browser tests do not modify real leave/booking records.
 - Remaining before merge/sign-off: user acceptance of the affected-booking handling workflow and real PostgreSQL concurrent approval/booking validation in an isolated test environment. This checkpoint does not claim final Sprint 13 acceptance.
 
 - Barber leave request

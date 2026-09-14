@@ -27,7 +27,7 @@ public class LeavesController(ApplicationDbContext db) : ControllerBase
     {
         var barberId = await CurrentBarber(cancellationToken);
         if (barberId is null) return Forbid();
-        var requests = await db.LeaveRequests.AsNoTracking().Where(l => l.BarberId == barberId)
+        var requests = await db.LeaveRequests.AsNoTracking().Include(l => l.Events).Where(l => l.BarberId == barberId)
             .OrderByDescending(l => l.CreatedAt).ToListAsync(cancellationToken);
         return Ok(requests.Select(ToResponse).ToList());
     }
@@ -55,11 +55,12 @@ public class LeavesController(ApplicationDbContext db) : ControllerBase
         await using var transaction = db.Database.IsRelational() ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
         if (transaction is not null)
             await db.Database.ExecuteSqlRawAsync("LOCK TABLE leave_requests IN SHARE ROW EXCLUSIVE MODE", cancellationToken);
-        if (await db.LeaveRequests.AnyAsync(l => l.BarberId == barberId && (l.Status == LeaveStatus.Pending || l.Status == LeaveStatus.Approved)
+        if (await db.LeaveRequests.AnyAsync(l => l.BarberId == barberId && (l.Status == LeaveStatus.Pending || l.Status == LeaveStatus.Approved || l.Status == LeaveStatus.CancellationPending)
             && l.StartAt < endAtUtc && l.EndAt > startAtUtc, cancellationToken))
             return Conflict(new { message = "ช่วงเวลานี้มีคำขอรออนุมัติหรือได้รับอนุมัติแล้ว กรุณาตรวจรายการคำขอ" });
         var leave = new LeaveRequest { Id = Guid.NewGuid(), BarberId = barberId.Value, LeaveType = request.LeaveType, StartAt = startAtUtc, EndAt = endAtUtc, Reason = reason, Status = LeaveStatus.Pending, CreatedAt = now, UpdatedAt = now };
         db.LeaveRequests.Add(leave);
+        RecordEvent(leave, Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!), "Requested", reason);
         await db.SaveChangesAsync(cancellationToken);
         if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return StatusCode(StatusCodes.Status201Created, ToResponse(leave));
@@ -70,7 +71,7 @@ public class LeavesController(ApplicationDbContext db) : ControllerBase
     public async Task<ActionResult<IReadOnlyList<ManagedLeaveResponse>>> List(CancellationToken cancellationToken)
     {
         if (await Reviewer(cancellationToken) is null) return Forbid();
-        var leaves = await db.LeaveRequests.AsNoTracking().Include(l => l.Barber).ThenInclude(b => b.User)
+        var leaves = await db.LeaveRequests.AsNoTracking().Include(l => l.Events).Include(l => l.Barber).ThenInclude(b => b.User)
             .Include(l => l.ReviewedByUser).OrderByDescending(l => l.CreatedAt).ToListAsync(cancellationToken);
         var result = new List<ManagedLeaveResponse>();
         foreach (var leave in leaves)
@@ -108,7 +109,7 @@ public class LeavesController(ApplicationDbContext db) : ControllerBase
         await using var transaction = await BookingWriteLock.BeginAsync(db, cancellationToken);
         if (transaction is not null)
             await db.Database.ExecuteSqlRawAsync("LOCK TABLE leave_requests IN SHARE ROW EXCLUSIVE MODE", cancellationToken);
-        var leave = await db.LeaveRequests.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+        var leave = await db.LeaveRequests.Include(l => l.Events).FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
         if (leave is null) return NotFound();
         if (leave.Status != LeaveStatus.Pending)
             return Conflict(new { message = "คำขอนี้ได้รับการพิจารณาแล้ว กรุณาโหลดข้อมูลล่าสุด" });
@@ -119,13 +120,14 @@ public class LeavesController(ApplicationDbContext db) : ControllerBase
             var affectedIds = await AffectedQuery(leave).Select(b => b.Id).ToListAsync(cancellationToken);
             if (request.AffectedBookingIds is null || !affectedIds.ToHashSet().SetEquals(request.AffectedBookingIds))
                 return Conflict(new { message = "รายการคิวที่กระทบเปลี่ยนแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนอนุมัติ" });
-            if (await db.LeaveRequests.AnyAsync(l => l.Id != id && l.BarberId == leave.BarberId && l.Status == LeaveStatus.Approved && l.StartAt < leave.EndAt && l.EndAt > leave.StartAt, cancellationToken))
+            if (await db.LeaveRequests.AnyAsync(l => l.Id != id && l.BarberId == leave.BarberId && (l.Status == LeaveStatus.Approved || l.Status == LeaveStatus.CancellationPending) && l.StartAt < leave.EndAt && l.EndAt > leave.StartAt, cancellationToken))
                 return Conflict(new { message = "มีวันลาที่อนุมัติแล้วทับช่วงเวลานี้" });
         }
         leave.Status = approve ? LeaveStatus.Approved : LeaveStatus.Rejected;
         leave.ReviewNote = string.IsNullOrEmpty(note) ? null : note;
         leave.ReviewedByUserId = reviewer;
         leave.ReviewedAt = leave.UpdatedAt = DateTimeOffset.UtcNow;
+        RecordEvent(leave, reviewer.Value, approve ? "Approved" : "Rejected", note);
         await db.SaveChangesAsync(cancellationToken);
         if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return Ok(ToResponse(leave));
@@ -142,5 +144,73 @@ public class LeavesController(ApplicationDbContext db) : ControllerBase
             .Select(u => (Guid?)u.Id).FirstOrDefaultAsync(cancellationToken);
     }
 
-    private static LeaveResponse ToResponse(LeaveRequest leave) => new(leave.Id, leave.LeaveType, leave.StartAt, leave.EndAt, leave.Reason, leave.Status.ToString(), leave.ReviewNote, leave.ReviewedAt, leave.CreatedAt);
+    [HttpPost("{id:guid}/cancel")]
+    [Authorize(Roles = "Barber")]
+    public async Task<ActionResult<LeaveResponse>> Cancel(Guid id, CancelLeaveRequest request, CancellationToken cancellationToken)
+    {
+        if (!User.IsInRole("Barber")) return Forbid();
+        var barberId = await CurrentBarber(cancellationToken);
+        if (barberId is null) return Forbid();
+        var note = request.Note?.Trim();
+        if (string.IsNullOrEmpty(note) || note.Length > 1000)
+            return BadRequest(new { message = "กรุณาระบุเหตุผลยกเลิกไม่เกิน 1,000 ตัวอักษร" });
+        await using var transaction = await BookingWriteLock.BeginAsync(db, cancellationToken);
+        if (transaction is not null) await db.Database.ExecuteSqlRawAsync("LOCK TABLE leave_requests IN SHARE ROW EXCLUSIVE MODE", cancellationToken);
+        var leave = await db.LeaveRequests.Include(l => l.Events).FirstOrDefaultAsync(l => l.Id == id && l.BarberId == barberId, cancellationToken);
+        if (leave is null) return NotFound();
+        if (leave.EndAt <= DateTimeOffset.UtcNow)
+            return Conflict(new { message = "ช่วงลาสิ้นสุดแล้ว ไม่สามารถยกเลิกย้อนหลังได้" });
+        if (leave.Status is not (LeaveStatus.Pending or LeaveStatus.Approved))
+            return Conflict(new { message = "สถานะคำขอเปลี่ยนแล้ว กรุณารีเฟรชรายการ" });
+        var withdraw = leave.Status == LeaveStatus.Pending;
+        leave.Status = withdraw ? LeaveStatus.Cancelled : LeaveStatus.CancellationPending;
+        RecordEvent(leave, Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!), withdraw ? "Withdrawn" : "CancellationRequested", note);
+        await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+        return Ok(ToResponse(leave));
+    }
+
+    [HttpPost("{id:guid}/approve-cancellation")]
+    [Authorize(Roles = "Owner,Admin")]
+    public Task<ActionResult<LeaveResponse>> ApproveCancellation(Guid id, CancelLeaveRequest request, CancellationToken cancellationToken) => ReviewCancellation(id, request, true, cancellationToken);
+
+    [HttpPost("{id:guid}/reject-cancellation")]
+    [Authorize(Roles = "Owner,Admin")]
+    public Task<ActionResult<LeaveResponse>> RejectCancellation(Guid id, CancelLeaveRequest request, CancellationToken cancellationToken) => ReviewCancellation(id, request, false, cancellationToken);
+
+    private async Task<ActionResult<LeaveResponse>> ReviewCancellation(Guid id, CancelLeaveRequest request, bool approve, CancellationToken cancellationToken)
+    {
+        var reviewer = await Reviewer(cancellationToken);
+        if (reviewer is null) return Forbid();
+        var note = request.Note?.Trim();
+        if ((!approve && string.IsNullOrEmpty(note)) || note?.Length > 1000)
+            return BadRequest(new { message = "กรุณาระบุเหตุผลที่ไม่ให้ยกเลิก ไม่เกิน 1,000 ตัวอักษร" });
+        await using var transaction = await BookingWriteLock.BeginAsync(db, cancellationToken);
+        if (transaction is not null) await db.Database.ExecuteSqlRawAsync("LOCK TABLE leave_requests IN SHARE ROW EXCLUSIVE MODE", cancellationToken);
+        var leave = await db.LeaveRequests.Include(l => l.Events).FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+        if (leave is null) return NotFound();
+        if (leave.Status != LeaveStatus.CancellationPending)
+            return Conflict(new { message = "คำขอนี้ไม่ได้รอยกเลิก กรุณารีเฟรชรายการ" });
+        if (approve && leave.EndAt <= DateTimeOffset.UtcNow)
+            return Conflict(new { message = "ช่วงลาสิ้นสุดแล้ว ไม่สามารถยกเลิกย้อนหลังได้" });
+        leave.Status = approve ? LeaveStatus.Cancelled : LeaveStatus.Approved;
+        RecordEvent(leave, reviewer.Value, approve ? "CancellationApproved" : "CancellationRejected", note);
+        await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+        return Ok(ToResponse(leave));
+    }
+
+    private void RecordEvent(LeaveRequest leave, Guid actor, string action, string? note)
+    {
+        leave.UpdatedAt = DateTimeOffset.UtcNow;
+        var entry = new LeaveEvent { Id = Guid.NewGuid(), LeaveRequestId = leave.Id, ActorUserId = actor,
+            Action = action, Note = string.IsNullOrWhiteSpace(note) ? null : note, CreatedAt = leave.UpdatedAt };
+        leave.Events.Add(entry);
+        db.LeaveEvents.Add(entry);
+    }
+
+    private static LeaveResponse ToResponse(LeaveRequest leave) => new(leave.Id, leave.LeaveType, leave.StartAt, leave.EndAt, leave.Reason, leave.Status.ToString(), leave.ReviewNote, leave.ReviewedAt, leave.CreatedAt)
+    {
+        History = leave.Events.OrderBy(e => e.CreatedAt).Select(e => new LeaveEventResponse(e.Id, e.ActorUserId, e.Action, e.Note, e.CreatedAt)).ToList()
+    };
 }

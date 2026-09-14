@@ -61,7 +61,17 @@ public class ChairsController(ApplicationDbContext dbContext) : ControllerBase
                     .ToList()))
             .ToListAsync(cancellationToken);
 
-        return Ok(chairs);
+        var dayStart = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime();
+        var dayEnd = dayStart.AddDays(1);
+        var leaves = await dbContext.LeaveRequests.AsNoTracking()
+            .Where(leave => (leave.Status == LeaveStatus.Approved || leave.Status == LeaveStatus.CancellationPending) && leave.StartAt < dayEnd && leave.EndAt > dayStart)
+            .OrderBy(leave => leave.StartAt)
+            .Select(leave => new ScheduleLeaveResponse(leave.Id, leave.BarberId, leave.StartAt, leave.EndAt))
+            .ToListAsync(cancellationToken);
+        return Ok(chairs.Select(chair => chair with
+        {
+            Leaves = leaves.Where(leave => chair.Barbers.Any(barber => barber.BarberId == leave.BarberId)).ToList()
+        }).ToList());
     }
 
     [Authorize(Roles = "Owner,Admin")]

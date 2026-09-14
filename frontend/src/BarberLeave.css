@@ -18,6 +18,15 @@
 .bq-leave-list article > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .bq-leave-list p { font-size: 12px; color: var(--bq-muted); overflow-wrap: anywhere; }
 .bq-leave-list .bq-leave-reason { margin-top: 8px; color: var(--bq-text); white-space: pre-wrap; }
+.bq-leave-card-actions { display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--bq-border); }
+.bq-workspace .bq-leave-card-actions .bq-leave-cancel-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; padding: 10px 16px; border: 1px solid #65515b; border-radius: 8px; background: #211d24; color: #e7b8c3; box-shadow: none; font: inherit; font-size: 13px; line-height: 1.5; transition: background-color 160ms ease, border-color 160ms ease; }
+.bq-leave-cancel-button svg { flex-shrink: 0; }
+.bq-workspace .bq-leave-cancel-button:focus-visible { outline: 2px solid var(--bq-gold); outline-offset: 3px; }
+.bq-workspace .bq-leave-cancel-button:active:not(:disabled) { background: #392a33; }
+.bq-workspace .bq-leave-cancel-button:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (hover: hover) { .bq-workspace .bq-leave-cancel-button:hover:not(:disabled) { background: #30252e; border-color: #ab7c8a; } }
+@media (min-width: 640px) { .bq-workspace .bq-leave-card-actions .bq-leave-cancel-button { width: auto; } }
+@media (prefers-reduced-motion: reduce) { .bq-workspace .bq-leave-card-actions .bq-leave-cancel-button { transition: none; } }
 .bq-leave-review { margin-top: 10px !important; border-top: 1px solid var(--bq-border); padding-top: 10px; }
 .bq-leave-notice { color: #41dfb9; margin-bottom: 12px !important; font-size: 12px; }
 .bq-leave-form { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; gap: 10px; }

@@ -6,4 +6,9 @@ public record ChairScheduleResponse(
     string? Note,
     int SortOrder,
     bool IsActive,
-    IReadOnlyList<ChairScheduleBarberResponse> Barbers);
+    IReadOnlyList<ChairScheduleBarberResponse> Barbers)
+{
+    public IReadOnlyList<ScheduleLeaveResponse> Leaves { get; init; } = [];
+}
+
+public record ScheduleLeaveResponse(Guid Id, Guid BarberId, DateTimeOffset StartAt, DateTimeOffset EndAt);

@@ -19,4 +19,5 @@ public class LeaveRequest
 
     public BarberProfile Barber { get; set; } = null!;
     public User? ReviewedByUser { get; set; }
+    public ICollection<LeaveEvent> Events { get; set; } = [];
 }

@@ -1,0 +1,6 @@
+.leave-history { margin-block: 12px; color: #aeb8c8; font-size: 12px; overflow-wrap: anywhere; }
+.leave-history summary { cursor: pointer; min-height: 44px; align-content: center; }
+.leave-history ol { padding-left: 20px; margin: 0; }
+.leave-history li { padding-block: 8px; border-bottom: 1px solid #2c333e; }
+.leave-history small { display: block; margin-top: 4px; }
+.leave-history p { margin-block: 4px; white-space: pre-wrap; }

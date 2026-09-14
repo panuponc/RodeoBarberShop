@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, Plus, RefreshCw, X } from 'lucide-react'
+import { ChevronLeft, Plus, RefreshCw, Undo2, X } from 'lucide-react'
 import { SheetBackdrop, SheetHandle } from './SheetBackdrop'
 import './BarberLeave.css'
+import { LeaveHistory, type LeaveEvent } from './LeaveHistory'
 
-type Leave = { id: string; leaveType: string; startAt: string; endAt: string; reason: string; status: string; reviewNote: string | null }
+type Leave = { id: string; leaveType: string; startAt: string; endAt: string; reason: string; status: string; reviewNote: string | null; history?: LeaveEvent[] }
 type Props = { api: <T>(path: string, options?: RequestInit) => Promise<T>; onClose: () => void }
 const types: Record<string, string> = { Sick: 'ลาป่วย', Personal: 'ลากิจ', Vacation: 'ลาพักร้อน', Other: 'อื่น ๆ' }
-const statuses: Record<string, string> = { Pending: 'รออนุมัติ', Approved: 'อนุมัติแล้ว', Rejected: 'ไม่อนุมัติ', Cancelled: 'ยกเลิก' }
+const statuses: Record<string, string> = { Pending: 'รออนุมัติ', Approved: 'อนุมัติแล้ว', Rejected: 'ไม่อนุมัติ', Cancelled: 'ยกเลิก', CancellationPending: 'รอยกเลิกการลา' }
 const format = (value: string) => new Date(value).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
 const shopToday = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10)
 const nextDate = (date: string) => new Date(new Date(`${date}T00:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10)
@@ -28,6 +29,8 @@ export function BarberLeave({ api, onClose }: Props) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState<Leave | null>(null)
+  const [cancelNote, setCancelNote] = useState('')
   const [leaveType, setLeaveType] = useState('Personal')
   const [start, setStart] = useState(shopToday)
   const [end, setEnd] = useState(shopToday)
@@ -67,12 +70,24 @@ export function BarberLeave({ api, onClose }: Props) {
     } catch (error) { setError(error instanceof Error ? error.message : 'ส่งไม่สำเร็จ กรุณารีเฟรชรายการเพื่อตรวจสอบก่อนส่งซ้ำ') }
     finally { savingRef.current = false; setSaving(false) }
   }
+  async function cancelLeave(event: React.FormEvent) {
+    event.preventDefault()
+    if (!cancelTarget || savingRef.current || !cancelNote.trim()) return
+    savingRef.current = true; setSaving(true); setError('')
+    try {
+      const result = await api<Leave>(`/api/leaves/${cancelTarget.id}/cancel`, { method: 'POST', body: JSON.stringify({ note: cancelNote.trim() }) })
+      setLeaves(current => current.map(leave => leave.id === result.id ? result : leave))
+      setCancelTarget(null); setCancelNote('')
+      setNotice(result.status === 'Cancelled' ? 'ถอนคำขอแล้ว' : 'ส่งคำขอยกเลิกแล้ว ช่วงลายังปิดรับจองจนกว่าร้านจะยืนยัน')
+    } catch (error) { setError(`${error instanceof Error ? error.message : 'ส่งคำขอไม่สำเร็จ'} กรุณากลับไปรายการและรีเฟรชก่อนลองใหม่`) }
+    finally { savingRef.current = false; setSaving(false) }
+  }
   return <SheetBackdrop onClose={onClose} busy={saving} protectEdits>{close => <article className="detail-panel bq-leave-panel" role="dialog" aria-modal="true" aria-labelledby="barber-leave-title">
     <SheetHandle />
     <header className="booking-detail-header bq-leave-header">
       {formOpen && <button className="icon-button" type="button" onClick={() => { setFormOpen(false); setError('') }} disabled={saving} aria-label="กลับไปรายการ" title="กลับไปรายการ"><ChevronLeft size={20} /></button>}
-      <div className="bq-leave-title"><span className="modal-eyebrow">การลาของฉัน</span><h2 id="barber-leave-title">{formOpen ? 'ขอลา' : 'คำขอลา'}</h2></div>
-      {!formOpen && <button className="icon-button" type="button" onClick={() => void refresh()} disabled={loading || saving} aria-label="รีเฟรชคำขอลา" title="รีเฟรชคำขอลา"><RefreshCw size={18} /></button>}
+      <div className="bq-leave-title"><span className="modal-eyebrow">การลาของฉัน</span><h2 id="barber-leave-title">{cancelTarget ? cancelTarget.status === 'Pending' ? 'ถอนคำขอ' : 'ขอยกเลิกการลา' : formOpen ? 'ขอลา' : 'คำขอลา'}</h2></div>
+      {!formOpen && !cancelTarget && <button className="icon-button" type="button" onClick={() => void refresh()} disabled={loading || saving} aria-label="รีเฟรชคำขอลา" title="รีเฟรชคำขอลา"><RefreshCw size={18} /></button>}
       <button className="icon-button" type="button" onClick={close} disabled={saving} aria-label="ปิดคำขอลา" title="ปิดคำขอลา"><X size={18} /></button>
     </header>
     <div className="sheet-body bq-leave-body">
@@ -89,16 +104,32 @@ export function BarberLeave({ api, onClose }: Props) {
         {start && <p className="bq-leave-summary">{dayLabel(start)}{multipleDays && end && end !== start ? ` – ${dayLabel(end)}` : ''} · {allDay ? 'เต็มวัน' : `${startTime}–${endTime} น. (เวลาไทย)`}</p>}
         <p>คำขอยังไม่ปิดเวลารับจองจนกว่าจะได้รับอนุมัติ</p>
       </form>}
-      {!formOpen && <section className="bq-leave-list" aria-label="ประวัติคำขอลา" aria-busy={loading}>
+      {cancelTarget && <form id="barber-cancel-leave" className="bq-leave-form" onSubmit={cancelLeave}>
+        <p>{periodLabel(cancelTarget)}</p>
+        <p>{cancelTarget.status === 'Pending' ? 'ถอนคำขอได้ทันที โดยเก็บประวัติไว้' : 'ช่วงลายังปิดรับจอง จนกว่า Owner/Admin จะยืนยันยกเลิก'}</p>
+        <label>เหตุผลยกเลิก<textarea autoFocus required maxLength={1000} rows={3} value={cancelNote} onChange={e => setCancelNote(e.target.value)} disabled={saving} /></label>
+      </form>}
+      {!formOpen && !cancelTarget && <section className="bq-leave-list" aria-label="ประวัติคำขอลา" aria-busy={loading}>
         {loading ? <p role="status">กำลังโหลดคำขอ</p> : leaves.length === 0 ? !error && <p>ยังไม่มีคำขอลา</p> : leaves.map(leave => <article key={leave.id}>
           <div><h3>{types[leave.leaveType] || leave.leaveType}</h3><span className={`bq-badge ${leave.status === 'Approved' ? 'bq-badge-green' : ''}`}>{statuses[leave.status] || leave.status}</span></div>
           <p>{periodLabel(leave)}</p><p className="bq-leave-reason">{leave.reason}</p>
           {leave.reviewNote && <p className="bq-leave-review">หมายเหตุจากผู้อนุมัติ: {leave.reviewNote}</p>}
+          {leave.status === 'CancellationPending' && <p>รอร้านยืนยันยกเลิก ช่วงลายังปิดรับจอง</p>}
+          <LeaveHistory history={leave.history} />
+          {['Pending', 'Approved'].includes(leave.status) && new Date(leave.endAt).getTime() > Date.now() && <footer className="bq-leave-card-actions">
+            <button className="secondary bq-leave-cancel-button" type="button" disabled={saving} onClick={() => { setCancelTarget(leave); setCancelNote(''); setError(''); setNotice('') }}>
+              <Undo2 size={17} aria-hidden="true" />
+              <span>{leave.status === 'Pending' ? 'ถอนคำขอ' : 'ขอยกเลิกการลา'}</span>
+            </button>
+          </footer>}
         </article>)}
       </section>}
     </div>
-    <footer className={`booking-detail-actions bq-leave-footer${formOpen ? ' bq-leave-footer-form' : ''}`}>
-      {formOpen ? <>
+    <footer className={`booking-detail-actions bq-leave-footer${formOpen || cancelTarget ? ' bq-leave-footer-form' : ''}`}>
+      {cancelTarget ? <>
+        <button className="secondary" type="button" disabled={saving} onClick={() => { setCancelTarget(null); setCancelNote(''); setError('') }}>กลับไปรายการ</button>
+        <button type="submit" form="barber-cancel-leave" disabled={saving || !cancelNote.trim()}>{saving ? 'กำลังส่ง' : cancelTarget.status === 'Pending' ? 'ยืนยันถอนคำขอ' : 'ส่งคำขอยกเลิก'}</button>
+      </> : formOpen ? <>
         <button className="secondary" type="button" disabled={saving} onClick={() => { setFormOpen(false); setReason(''); setStart(shopToday()); setEnd(shopToday()); setMultipleDays(false); setAllDay(true); setStartTime('10:00'); setEndTime('18:00'); setError('') }}>ยกเลิก</button>
         <button type="submit" form="barber-leave-form" disabled={saving || !reason.trim()}>{saving ? 'กำลังส่งคำขอ' : 'ส่งคำขอลา'}</button>
       </> : <button type="button" onClick={() => { setFormOpen(true); setError(''); setNotice('') }}><Plus size={18} aria-hidden="true" />ขอลา</button>}

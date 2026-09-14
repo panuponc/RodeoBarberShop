@@ -420,7 +420,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
 
         var slots = new List<AvailabilitySlotResponse>();
         var approvedLeaves = await dbContext.LeaveRequests.AsNoTracking()
-            .Where(l => l.BarberId == barberId && l.Status == LeaveStatus.Approved && l.StartAt < dayEndUtc && l.EndAt > dayStartUtc)
+            .Where(l => l.BarberId == barberId && (l.Status == LeaveStatus.Approved || l.Status == LeaveStatus.CancellationPending) && l.StartAt < dayEndUtc && l.EndAt > dayStartUtc)
             .Select(l => new { l.StartAt, l.EndAt }).ToListAsync(cancellationToken);
         for (var startAt = dayStart; startAt.AddMinutes(durationMinutes) <= dayEnd; startAt = startAt.AddMinutes(slotIntervalMinutes))
         {
@@ -428,7 +428,21 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             var overlaps = existingBookings.Any(booking => startAt < booking.EndAt && endAt > booking.StartAt)
                 || approvedLeaves.Any(leave => startAt < leave.EndAt && endAt > leave.StartAt);
 
-            slots.Add(new AvailabilitySlotResponse(startAt, endAt, !overlaps));
+            var busyPeriods = existingBookings.Select(booking => (booking.StartAt, booking.EndAt))
+                .Concat(approvedLeaves.Select(leave => (leave.StartAt, leave.EndAt)));
+            var freeUntil = dayEnd;
+            foreach (var period in busyPeriods)
+            {
+                if (period.StartAt <= startAt && period.EndAt > startAt)
+                {
+                    freeUntil = startAt;
+                    break;
+                }
+                if (period.StartAt > startAt && period.StartAt < freeUntil)
+                    freeUntil = period.StartAt;
+            }
+            slots.Add(new AvailabilitySlotResponse(startAt, endAt, !overlaps,
+                (int)(freeUntil - startAt).TotalMinutes));
         }
 
         return Ok(slots);
@@ -456,7 +470,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         }
 
         var requestedStartAtLocal = requestedStartAt.ToOffset(ShopUtcOffset);
-        if (await dbContext.LeaveRequests.AnyAsync(l => l.BarberId == barberId && l.Status == LeaveStatus.Approved && l.StartAt < endAtUtc && l.EndAt > startAtUtc, cancellationToken))
+        if (await dbContext.LeaveRequests.AnyAsync(l => l.BarberId == barberId && (l.Status == LeaveStatus.Approved || l.Status == LeaveStatus.CancellationPending) && l.StartAt < endAtUtc && l.EndAt > startAtUtc, cancellationToken))
             return "ช่างลาช่วงเวลานี้ กรุณาเลือกเวลาอื่น";
         var requestedEndAtLocal = requestedStartAtLocal.Add(endAtUtc - startAtUtc);
         var bookingDate = DateOnly.FromDateTime(requestedStartAtLocal.DateTime);

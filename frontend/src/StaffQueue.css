@@ -61,7 +61,7 @@
 /* One native scrollport keeps both sticky axes on the browser's scrolling layer. */
 .staff-queue-workspace .schedule-board { padding: 0; overflow: auto; touch-action: pan-x pan-y; }
 .staff-queue-workspace .schedule-board-content { height: auto; min-height: 100%; }
-.staff-queue-workspace .schedule-fixed-grid { position: sticky; top: 0; z-index: 20; }
+.staff-queue-workspace .schedule-fixed-grid { position: sticky; top: 0; z-index: 20; grid-template-rows: minmax(82px, auto); }
 .staff-queue-workspace .schedule-scroll-area { flex: 0 0 auto; overflow: visible; }
 .staff-queue-workspace :is(.schedule-time-column-header, .schedule-time-axis) {
   position: sticky;
@@ -77,6 +77,12 @@
 .staff-queue-workspace .availability-dot { border-color: #1b1e25; box-shadow: none; }
 .staff-queue-workspace .barber-column.barber-column-timeline { background: #13161b; border-color: var(--sq-border); }
 .staff-queue-workspace .barber-column-header.off-day { background: #14161a; }
+.staff-queue-workspace .barber-column-header.has-approved-leave { border-color: #8d6670; }
+.staff-queue-workspace .availability-dot.on-leave { background: #e9a8b5; }
+.staff-queue-workspace .schedule-leave-summary { grid-column: 1 / -1; display: grid; gap: 3px; color: #f0bdc7; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.staff-queue-workspace .schedule-leave-band { position: absolute; inset-inline: 0; z-index: 1; padding: 5px 8px; overflow: hidden; box-sizing: border-box; border-block: 1px dashed #996673; border-left: 3px solid #d49bab; background: repeating-linear-gradient(135deg, #30232b 0px, #30232b 7px, #272128 7px, #272128 14px); color: #f0bdc7; pointer-events: none; font-size: 11px; }
+.staff-queue-workspace .schedule-leave-band :is(span, small) { display: block; }
+.staff-queue-workspace .schedule-leave-conflict { color: #f0bdc7; font-size: 10px; }
 .staff-queue-workspace .barber-column-header.off-day :is(strong, .barber-avatar) { color: #8e96a3; }
 .staff-queue-workspace .barber-column-header.off-day .barber-avatar { background: #252931; border-color: var(--sq-border); }
 .staff-queue-workspace .barber-column.barber-column-timeline.off-day { background: #111318; }
@@ -142,7 +148,12 @@ body:has(.staff-queue-workspace .modal-backdrop) { overflow: hidden; }
 .staff-queue-workspace .staff-service-card.selected { background: #2b261c; border-color: #8a7343; }
 .staff-queue-workspace .staff-service-card :is(strong, b) { color: var(--sq-text); font-size: 12px; }
 .staff-queue-workspace .staff-service-card b { color: var(--sq-gold); }
+.staff-queue-workspace .staff-service-card.unavailable { cursor: not-allowed; background: #171a1f; border-color: var(--sq-border); transform: none; box-shadow: none; }
+.staff-queue-workspace .staff-service-card.unavailable :is(strong, b, small) { color: var(--sq-muted); }
+.staff-queue-workspace .staff-service-availability { color: var(--sq-muted); font-size: 13px; margin: 0 0 12px; overflow-wrap: anywhere; }
 .staff-queue-workspace .staff-booking-form .action-row { position: sticky; bottom: 0; display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr); gap: 8px; margin: 0; padding: 16px 18px max(16px, env(safe-area-inset-bottom)); background: var(--sq-surface); border-color: var(--sq-border); box-shadow: none; }
+.staff-queue-workspace .staff-booking-feedback { grid-column: 1 / -1; margin: 0; color: var(--sq-gold); font-size: 13px; overflow-wrap: anywhere; }
+.staff-queue-workspace .staff-booking-feedback:empty { display: none; }
 .staff-queue-workspace :is(.payment-box, .receipt-box, .cancel-booking-box, .booking-history-box, .cancel-reason-note) { margin: 16px 18px; padding: 14px; background: #101318; color: var(--sq-text); border-color: var(--sq-border); border-radius: 8px; box-shadow: none; }
 .staff-queue-workspace .payment-box img { max-width: 100%; background: white; border: 12px solid white; }
 .staff-queue-workspace :is(.cancel-booking-box p, .cancel-reason-note strong, .receipt-box p) { color: var(--sq-muted); }

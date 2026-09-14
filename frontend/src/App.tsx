@@ -81,7 +81,10 @@ type ChairScheduleConfig = {
   sortOrder: number
   isActive: boolean
   barbers: ChairScheduleBarber[]
+  leaves?: ScheduleLeave[]
 }
+
+type ScheduleLeave = { id: string; barberId: string; startAt: string; endAt: string }
 
 type Chair = {
   id: string
@@ -157,6 +160,7 @@ type AvailabilitySlot = {
   startAt: string
   endAt: string
   isAvailable: boolean
+  maxDurationMinutes: number
 }
 
 type BookingService = {
@@ -402,6 +406,8 @@ function App() {
   const [myBookings, setMyBookings] = useState<Booking[]>([])
   const [customerReceipt, setCustomerReceipt] = useState<Receipt | null>(null)
   const [isStaffBookingFormOpen, setIsStaffBookingFormOpen] = useState(false)
+  const [staffBookingError, setStaffBookingError] = useState('')
+  const [staffSlots, setStaffSlots] = useState<{ key: string; slots: AvailabilitySlot[]; error: string } | null>(null)
   const staffBookingFormRef = useRef<HTMLFormElement | null>(null)
   const staffDetailBodyRef = useRef<HTMLDivElement | null>(null)
   const scheduleDatePickerRef = useRef<HTMLDivElement | null>(null)
@@ -413,6 +419,8 @@ function App() {
     startX: 0,
   })
   const [scheduleDate, setScheduleDate] = useState(getTodayDate())
+  const [scheduleLeaves, setScheduleLeaves] = useState<{ date: string; items: ScheduleLeave[] }>({ date: '', items: [] })
+  const visibleScheduleLeaves = scheduleLeaves.date === scheduleDate ? scheduleLeaves.items : []
   const [scheduleViewportKey, setScheduleViewportKey] = useState(getScheduleViewportKey)
   const [isScheduleDatePickerOpen, setIsScheduleDatePickerOpen] = useState(false)
   const [scheduleCalendarMonth, setScheduleCalendarMonth] = useState(getMonthKey(getTodayDate()))
@@ -554,7 +562,7 @@ function selectScheduleDate(dateValue: string) {
     void refreshQueue(scheduleDate)
     void refreshScheduleChairConfigs(scheduleDate)
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [scheduleDate])
+  }, [scheduleDate, activeStaffPanel])
 
   useEffect(() => {
     if (!auth || auth.role !== 'Barber') return
@@ -644,6 +652,44 @@ function selectScheduleDate(dateValue: string) {
     staffBookingForm.guestName,
     staffBookingForm.guestPhoneNumber,
   ])
+
+  const staffSlotDate = staffBookingForm.startAt.slice(0, 10)
+  // The shortest service exposes every usable start; the API supplies its free window.
+  const staffSlotServices = services.reduce<Service | undefined>((shortest, service) =>
+    !shortest || service.durationMinutes < shortest.durationMinutes ? service : shortest, undefined)?.id ?? ''
+  const staffSelectedMinutes = services.filter((service) => staffBookingForm.serviceIds.includes(service.id))
+    .reduce((total, service) => total + service.durationMinutes, 0)
+  const staffSlotKey = `${staffBookingForm.barberId}/${staffSlotDate}/${staffSlotServices}`
+  const staffSlotsReady = staffSlots?.key === staffSlotKey && !staffSlots.error
+  const staffSelectedSlot = staffSlotsReady ? staffSlots.slots.find((slot) =>
+    new Date(slot.startAt).getTime() === new Date(staffBookingForm.startAt).getTime()) : undefined
+  const staffFreeMinutes = staffSelectedSlot && new Date(staffSelectedSlot.startAt).getTime() > Date.now()
+    ? staffSelectedSlot.maxDurationMinutes : 0
+  const staffSelectedSlotAvailable = staffSelectedMinutes > 0 && staffSlotsReady && staffSlots.slots.some((slot) =>
+    slot.maxDurationMinutes >= staffSelectedMinutes &&
+    slot.isAvailable && new Date(slot.startAt).getTime() === new Date(staffBookingForm.startAt).getTime()
+      && new Date(slot.startAt).getTime() > Date.now())
+
+  useEffect(() => {
+    setStaffBookingError('')
+    if (!isStaffBookingFormOpen || !staffBookingForm.barberId || !staffSlotDate || !staffSlotServices) return
+    const controller = new AbortController()
+    const params = new URLSearchParams({ barberId: staffBookingForm.barberId, date: staffSlotDate })
+    staffSlotServices.split(',').forEach((id) => params.append('serviceIds', id))
+    setStaffSlots(null)
+    fetch(`/api/bookings/availability?${params}`, {
+      signal: controller.signal,
+      headers: auth ? { Authorization: `Bearer ${auth.accessToken}` } : {},
+    }).then(async (response) => {
+      if (!response.ok) throw new Error('ตรวจสอบเวลาว่างไม่สำเร็จ กรุณาปิดแล้วเปิดฟอร์มใหม่')
+      return await response.json() as AvailabilitySlot[]
+    }).then((slots) => {
+      if (!controller.signal.aborted) setStaffSlots({ key: staffSlotKey, slots, error: '' })
+    }).catch((error: unknown) => {
+      if (!controller.signal.aborted) setStaffSlots({ key: staffSlotKey, slots: [], error: error instanceof Error ? error.message : 'ตรวจสอบเวลาว่างไม่สำเร็จ' })
+    })
+    return () => controller.abort()
+  }, [isStaffBookingFormOpen, staffBookingForm.barberId, staffSlotDate, staffSlotServices, staffSlotKey, auth])
 
   async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(path, {
@@ -808,6 +854,7 @@ function selectScheduleDate(dateValue: string) {
 
   async function refreshScheduleChairConfigs(targetDate = scheduleDate) {
     const result = await api<ChairScheduleConfig[]>(`/api/chairs/schedule?date=${targetDate}`)
+    setScheduleLeaves({ date: targetDate, items: [...new Map(result.flatMap((chair) => chair.leaves ?? []).map((leave) => [leave.id, leave])).values()] })
     const mappedChairs = result
       .filter((chair) => chair.isActive)
       .map((chair) => {
@@ -1702,6 +1749,7 @@ function selectScheduleDate(dateValue: string) {
     event.preventDefault()
     setIsBusy(true)
     setMessage('')
+    setStaffBookingError('')
 
     try {
       if (!staffBookingForm.barberId || staffBookingForm.serviceIds.length === 0) {
@@ -1710,6 +1758,10 @@ function selectScheduleDate(dateValue: string) {
 
       if (new Date(staffBookingForm.startAt) <= new Date()) {
         throw new Error('กรุณาเลือกวันเวลาในอนาคต')
+      }
+
+      if (!staffSelectedSlotAvailable) {
+        throw new Error('เวลานี้ไม่ว่างสำหรับบริการที่เลือก กรุณาเลือกเวลาอื่น')
       }
 
       await api<Booking>('/api/bookings/staff', {
@@ -1741,7 +1793,7 @@ function selectScheduleDate(dateValue: string) {
       setStaffReceipt(null)
       setMessage('เพิ่มการนัดหมายแล้ว')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'เพิ่มการนัดหมายไม่สำเร็จ')
+      setStaffBookingError(error instanceof Error ? error.message : 'เพิ่มการนัดหมายไม่สำเร็จ')
     } finally {
       setIsBusy(false)
     }
@@ -2452,7 +2504,7 @@ function selectScheduleDate(dateValue: string) {
                   <div className="schedule-fixed-grid">
                     <ScheduleTimeColumnHeader />
                     {scheduleChairs.map((chair) => (
-                      <ChairScheduleHeader chair={chair} key={`${chair.id}-header`} onCreateBooking={openStaffBookingFormForChair} />
+                      <ChairScheduleHeader chair={chair} date={scheduleDate} leaves={visibleScheduleLeaves.filter((leave) => chair.barbers.some(({ barber }) => barber.id === leave.barberId))} key={`${chair.id}-header`} onCreateBooking={openStaffBookingFormForChair} />
                     ))}
                   </div>
                   <div className="schedule-scroll-area">
@@ -2460,6 +2512,8 @@ function selectScheduleDate(dateValue: string) {
                       <ScheduleTimeAxis />
                   {scheduleChairs.map((chair) => (
                     <ChairScheduleTimeline
+                      date={scheduleDate}
+                      leaves={visibleScheduleLeaves.filter((leave) => chair.barbers.some(({ barber }) => barber.id === leave.barberId))}
                       bookings={queue.filter((booking) => chair.barbers.some(({ barber }) => booking.barberId === barber.id))}
                       chair={chair}
                       key={`${chair.id}-timeline`}
@@ -2576,17 +2630,22 @@ function selectScheduleDate(dateValue: string) {
                     <label>
                       เวลาเริ่ม
                       <select
+                        disabled={!staffSlotsReady || !staffSlotServices}
                         value={getBookingHourValue(staffBookingForm.startAt)}
                         onChange={(event) => setStaffBookingForm({
                           ...staffBookingForm,
                           startAt: clampDateTimeToMinimum(buildBookingDateTime(staffBookingForm.startAt.slice(0, 10), event.target.value)),
                         })}
                       >
-                        {bookingStartHours.map((hour) => (
-                          <option key={hour} value={String(hour).padStart(2, '0')}>
-                            {String(hour).padStart(2, '0')}:00
+                        {bookingStartHours.map((hour) => {
+                          const value = String(hour).padStart(2, '0')
+                          const instant = new Date(buildBookingDateTime(staffSlotDate, value)).getTime()
+                          const available = staffSlotsReady && staffSlots.slots.some((slot) =>
+                            slot.isAvailable && slot.maxDurationMinutes >= staffSelectedMinutes && new Date(slot.startAt).getTime() === instant && instant > Date.now())
+                          return <option disabled={!available} key={hour} value={value}>
+                            {value}:00{staffSlotsReady && !available ? ' — ไม่ว่าง' : ''}
                           </option>
-                        ))}
+                        })}
                       </select>
                     </label>
                     <label>
@@ -2605,6 +2664,11 @@ function selectScheduleDate(dateValue: string) {
                     <h4>บริการ</h4>
                     <span>{staffBookingForm.serviceIds.length} รายการที่เลือก</span>
                   </div>
+                  <p className="staff-service-availability" role="status">
+                    {!staffBookingForm.barberId ? 'เลือกช่างและเวลาเริ่มก่อนเลือกบริการ'
+                      : !staffSlotsReady ? 'กำลังตรวจสอบระยะเวลาว่าง...'
+                        : `เวลานี้ว่างต่อเนื่อง ${staffFreeMinutes} นาที · เลือกแล้ว ${staffSelectedMinutes} นาที`}
+                  </p>
                   {services.length === 0 ? (
                     <small>ยังไม่มีบริการ active</small>
                   ) : (
@@ -2619,10 +2683,14 @@ function selectScheduleDate(dateValue: string) {
                             <span>{group.services.length} รายการ</span>
                           </div>
                           <div className="staff-service-grid">
-                            {group.services.map((service) => (
-                              <label className={staffBookingForm.serviceIds.includes(service.id) ? 'staff-service-card selected' : 'staff-service-card'} key={service.id}>
+                            {group.services.map((service) => {
+                              const selected = staffBookingForm.serviceIds.includes(service.id)
+                              const disabled = !selected && (!staffSlotsReady || staffSelectedMinutes + service.durationMinutes > staffFreeMinutes)
+                              return (
+                              <label className={`staff-service-card${selected ? ' selected' : ''}${disabled ? ' unavailable' : ''}`} key={service.id}>
                                 <input
-                                  checked={staffBookingForm.serviceIds.includes(service.id)}
+                                  checked={selected}
+                                  disabled={disabled}
                                   onChange={(event) => {
                                     setStaffBookingForm((current) => ({
                                       ...current,
@@ -2636,10 +2704,11 @@ function selectScheduleDate(dateValue: string) {
                                 <span>
                                   <strong>{service.name}</strong>
                                   <small>{service.durationMinutes} นาที</small>
+                                  {disabled && <small>{!staffBookingForm.barberId ? 'เลือกช่างก่อน' : !staffSlotsReady ? 'กำลังตรวจสอบเวลา' : 'เวลาว่างไม่พอ'}</small>}
                                 </span>
                                 <b>{formatMoney(service.price)}</b>
                               </label>
-                            ))}
+                            )})}
                           </div>
                         </section>
                       ))}
@@ -2649,10 +2718,20 @@ function selectScheduleDate(dateValue: string) {
 
                 </div>
                 <div className="action-row">
+                  <p className="staff-booking-feedback" role={staffBookingError || staffSlots?.error ? 'alert' : 'status'}>
+                    {staffBookingError || (staffSlots?.key === staffSlotKey && staffSlots.error)
+                      || (!staffBookingForm.barberId || !staffSlotServices ? 'เลือกช่างเพื่อตรวจสอบเวลาว่าง'
+                        : !staffSlotsReady ? 'กำลังตรวจสอบเวลาว่าง...'
+                          : !staffSlots.slots.some((slot) => slot.isAvailable && new Date(slot.startAt).getTime() > Date.now())
+                            ? 'ไม่มีเวลาว่างสำหรับบริการนี้ในวันที่เลือก กรุณาเปลี่ยนวันหรือช่าง'
+                            : !staffFreeMinutes ? 'เวลาที่เลือกไม่ว่าง กรุณาเลือกเวลาใหม่'
+                              : !staffSelectedMinutes ? 'เลือกบริการที่ต้องการ'
+                                : !staffSelectedSlotAvailable ? 'เวลาว่างไม่พอ กรุณาลดบริการหรือเปลี่ยนเวลา' : '')}
+                  </p>
                   <button className="secondary" disabled={isBusy} onClick={closeSheet} type="button">
                     ยกเลิก
                   </button>
-                  <button disabled={isBusy} type="submit">
+                  <button disabled={isBusy || !staffSelectedSlotAvailable} type="submit">
                     บันทึกการนัดหมาย
                   </button>
                 </div>
@@ -3669,24 +3748,37 @@ function ScheduleTimeAxis() {
   )
 }
 
+function scheduleLeaveLabel(leave: ScheduleLeave, date: string) {
+  const dayStart = new Date(`${date}T00:00:00+07:00`).getTime()
+  const start = Math.max(0, (new Date(leave.startAt).getTime() - dayStart) / 60000)
+  const end = Math.min(1440, (new Date(leave.endAt).getTime() - dayStart) / 60000)
+  const clock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+  return start === 0 && end === 1440 ? 'ลาเต็มวัน' : `ลา ${clock(start)} - ${clock(end)}`
+}
+
 function ChairScheduleHeader({
   chair,
+  date,
+  leaves,
   onCreateBooking,
 }: {
   chair: ScheduleChair
+  date: string
+  leaves: ScheduleLeave[]
   onCreateBooking: (chair: ScheduleChair) => void
 }) {
   const headerClassName = [
     'barber-column-header',
     chair.isWorkingToday ? '' : 'off-day',
     chair.isShared ? 'shared-chair' : '',
+    leaves.length ? 'has-approved-leave' : '',
   ].filter(Boolean).join(' ')
 
   return (
     <header className={headerClassName}>
       <div className="barber-avatar-wrap">
         <div className="barber-avatar">{getInitials(chair.title)}</div>
-        <span className={chair.isWorkingToday ? 'availability-dot available' : 'availability-dot'} />
+        <span className={leaves.length ? 'availability-dot on-leave' : chair.isWorkingToday ? 'availability-dot available' : 'availability-dot'} />
       </div>
       <div>
         <strong>{chair.title}</strong>
@@ -3708,6 +3800,12 @@ function ChairScheduleHeader({
           + จอง
         </button>
       )}
+      {leaves.length > 0 && <div className="schedule-leave-summary">
+        {leaves.map((leave) => <span key={leave.id}>
+          {chair.barbers.length > 1 ? `${chair.barbers.find(({ barber }) => barber.id === leave.barberId)?.barber.fullName ?? ''} · ` : ''}
+          {scheduleLeaveLabel(leave, date)}
+        </span>)}
+      </div>}
     </header>
   )
 }
@@ -3715,10 +3813,14 @@ function ChairScheduleHeader({
 function ChairScheduleTimeline({
   bookings,
   chair,
+  date,
+  leaves,
   onSelectBooking,
   selectedBookingId,
 }: {
   chair: ScheduleChair
+  date: string
+  leaves: ScheduleLeave[]
   bookings: Booking[]
   onSelectBooking: (booking: Booking, history?: Booking[]) => void
   selectedBookingId?: string
@@ -3755,6 +3857,16 @@ function ChairScheduleTimeline({
     <article className={columnClassName}>
       <div className="barber-column-body">
         <div className="schedule-timeline">
+          {leaves.map((leave) => {
+            const dayStart = new Date(`${date}T00:00:00+07:00`).getTime()
+            const start = Math.max(scheduleTimelineStartHour * 60, (new Date(leave.startAt).getTime() - dayStart) / 60000)
+            const end = Math.min(scheduleTimelineEndHour * 60, (new Date(leave.endAt).getTime() - dayStart) / 60000)
+            if (end <= start) return null
+            return <div key={leave.id} className="schedule-leave-band" style={{ top: (start / 60 - scheduleTimelineStartHour) * scheduleHourHeightPx, height: (end - start) / 60 * scheduleHourHeightPx }}>
+              <span>{scheduleLeaveLabel(leave, date)}</span>
+              {chair.barbers.length > 1 && <small>{chair.barbers.find(({ barber }) => barber.id === leave.barberId)?.barber.fullName}</small>}
+            </div>
+          })}
           <div className="schedule-hour-lines" aria-hidden="true">
             {Array.from({ length: scheduleTimelineEndHour - scheduleTimelineStartHour + 1 }, (_, index) => (
               <span key={scheduleTimelineStartHour + index} />
@@ -3815,6 +3927,7 @@ function ChairScheduleTimeline({
                   >
                   <span className="schedule-time">{formatTime(booking.startAt)} - {formatTime(booking.endAt)}</span>
                   <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
+                  {leaves.some((leave) => leave.barberId === booking.barberId && new Date(leave.startAt) < new Date(booking.endAt) && new Date(leave.endAt) > new Date(booking.startAt)) && <span className="schedule-leave-conflict">คิวทับช่วงลา</span>}
                   <BookingWorkSummary booking={booking} compact />
                   <span className={`schedule-card-status status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
                 </button>
