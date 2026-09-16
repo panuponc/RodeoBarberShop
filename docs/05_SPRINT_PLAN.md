@@ -135,7 +135,26 @@ Goal: Complete advanced management, dashboard, notification, promotion, and repo
 
 ### Sprint 13: Barber Leave Management
 
-Implementation checkpoint (2026-09-14, branch `feature/barber-leave-management`):
+Current checkpoint (2026-09-17): implemented and integrated into `main` through
+`0a3979e`. The following six planned items have implementation coverage:
+
+| Planned item | Implementation |
+| --- | --- |
+| Barber leave request | Own requests, full/partial-day periods and own history |
+| Owner approval | Owner/Admin approval with affected-booking recheck |
+| Owner rejection | Owner/Admin rejection with a required reason |
+| Leave type and reason | Captured with the requested period |
+| Affected booking list | Review shows overlapping appointments and links to their queue date |
+| Staff action for affected bookings | Queue details provide phone copying, cancellation and staff-only reassignment/rescheduling |
+
+- Verified in prior runs: 103 backend tests, including eight real PostgreSQL concurrency cases with zero skips; frontend build/lint; responsive browser-emulation checks. This documentation review does not constitute a new test run.
+- User feedback: the rescheduling workflow was reported working. This is not a claim that every role and edge case received manual acceptance testing.
+- Integration: `feature/barber-leave-management` was included in `feature/booking-reschedule`; both were fast-forwarded into `main`, with `main` and the locally recorded `origin/main` at `0a3979e` when checked.
+- No missing implementation was identified against the six planned items in this focused review. Final milestone acceptance remains a separate decision; integration alone is not full-project or production sign-off.
+- Known limits: browser checks used emulation, not real mobile hardware; PostgreSQL tests cover the documented races, not all possible operations or migration upgrades. A dedicated rescheduling-history screen is not implemented and is not added to the required scope by this checkpoint.
+- Sprint 14 notifications remain planned, not started or approved for implementation by this documentation update.
+
+Historical implementation checkpoint (2026-09-14, branch `feature/barber-leave-management`; later corrections below take precedence):
 - Implemented: barber request submission and own request history via `/api/leaves` and `/api/leaves/my`, with pending/approved overlap validation.
 - Implemented: Owner/Admin request list, affected booking preview, approve/reject with reviewer identity and notes. Approval rechecks affected booking IDs; rejection requires a reason.
 - Implemented: approved leave blocks overlapping availability, customer/staff booking creation, and service extensions into leave. Pending/rejected requests do not block booking availability.
@@ -151,7 +170,7 @@ Implementation checkpoint (2026-09-14, branch `feature/barber-leave-management`)
 - Status color agreement: black means shop closed, red means shop open but barber unavailable (off shift, disabled booking, leave or closure), green means bookable according to schedule. Shop hours are supplied separately from barber hours. Partial leave only makes today's dot red during the actual interval; non-current dates use their own planned windows. No amber or gray status dots.
 - Implemented: schedule status dots and text use bookable working windows (shop hours, holidays and barber booking flags) plus blocking leave intervals. Current-day status advances with the clock; future dates describe planned availability, not attendance.
 - Verified: 72 isolated backend tests (replacing the superseded leave-report tests with closure role/close/reopen/next-day/leave-preservation tests), frontend build/lint, deterministic status boundary tests, mocked schedule close/reopen workflow with responsive transitions, and read-only PostgreSQL-backed development API checks. Browser tests do not modify real leave/booking records.
-- Remaining before merge/sign-off: user acceptance of the affected-booking handling workflow and real PostgreSQL concurrent approval/booking validation in an isolated test environment. This checkpoint does not claim final Sprint 13 acceptance.
+- At this historical checkpoint, affected-booking acceptance and PostgreSQL concurrency checks were pending. See the current checkpoint and later verification below for their updated status.
 
 - Barber leave request
 - Owner approval
@@ -167,12 +186,12 @@ Rescheduling checkpoint (2026-09-17, branch `feature/booking-reschedule`, based 
 - The edit sheet shows the original appointment, eligible barbers, available full-duration slots, a required reason and the new appointment before confirmation. Service snapshots, prices, payments and booking ID/number are preserved. Changing time resets arrival status to PendingConfirmation; changing only the barber preserves status.
 - Server validation reuses booking availability rules, excludes the edited booking itself, and checks leave, closures, hours, holidays, service skills, shared-chair conflicts, staff access and stale updates. Rescheduling and queue status changes share the existing booking write lock.
 - Audit uses existing QueueEvents (structured Rescheduled note with old/new barber and times, reason and actor) plus BarberAssignmentEvents when the barber changes. No schema migration is needed. A dedicated audit-history UI is not included yet.
-- Verified: 95 isolated backend tests, frontend build/lint, and mocked browser edit/conflict/retry/save workflows across 320/390/820/1440 widths. No real customer appointment was moved by browser testing. PostgreSQL concurrent-write validation and user acceptance remain pending; Sprint 13 is not marked complete.
+- Verified at the rescheduling checkpoint: 95 isolated backend tests, frontend build/lint, and mocked browser edit/conflict/retry/save workflows across 320/390/820/1440 widths. No real customer appointment was moved by browser testing. The concurrency and user-feedback updates are recorded below and in the current checkpoint.
 
 Concurrency verification checkpoint (2026-09-17):
 - Verified the previously pending booking/rescheduling and leave-approval races on an isolated local PostgreSQL 16.15 instance. Eight cases cover staff booking/customer booking, reschedule/customer booking, two reschedules, and leave approval/customer booking in both lock acquisition orders.
 - Each case confirms two blocked PostgreSQL writers before releasing the lock and asserts a single successful operation with no conflicting committed appointment. The focused run passed 8/8; the full run passed 103/103, zero skips. No shop database was used; generated databases were cleaned up and the local server stopped after testing.
-- This supersedes the pending PostgreSQL concurrency checks above for these scenarios only. User reported the rescheduling workflow working. Full milestone acceptance and branch integration still require review; this does not automatically mark Sprint 13 complete. See `docs/POSTGRES_CONCURRENCY_TESTS.md` for scope, limitations and rerun steps.
+- This supersedes the pending PostgreSQL concurrency checks above for these scenarios only. User reported the rescheduling workflow working. Branch integration subsequently completed as recorded in the current checkpoint; final milestone acceptance is separate. See `docs/POSTGRES_CONCURRENCY_TESTS.md` for scope, limitations and rerun steps.
 
 ### Sprint 14: Notifications
 
