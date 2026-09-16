@@ -169,6 +169,11 @@ Rescheduling checkpoint (2026-09-17, branch `feature/booking-reschedule`, based 
 - Audit uses existing QueueEvents (structured Rescheduled note with old/new barber and times, reason and actor) plus BarberAssignmentEvents when the barber changes. No schema migration is needed. A dedicated audit-history UI is not included yet.
 - Verified: 95 isolated backend tests, frontend build/lint, and mocked browser edit/conflict/retry/save workflows across 320/390/820/1440 widths. No real customer appointment was moved by browser testing. PostgreSQL concurrent-write validation and user acceptance remain pending; Sprint 13 is not marked complete.
 
+Concurrency verification checkpoint (2026-09-17):
+- Verified the previously pending booking/rescheduling and leave-approval races on an isolated local PostgreSQL 16.15 instance. Eight cases cover staff booking/customer booking, reschedule/customer booking, two reschedules, and leave approval/customer booking in both lock acquisition orders.
+- Each case confirms two blocked PostgreSQL writers before releasing the lock and asserts a single successful operation with no conflicting committed appointment. The focused run passed 8/8; the full run passed 103/103, zero skips. No shop database was used; generated databases were cleaned up and the local server stopped after testing.
+- This supersedes the pending PostgreSQL concurrency checks above for these scenarios only. User reported the rescheduling workflow working. Full milestone acceptance and branch integration still require review; this does not automatically mark Sprint 13 complete. See `docs/POSTGRES_CONCURRENCY_TESTS.md` for scope, limitations and rerun steps.
+
 ### Sprint 14: Notifications
 
 - Internal website notification storage
