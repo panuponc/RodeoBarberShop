@@ -102,6 +102,7 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
             return BadRequest(new { message = "Status is invalid." });
         }
 
+        await using var transaction = await BookingWriteLock.BeginAsync(dbContext, cancellationToken);
         var booking = await QueueBookingQuery()
             .FirstOrDefaultAsync(booking => booking.Id == bookingId, cancellationToken);
 
@@ -183,6 +184,7 @@ public class QueueController(ApplicationDbContext dbContext) : ControllerBase
         dbContext.QueueEvents.Add(queueEvent);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return Ok(new UpdateQueueStatusResponse(ToResponse(booking), ToResponse(queueEvent)));
     }
 

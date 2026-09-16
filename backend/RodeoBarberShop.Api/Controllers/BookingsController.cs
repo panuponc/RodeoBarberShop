@@ -383,6 +383,13 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         }
 
         var durationMinutes = selectedServices.Sum(service => service.DurationMinutes);
+
+        return await AvailabilityForDuration(barberId, date, durationMinutes, cancellationToken);
+    }
+
+    private async Task<ActionResult<IReadOnlyList<AvailabilitySlotResponse>>> AvailabilityForDuration(
+        Guid barberId, DateOnly date, int durationMinutes, CancellationToken cancellationToken, Guid? excludedBookingId = null)
+    {
         var slotIntervalMinutes = BookingStartIntervalMinutes;
 
         var workingHour = await dbContext.BarberWorkingHours
@@ -420,7 +427,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         var resourceBarberIds = await GetBookingResourceBarberIds(barberId, cancellationToken);
         var existingBookings = await dbContext.Bookings
             .AsNoTracking()
-            .Where(booking => booking.BarberId.HasValue
+            .Where(booking => booking.Id != excludedBookingId && booking.BarberId.HasValue
                 && resourceBarberIds.Contains(booking.BarberId.Value)
                 && ActiveBookingStatuses.Contains(booking.BookingStatus)
                 && booking.StartAt < dayEndUtc
@@ -462,6 +469,97 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         return Ok(slots);
     }
 
+    private async Task<Guid?> RescheduleStaff(CancellationToken ct)
+    {
+        var id = GetCurrentUserId();
+        if (id is null || !(User.IsInRole("Owner") || User.IsInRole("Admin") || User.IsInRole("FrontDeskStaff"))) return null;
+        return await dbContext.Users.Where(u => u.Id == id && u.AccountStatus == AccountStatus.Active
+            && (u.Role == UserRole.Owner || u.Role == UserRole.Admin || u.Role == UserRole.FrontDeskStaff))
+            .Select(u => (Guid?)u.Id).FirstOrDefaultAsync(ct);
+    }
+
+    private static bool CanReschedule(Booking booking) => booking.ServiceStartedAt is null
+        && booking.BookingStatus is BookingStatus.PendingConfirmation or BookingStatus.Confirmed or BookingStatus.WaitingService;
+
+    [HttpGet("{id:guid}/reschedule")]
+    [Authorize(Roles = "Owner,Admin,FrontDeskStaff")]
+    public async Task<IActionResult> GetRescheduleOptions(Guid id, [FromQuery] Guid? barberId,
+        [FromQuery] DateOnly? date, CancellationToken ct)
+    {
+        if (await RescheduleStaff(ct) is null) return Forbid();
+        var booking = await BookingResponseQuery().AsNoTracking().FirstOrDefaultAsync(b => b.Id == id, ct);
+        if (booking is null) return NotFound();
+        if (!CanReschedule(booking)) return Conflict(new { message = "แก้ไขได้เฉพาะคิวที่ยังไม่เริ่มบริการ" });
+        var serviceIds = booking.BookingServices.Select(s => s.ServiceId).Distinct().ToList();
+        var candidates = await dbContext.BarberProfiles.AsNoTracking().Include(b => b.User).Include(b => b.BarberServices)
+            .Where(b => b.IsAvailable && b.AcceptsBooking && b.User.AccountStatus == AccountStatus.Active).ToListAsync(ct);
+        var barbers = candidates.Where(b => b.BarberServices.Count == 0 || serviceIds.All(s => b.BarberServices.Any(bs => bs.ServiceId == s)))
+            .Select(b => new { b.Id, FullName = b.User.FullName }).ToList();
+        var targetBarber = barberId ?? booking.BarberId;
+        var targetDate = date ?? DateOnly.FromDateTime(booking.StartAt.ToOffset(ShopUtcOffset).Date);
+        var duration = booking.BookingServices.Sum(s => s.DurationMinutes * s.Quantity);
+        IReadOnlyList<AvailabilitySlotResponse> slots = [];
+        if (duration > 0 && barbers.Any(b => b.Id == targetBarber))
+        {
+            var result = await AvailabilityForDuration(targetBarber!.Value, targetDate, duration, ct, id);
+            if (result.Result is OkObjectResult { Value: IReadOnlyList<AvailabilitySlotResponse> available })
+                slots = available.Where(s => s.IsAvailable && s.StartAt > DateTimeOffset.UtcNow).ToList();
+        }
+        return Ok(new { booking.UpdatedAt, booking.BarberId, booking.StartAt, booking.EndAt,
+            booking.TotalAmount, BookingStatus = booking.BookingStatus.ToString(), Barbers = barbers, Slots = slots });
+    }
+
+    [HttpPut("{id:guid}/reschedule")]
+    [Authorize(Roles = "Owner,Admin,FrontDeskStaff")]
+    public async Task<IActionResult> Reschedule(Guid id, RescheduleBookingRequest request, CancellationToken ct)
+    {
+        var actor = await RescheduleStaff(ct);
+        if (actor is null) return Forbid();
+        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length > 500)
+            return BadRequest(new { message = "ระบุเหตุผลการแก้ไขไม่เกิน 500 ตัวอักษร" });
+        await using var transaction = await BookingWriteLock.BeginAsync(dbContext, ct);
+        var booking = await BookingResponseQuery().FirstOrDefaultAsync(b => b.Id == id, ct);
+        if (booking is null) return NotFound();
+        if (!CanReschedule(booking)) return Conflict(new { message = "คิวเริ่มบริการหรือสิ้นสุดแล้ว ไม่สามารถแก้ไขนัดหมายได้" });
+        if (booking.UpdatedAt != request.ExpectedUpdatedAt)
+            return Conflict(new { message = "คิวนี้มีการเปลี่ยนแปลงแล้ว กรุณาปิดหน้าต่างและรีเฟรชคิว" });
+        var barber = await dbContext.BarberProfiles.Include(b => b.User).Include(b => b.BarberServices)
+            .FirstOrDefaultAsync(b => b.Id == request.BarberId && b.IsAvailable && b.AcceptsBooking && b.User.AccountStatus == AccountStatus.Active, ct);
+        if (barber is null || (barber.BarberServices.Count > 0 && booking.BookingServices.Any(s => !barber.BarberServices.Any(bs => bs.ServiceId == s.ServiceId))))
+            return BadRequest(new { message = "ช่างที่เลือกไม่สามารถรับบริการในคิวนี้ได้" });
+        var start = request.StartAt.ToUniversalTime();
+        var duration = booking.BookingServices.Sum(s => s.DurationMinutes * s.Quantity);
+        if (duration <= 0) return BadRequest(new { message = "คิวนี้ไม่มีระยะเวลาบริการที่ถูกต้อง" });
+        var end = start.AddMinutes(duration);
+        if (booking.BarberId == barber.Id && booking.StartAt == start)
+            return BadRequest(new { message = "ยังไม่ได้เปลี่ยนช่างหรือเวลานัดหมาย" });
+        var error = await ValidateBookingAvailability(barber.Id, request.StartAt, start, end, ct, id);
+        if (error is not null) return BadRequest(new { message = error });
+        var oldStatus = booking.BookingStatus;
+        var now = DateTimeOffset.UtcNow;
+        var note = System.Text.Json.JsonSerializer.Serialize(new {
+            Action = "Rescheduled", FromBarberId = booking.BarberId, ToBarberId = barber.Id,
+            FromStartAt = booking.StartAt, FromEndAt = booking.EndAt, ToStartAt = start, ToEndAt = end,
+            Reason = request.Reason.Trim()
+        });
+        if (booking.BarberId != barber.Id)
+            dbContext.BarberAssignmentEvents.Add(new() { Id = Guid.NewGuid(), BookingId = id,
+                FromBarberId = booking.BarberId, ToBarberId = barber.Id, ChangedByUserId = actor.Value,
+                Reason = request.Reason.Trim(), CreatedAt = now });
+        if (booking.StartAt != start)
+        {
+            booking.BookingStatus = BookingStatus.PendingConfirmation;
+            booking.CheckedInAt = null;
+        }
+        booking.BarberId = barber.Id; booking.StartAt = start; booking.EndAt = end;
+        booking.EstimatedDurationMinutes = duration; booking.UpdatedAt = now;
+        dbContext.QueueEvents.Add(new() { Id = Guid.NewGuid(), BookingId = id, FromStatus = oldStatus,
+            ToStatus = booking.BookingStatus, ChangedByUserId = actor.Value, Note = note, CreatedAt = now });
+        await dbContext.SaveChangesAsync(ct);
+        if (transaction is not null) await transaction.CommitAsync(ct);
+        return Ok(new { booking.Id, booking.StartAt, booking.EndAt, booking.UpdatedAt });
+    }
+
     private IQueryable<Booking> BookingResponseQuery()
     {
         return dbContext.Bookings
@@ -476,7 +574,8 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         DateTimeOffset requestedStartAt,
         DateTimeOffset startAtUtc,
         DateTimeOffset endAtUtc,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? excludedBookingId = null)
     {
         if (startAtUtc <= DateTimeOffset.UtcNow)
         {
@@ -525,8 +624,8 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         var resourceBarberIds = await GetBookingResourceBarberIds(barberId, cancellationToken);
         var overlaps = await dbContext.Bookings
             .AnyAsync(
-                booking => booking.BarberId.HasValue
-                    && resourceBarberIds.Contains(booking.BarberId.Value)
+                booking => booking.Id != excludedBookingId && booking.BarberId.HasValue
+                && resourceBarberIds.Contains(booking.BarberId.Value)
                     && ActiveBookingStatuses.Contains(booking.BookingStatus)
                     && startAtUtc < booking.EndAt
                     && endAtUtc > booking.StartAt,

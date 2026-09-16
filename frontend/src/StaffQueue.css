@@ -137,6 +137,7 @@
 .staff-queue-workspace .error { background: #321e25; color: #f5a9b3; border-color: #6b3d46; }
 
 /* Dialogs use the same surfaces and compact fields as the barber checkout. */
+.staff-queue-workspace .staff-edit-appointment { margin: 12px 18px 0; min-height: 44px; width: calc(100% - 36px); background: #20252d; border: 1px solid var(--sq-border); color: var(--sq-gold); border-radius: 8px; }
 .staff-queue-workspace .sheet-body > .bq-phone-copy-full { margin: 16px 18px 0; }
 .staff-queue-workspace .bq-customer-phone { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 10px 12px; background: #20252d; border: 1px solid var(--sq-border); border-radius: 8px; color: var(--sq-gold); box-shadow: none; user-select: text; }
 .staff-queue-workspace .bq-customer-phone strong { color: var(--sq-text); }

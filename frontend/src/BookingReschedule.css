@@ -1,0 +1,18 @@
+.reschedule-body { display: grid; gap: 18px; padding: 18px; }
+.reschedule-original, .reschedule-review { display: grid; gap: 4px; padding-bottom: 14px; border-bottom: 1px solid #34383d; font-size: 13px; }
+.reschedule-original > span:first-child, .reschedule-review > span:first-child { color: #e5c378; font-size: 11px; }
+.reschedule-review small { color: #a8b3c3; }
+.reschedule-fields { display: grid; gap: 12px; }
+.reschedule-body label { display: grid; gap: 6px; min-width: 0; font-size: 12px; }
+.reschedule-body :is(input, select, textarea) { min-width: 0; width: 100%; min-height: 44px; color-scheme: dark; }
+.reschedule-times { border: 0; padding: 0; margin: 0; min-width: 0; }
+.reschedule-times legend { font-size: 12px; margin-bottom: 8px; }
+.reschedule-times > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.reschedule-times label { position: relative; }
+.reschedule-body .reschedule-times input { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; clip-path: inset(50%); pointer-events: none; }
+.reschedule-times label span { display: grid; place-items: center; min-height: 44px; padding: 6px; border: 1px solid #34383d; border-radius: 8px; background: #20252d; }
+.reschedule-times input:checked + span { border-color: #e5c378; background: #302a1c; color: #e5c378; }
+.reschedule-times input:focus-visible + span { outline: 2px solid #e5c378; outline-offset: 2px; }
+.reschedule-times p, .reschedule-error { font-size: 12px; }
+.reschedule-error { color: #f5a9b3; }
+@media (min-width: 480px) { .reschedule-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

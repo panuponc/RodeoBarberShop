@@ -162,6 +162,13 @@ Implementation checkpoint (2026-09-14, branch `feature/barber-leave-management`)
 
 - Scope correction (2026-09-15): staff may close/reopen today's bookings before opening while working time remains. Pre-opening closures cover the scheduled shift; during work they start immediately. Past dates, ended shifts, holidays and disabled booking flags remain blocked. This supersedes the current-working-hours restriction above. Existing appointments remain unchanged.
 
+Rescheduling checkpoint (2026-09-17, branch `feature/booking-reschedule`, based on `feature/barber-leave-management`):
+- Implemented: Owner/Admin/FrontDeskStaff can change the barber, appointment time, or both on an existing unstarted booking. No customer self-rescheduling or drag-and-drop is included.
+- The edit sheet shows the original appointment, eligible barbers, available full-duration slots, a required reason and the new appointment before confirmation. Service snapshots, prices, payments and booking ID/number are preserved. Changing time resets arrival status to PendingConfirmation; changing only the barber preserves status.
+- Server validation reuses booking availability rules, excludes the edited booking itself, and checks leave, closures, hours, holidays, service skills, shared-chair conflicts, staff access and stale updates. Rescheduling and queue status changes share the existing booking write lock.
+- Audit uses existing QueueEvents (structured Rescheduled note with old/new barber and times, reason and actor) plus BarberAssignmentEvents when the barber changes. No schema migration is needed. A dedicated audit-history UI is not included yet.
+- Verified: 95 isolated backend tests, frontend build/lint, and mocked browser edit/conflict/retry/save workflows across 320/390/820/1440 widths. No real customer appointment was moved by browser testing. PostgreSQL concurrent-write validation and user acceptance remain pending; Sprint 13 is not marked complete.
+
 ### Sprint 14: Notifications
 
 - Internal website notification storage

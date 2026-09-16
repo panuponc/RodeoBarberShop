@@ -7,6 +7,7 @@ import { BarberLeave } from './BarberLeave'
 import { OwnerLeaves } from './OwnerLeaves'
 import { hasRemainingBookingWindow, scheduleAvailability } from './scheduleAvailability'
 import { BookingClosureDialog } from './BookingClosureDialog'
+import { BookingReschedule } from './BookingReschedule'
 import { BarberAddServices } from './BarberAddServices'
 import { BookingWorkSummary } from './BookingWorkSummary'
 import { CustomerPhoneLink } from './CustomerPhoneLink'
@@ -334,6 +335,7 @@ function App() {
   })
   const [barberScheduleDate, setBarberScheduleDate] = useState(getTodayDate())
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null)
   const [selectedBookingHistory, setSelectedBookingHistory] = useState<Booking[]>([])
   const [isCancelBookingOpen, setIsCancelBookingOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
@@ -2539,6 +2541,12 @@ function selectScheduleDate(dateValue: string) {
           </div>
 
           {closureChair && <BookingClosureDialog date={scheduleDate} api={api} barbers={closureChair.barbers.map(b=>b.barber)} closures={visibleScheduleLeaves.filter(l=>l.isClosure)} bookings={queue} onClose={()=>setClosureChair(null)} onSaved={()=>{setClosureChair(null);void refreshStaffQueue()}} />}
+          {rescheduleBooking && <BookingReschedule booking={rescheduleBooking} api={api} onClose={() => setRescheduleBooking(null)} onSaved={date => {
+            setRescheduleBooking(null)
+            setScheduleDate(date)
+            void refreshQueue(date)
+            void refreshScheduleChairConfigs(date)
+          }} />}
           {isStaffBookingFormOpen && (
             <SheetBackdrop onClose={closeStaffBookingForm} busy={isBusy} protectEdits>{(closeSheet) => (
               <form className="staff-booking-form booking-modal" role="dialog" aria-modal="true" aria-labelledby="staff-booking-title" onSubmit={createStaffBooking} ref={staffBookingFormRef}>
@@ -2795,6 +2803,11 @@ function selectScheduleDate(dateValue: string) {
 
                 <div className="sheet-body" ref={staffDetailBodyRef}>
                 <CustomerPhoneLink key={selectedBooking.id} booking={selectedBooking} showNumber />
+                {['PendingConfirmation', 'Confirmed', 'WaitingService'].includes(selectedBooking.bookingStatus) && <button
+                  className="secondary staff-edit-appointment" type="button" disabled={isBusy}
+                  onClick={() => { setRescheduleBooking(selectedBooking); setSelectedBooking(null) }}>
+                  แก้ไขนัดหมาย
+                </button>}
                 <dl className="booking-detail-grid">
                   <div>
                     <dt>ช่าง</dt>
