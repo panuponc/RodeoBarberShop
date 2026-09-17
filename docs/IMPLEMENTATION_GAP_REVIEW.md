@@ -43,11 +43,14 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 
 ### S06-01: Customer Cancellation Rules And UI
 
-- Type: Partial. Status: Not Started.
-- Finding: customer history has no cancel action. The cancellation API checks ownership and status but does not enforce the planned one-hour cutoff; the request reason is nullable.
+- Type: Partial. Status: Awaiting Verification.
+- Original finding: customer history had no cancel action. The cancellation API checked ownership and status but did not enforce the planned one-hour cutoff; the request reason was nullable.
 - Evidence: [BookingsController.cs](../backend/RodeoBarberShop.Api/Controllers/BookingsController.cs), `CancelBooking`; [CancelBookingRequest.cs](../backend/RodeoBarberShop.Api/Contracts/Bookings/CancelBookingRequest.cs); [App.tsx](../frontend/src/App.tsx), customer history.
 - Acceptance: customer can cancel only their eligible booking; UI and API enforce the agreed one-hour boundary and required reason; cancelled bookings remain in history. Test just before/at/after the boundary, wrong owner and repeat requests.
-- Clarify before implementation: which statuses the customer may cancel and whether exactly one hour is allowed. Keep staff override rules separate; do not apply customer restrictions to staff automatically.
+- Agreed rule (2026-09-17): the shop confirms only on arrival. Customer cancellation is limited to PendingConfirmation, at least one hour before the appointment (exactly one hour allowed), with a nonblank reason. Keep staff rules separate.
+- Approved follow-up: one hour becomes the default, not a permanent fixed rule. S05-01 owns the configurable lead-time integration for both UI and API; existing `ShopSetting.CancellationDeadlineHours` must be considered rather than introducing an unrelated setting. This branch still uses a fixed one-hour cutoff. The dynamic requirement is not complete until the integration is verified.
+- Implemented: customer history cancellation with inline confirmation, required reason, live cutoff and inline errors; API ownership/status/time/reason guards under the booking write lock. Staff cutoff/reason rules are unchanged. PendingConfirmation displays as booked; arrival actions explicitly mark the customer as arrived. No database status migration.
+- Verification: 114 backend tests passed, including 19 new cancellation cases; PostgreSQL concurrency theory skipped without its test database. Frontend production build passed. Mocked Playwright UI checks passed at 320/390/768/1440 widths, including empty reason, rejection/retry, retained history and cutoff expiry. Screenshot inspected. Real-device and live end-to-end acceptance remain pending; no production data changed by these tests.
 
 ### S02-01: Customer Profile Editing
 
@@ -77,12 +80,19 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 - Evidence: [BarbersController.cs](../backend/RodeoBarberShop.Api/Controllers/BarbersController.cs), `UpdateBarber`; [App.tsx](../frontend/src/App.tsx).
 - Acceptance: Owner/Admin can inspect and update mappings, changes persist, and booking/rescheduling honor eligible services. Confirm the meaning of an empty mapping before changing it; current backend treats it as unrestricted.
 
-### S05-01: Shop Settings And Holidays UI
+### S05-01: Shop Settings, Operating Calendar And Cancellation Rules
 
 - Type: Partial. Status: Not Started.
-- Finding: shop information/hours and weekly/special holiday APIs exist; corresponding management UI was not found. Barber working-hours editing already exists and should not be rebuilt.
+- Finding: shop information/hours and weekly/special holiday APIs exist; corresponding management UI was not found. Existing shop hours use one opening/closing pair; special holidays use a single date, not a date range or annual recurrence. `CancellationDeadlineHours` is already exposed by the shop API but is not used by the current customer-cancellation guards. Barber working-hours editing already exists and should not be rebuilt.
 - Evidence: [ShopController.cs](../backend/RodeoBarberShop.Api/Controllers/ShopController.cs); [App.tsx](../frontend/src/App.tsx), working-hours requests and staff navigation.
-- Acceptance: authorized staff can manage shop information, opening/closing hours and weekly/special holidays; UI and backend validate ranges; booking availability respects changes. Define handling of existing appointments affected by a settings change rather than silently changing them.
+- Approved scope (2026-09-17): Owner settings with shop information, operating calendar and booking/cancellation sections. Retain existing Owner/Admin permissions. Desktop navigation entry belongs at the end; mobile uses additional settings navigation rather than adding a permanent bottom-bar action.
+- Operating calendar: weekday opening/closing hours and regular closed days; named one-off holidays for a single date or inclusive multi-day range; edit/remove ranges; support year-end crossings such as December 30 through January 2.
+- Annual holidays: optional yearly recurrence for fixed dates/ranges, without manually creating every year. Moving-date holidays are configured for the specific year. No automatic closure based on public-holiday calendars. Decide explicit February 29 behavior before implementing recurrence; reject invalid/reversed ranges and define overlap handling.
+- Booking effects: shop closures block all barbers in both the UI and backend, including direct booking/rescheduling requests. Timeline and status indicators read the same effective shop calendar and distinguish shop closure from barber leave. After the closure ends, normal hours resume automatically, still respecting other applicable holidays and barber restrictions. Use the shop timezone consistently.
+- Existing appointments: preview affected appointments before confirmation, revalidate conflicts when saving, and require renewed review if the affected set changed. Keep existing bookings intact; no automatic cancellation/reassignment. Staff contact customers and use explicit reschedule/cancel actions.
+- Cancellation configuration: default 60 minutes; reuse/evolve the existing hours setting deliberately to support minute-based choices such as 30 minutes. Preserve stored values through any unit/schema migration. UI eligibility, cutoff copy and backend validation must use the same persisted rule, including after Owner edits. Exactly the configured boundary is allowed; customer ownership, pre-arrival status and required reason remain enforced; staff restrictions are unchanged. Define zero-value behavior and how edits affect existing bookings before implementation.
+- Acceptance checks: authorized save/reload and unauthorized rejection; weekday boundaries; 3-5 day closures including both endpoints; cross-year ranges; annual recurrence across years; specific-year moving holidays; edit/removal and reopening; existing-booking preview with a concurrent booking; direct API blocking and matching timeline/status; nondefault cancellation cutoff before/at/after boundary and stale settings. Verify responsive transitions, not only fixed screenshots.
+- Delivery: remain Not Started until work begins on a focused shop-settings branch after review/integration of the current cancellation increment. Updating these requirements does not implement the settings system or close S06-01's dynamic follow-up.
 
 ### S06-02: Booking Without A Selected Barber
 
@@ -161,3 +171,5 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 | Item ID | Status change | Verified on | Evidence / commit | Remaining limits |
 | --- | --- | --- | --- | --- |
 | Baseline | Review recorded; no gaps closed by this document | 2026-09-17 | Static review of `bbd8560` | Recheck before implementation |
+| S06-01 | Not Started -> Awaiting Verification | 2026-09-17 | CustomerCancellationTests.cs; frontend build; mocked browser checks; commit pending | Live customer/shop acceptance and real mobile check pending; PostgreSQL races not rerun |
+| S05-01 | Approved scope expanded; remains Not Started | 2026-09-17 | User-approved operating calendar, holiday ranges/recurrence and configurable cancellation; rechecked ShopController | Settings implementation and dynamic S06-01 integration pending |

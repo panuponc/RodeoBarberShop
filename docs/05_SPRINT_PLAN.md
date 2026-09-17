@@ -67,6 +67,24 @@ Goal: Build the core management and booking system.
 - Barber weekly working hours
 - Available slot calculation
 
+Approved follow-up scope (2026-09-17), tracked in S05-01 of
+[Implementation Gap Review](IMPLEMENTATION_GAP_REVIEW.md):
+
+- Owner shop settings screen: shop information, operating days/hours, and booking/cancellation rules; retain existing Owner/Admin API permissions.
+- Manage opening/closing hours by weekday and regular closed days without rebuilding barber working-hours management.
+- Named special closures for a single date or an inclusive date range, including multi-day festivals and ranges crossing year-end; allow editing/removal.
+- Optional annual recurrence for fixed-date holidays; dates that change annually are configured for each specific year. Public holidays do not automatically close the shop.
+- Apply shop closures to all barbers, booking availability, timeline and shop-status indicators; return to normal operating hours after a closure ends. Shop closure is distinct from barber leave.
+- Preview affected existing appointments before confirming schedule/holiday changes; revalidate at save, retain appointments, and let shop staff contact customers and explicitly reschedule/cancel.
+- Configurable customer cancellation lead time, default 60 minutes, shared by UI, messages and API enforcement. Keep customer status/ownership/reason restrictions and staff rules separate.
+- Desktop entry at the end of Owner navigation; mobile entry through additional settings navigation, not another permanent bottom-bar action.
+
+Implementation sequencing: finish and verify the focused customer-cancellation
+increment first. Review its Git state before integration; then create a focused
+shop-settings branch from the updated integration base. This scope is approved,
+but the settings screen, range/recurrence support and dynamic rule integration
+are not yet implemented.
+
 ### Sprint 6: Online Booking
 
 - Customer booking flow
@@ -77,7 +95,7 @@ Goal: Build the core management and booking system.
 - Date and time selection
 - Booking overlap validation
 - Customer booking history
-- Customer cancellation with 1-hour rule and reason
+- Customer cancellation with shop-configured lead time (default 1 hour) and reason; configuration tracked under S05-01
 
 ### Sprint 7: Guest Booking
 

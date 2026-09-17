@@ -11,7 +11,7 @@ namespace RodeoBarberShop.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
+public class BookingsController(ApplicationDbContext dbContext, TimeProvider? timeProvider = null) : ControllerBase
 {
     private static readonly TimeSpan ShopUtcOffset = TimeSpan.FromHours(7);
     private const int BookingStartIntervalMinutes = 60;
@@ -333,6 +333,7 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
         CancelBookingRequest request,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await BookingWriteLock.BeginAsync(dbContext, cancellationToken);
         var booking = await BookingResponseQuery()
             .FirstOrDefaultAsync(booking => booking.Id == id, cancellationToken);
 
@@ -351,12 +352,23 @@ public class BookingsController(ApplicationDbContext dbContext) : ControllerBase
             return BadRequest(new { message = "Booking can only be cancelled before it is confirmed." });
         }
 
+        var now = (timeProvider ?? TimeProvider.System).GetUtcNow();
+        var reason = NormalizeOptionalText(request.Reason);
+        if (User.IsInRole("Customer"))
+        {
+            if (booking.StartAt - now < TimeSpan.FromHours(1))
+                return BadRequest(new { message = "ยกเลิกออนไลน์ได้ก่อนเวลานัดอย่างน้อย 1 ชั่วโมง กรุณาติดต่อร้าน" });
+            if (reason is null)
+                return BadRequest(new { message = "กรุณาระบุเหตุผลการยกเลิก" });
+        }
+
         booking.BookingStatus = BookingStatus.Cancelled;
-        booking.CancelReason = NormalizeOptionalText(request.Reason);
-        booking.CancelledAt = DateTimeOffset.UtcNow;
-        booking.UpdatedAt = DateTimeOffset.UtcNow;
+        booking.CancelReason = reason;
+        booking.CancelledAt = now;
+        booking.UpdatedAt = now;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
 
         return Ok(ToResponse(booking));
     }

@@ -11,6 +11,7 @@ import { BookingReschedule } from './BookingReschedule'
 import { BarberAddServices } from './BarberAddServices'
 import { BookingWorkSummary } from './BookingWorkSummary'
 import { CustomerPhoneLink } from './CustomerPhoneLink'
+import { CustomerBookingCancellation } from './CustomerBookingCancellation'
 import { CalendarDays, ChevronLeft, ChevronRight, LogOut, RefreshCw, Users, Wallet, X } from 'lucide-react'
 import './StaffQueue.css'
 import { SheetBackdrop, SheetHandle } from './SheetBackdrop'
@@ -284,7 +285,7 @@ const previousStatus: Record<string, string> = {
 const cancellableStatuses = ['PendingConfirmation']
 
 const statusLabels: Record<string, string> = {
-  PendingConfirmation: 'รอยืนยัน',
+  PendingConfirmation: 'จองแล้ว',
   Confirmed: 'มาถึงร้าน',
   WaitingService: 'มาถึงร้าน',
   InService: 'กำลังให้บริการ',
@@ -2223,7 +2224,7 @@ function selectScheduleDate(dateValue: string) {
                 )}
                 {nextStatus[selectedBooking.bookingStatus] && (
                   <button className="status-next-button" disabled={isBusy} onClick={() => moveStatus(selectedBooking)} type="button">
-                    เปลี่ยนเป็น {statusLabels[nextStatus[selectedBooking.bookingStatus]]}
+                    {selectedBooking.bookingStatus === 'PendingConfirmation' ? 'ลูกค้ามาถึงแล้ว' : `เปลี่ยนเป็น ${statusLabels[nextStatus[selectedBooking.bookingStatus]]}`}
                   </button>
                 )}
                 {!nextStatus[selectedBooking.bookingStatus] && !previousStatus[selectedBooking.bookingStatus] && (
@@ -2332,6 +2333,18 @@ function selectScheduleDate(dateValue: string) {
                       </span>
                       <span className={`status-pill status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
                     </button>
+                    <CustomerBookingCancellation
+                      startAt={booking.startAt}
+                      status={booking.bookingStatus}
+                      onCancel={async (reason) => {
+                        const updated = await api<Booking>(`/api/bookings/${booking.id}/cancel`, {
+                          method: 'POST', body: JSON.stringify({ reason }),
+                        })
+                        setMyBookings(current => current.map(item => item.id === updated.id ? updated : item))
+                        setAvailability([])
+                        setMessage('ยกเลิกการจองแล้ว')
+                      }}
+                    />
                     {booking.bookingStatus === 'Completed' && (
                       <div className="inline-actions">
                         <button className="secondary" disabled={isBusy} onClick={() => loadCustomerReceipt(booking)} type="button">
@@ -2773,7 +2786,7 @@ function selectScheduleDate(dateValue: string) {
 
             <section className="status-legend">
               <h3>สถานะคิว</h3>
-              <span><i className="legend-dot pending" /> รอยืนยัน <strong>{queueSummary.pending}</strong></span>
+              <span><i className="legend-dot pending" /> จองแล้ว <strong>{queueSummary.pending}</strong></span>
               <span><i className="legend-dot confirmed" /> มาถึงร้าน <strong>{queueSummary.confirmed}</strong></span>
               <span><i className="legend-dot progress" /> กำลังให้บริการ/รอชำระ <strong>{queueSummary.inProgress}</strong></span>
               <span><i className="legend-dot done" /> เสร็จสิ้น <strong>{queueSummary.completed}</strong></span>
@@ -2937,7 +2950,7 @@ function selectScheduleDate(dateValue: string) {
                   )}
                   {nextStatus[selectedBooking.bookingStatus] && (
                     <button className="status-next-button" disabled={isBusy} onClick={() => moveStatus(selectedBooking)} type="button">
-                      เปลี่ยนเป็น {statusLabels[nextStatus[selectedBooking.bookingStatus]]}
+                      {selectedBooking.bookingStatus === 'PendingConfirmation' ? 'ลูกค้ามาถึงแล้ว' : `เปลี่ยนเป็น ${statusLabels[nextStatus[selectedBooking.bookingStatus]]}`}
                     </button>
                   )}
                   {selectedBooking.bookingStatus === 'WaitingPayment' && (

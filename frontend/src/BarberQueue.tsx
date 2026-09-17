@@ -36,7 +36,7 @@ const money = (value: number) => new Intl.NumberFormat('th-TH', { style: 'curren
 const dateLabel = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })
 const localDate = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
 const actionLabels: Record<string, string> = {
-  PendingConfirmation: 'ยืนยันมาถึงร้าน',
+  PendingConfirmation: 'ลูกค้ามาถึงแล้ว',
   Confirmed: 'เริ่มให้บริการ',
   WaitingService: 'เริ่มให้บริการ',
   InService: 'เสร็จแล้ว / รอชำระ',

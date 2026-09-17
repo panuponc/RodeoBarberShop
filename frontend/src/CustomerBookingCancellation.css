@@ -1,0 +1,56 @@
+.customer-cancellation {
+  padding: 0 14px 14px;
+}
+
+.customer-cancellation form,
+.customer-cancellation label {
+  display: grid;
+  gap: 8px;
+}
+
+.customer-cancellation textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+}
+
+.customer-cancellation p {
+  margin: 8px 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.customer-cancellation-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 8px;
+}
+
+.queue-item .customer-cancellation button {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+  white-space: normal;
+  text-align: center;
+  background: #20252d;
+  color: #e3e6eb;
+  border: 1px solid #343a43;
+}
+
+.queue-item .customer-cancellation button.danger {
+  color: #efa7b2;
+  border-color: #694650;
+}
+
+.queue-item .customer-cancellation button.solid {
+  background: #392127;
+}
+
+.customer-cancellation textarea {
+  border: 1px solid #343a43;
+  border-radius: 6px;
+  padding: 10px;
+  background: #111519;
+  color: #e3e6eb;
+  font: inherit;
+}

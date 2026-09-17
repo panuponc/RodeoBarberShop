@@ -93,7 +93,7 @@ export function BookingReschedule({ booking, api, onClose, onSaved }: Props) {
           </label>)}</div>
         </fieldset>
         <label>เหตุผล / ข้อตกลงกับลูกค้า<textarea required maxLength={500} rows={2} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /></label>
-        {slot && changed && <div className="reschedule-review"><span>นัดใหม่</span><strong>{loaded?.data.barbers.find(b => b.id === barberId)?.fullName}</strong><span>{appointment(slot.startAt)} - {time(slot.endAt)}</span><small>บริการและยอดชำระเดิม {booking.totalAmount.toLocaleString('th-TH')} บาท</small>{Date.parse(startAt) !== Date.parse(booking.startAt) && <small>เปลี่ยนเวลาแล้ว คิวจะกลับเป็นรอยืนยัน</small>}</div>}
+        {slot && changed && <div className="reschedule-review"><span>นัดใหม่</span><strong>{loaded?.data.barbers.find(b => b.id === barberId)?.fullName}</strong><span>{appointment(slot.startAt)} - {time(slot.endAt)}</span><small>บริการและยอดชำระเดิม {booking.totalAmount.toLocaleString('th-TH')} บาท</small>{Date.parse(startAt) !== Date.parse(booking.startAt) && <small>เปลี่ยนเวลาแล้ว คิวจะกลับเป็นจองแล้ว และต้องเช็กอินใหม่เมื่อมาถึงร้าน</small>}</div>}
         {error && <div role="alert" className="reschedule-error"><p>{error}</p><button type="button" className="secondary" disabled={busy} onClick={() => { setError(''); setRetry(n => n + 1) }}>ตรวจสอบอีกครั้ง</button></div>}
       </div>
       <footer className="booking-detail-actions"><button type="submit" disabled={busy || !slot || !changed || !reason.trim()}>{busy ? 'กำลังบันทึก...' : 'ยืนยันแก้ไขนัดหมาย'}</button></footer>
