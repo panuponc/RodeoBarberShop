@@ -171,6 +171,12 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 - Acceptance: follow the linked checklist, preserve historical snapshots and permissions, validate extensions atomically, and prevent payment with unresolved pricing. Existing customer cancellation and service/payment workflows must remain functional.
 - Delivery: keep the customer UI increment separate; review its acceptance/Git state before integrating and opening the service-assessment branch. No catalogue data has been replaced by recording this scope.
 
+## Customer UI Acceptance Update
+
+- User confirmed live booking through the redesigned customer UI and matching barber, date/time and services in the Owner view for `4033353`. The focused customer UI increment is ready for integration.
+- This supersedes the pending live booking happy-path note under S06-03, but does not claim physical-device or live conflict/cancellation/receipt testing. Those limits remain in [Customer Booking UI Verification](CUSTOMER_BOOKING_UI_TESTS.md).
+- S09-01 assessment/catalogue work and S05-01 shop settings are still not implemented; merging this UI branch does not complete them.
+
 ## Priority And Scope Decisions
 
 - Recommended first: S06-01, because customer cancellation is a core workflow with a missing backend business rule. This is a recommendation, not permission to start edits automatically.

@@ -30,9 +30,14 @@ Screenshots are written to the existing ignored `.tmp` directory. These are brow
 - Successful appointment is immediately visible, cancellation requires a reason and retains history, receipt opens/closes, refresh retains the selected history filter.
 - Layout and primary-action bounds during transitions through 320, 390, 759, 760, 820 and 1440 pixels; selected and unselected text inspected in screenshots.
 
+## Live Acceptance
+
+- User confirmed the redesigned booking flow works and the Owner view shows matching barber, date/time and services for increment `4033353`.
+- This confirms the live booking happy path only. Device type was not specified; it does not establish live conflict, cancellation, receipt or physical-mobile regression coverage.
+
 ## Remaining Acceptance
 
-- Real customer/Owner end-to-end verification of the redesigned flow is still needed. Earlier acceptance applies to the previous cancellation UI, not automatically this redesign.
+- Live booking/Owner happy-path acceptance is recorded above. Cancellation, receipts and negative-path checks for this redesign remain browser-mocked evidence.
 - Physical touch devices, virtual keyboard and mobile Safari have not been tested.
 - Backend collision/status guards are retained, not replaced by UI validation. This browser suite is not a database concurrency test.
 - Shop-configured cancellation deadlines, catalogue administration, profile/password editing and guest OTP remain separate tracked work.
