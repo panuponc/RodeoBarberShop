@@ -17,6 +17,12 @@ findings against current code before choosing work, and update their status and
 closure evidence as fixes are completed. Sprint order or a merged branch does not
 mean earlier requirements are all complete.
 
+Approved service-catalogue and in-shop assessment follow-up is specified in
+[Service Assessment Scope](SERVICE_ASSESSMENT_SCOPE.md), tracked as S09-01 across
+Sprints 4, 6, 8-10. Customers book main services only; substeps, assessed prices and
+time adjustments are entered by barbers or shop staff after arrival. This is planned
+work, not part of the implemented customer UI. S05-01 shop settings remain pending.
+
 ## Project 1
 
 Goal: Build the core management and booking system.

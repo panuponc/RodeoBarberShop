@@ -11,7 +11,7 @@ import { BookingReschedule } from './BookingReschedule'
 import { BarberAddServices } from './BarberAddServices'
 import { BookingWorkSummary } from './BookingWorkSummary'
 import { CustomerPhoneLink } from './CustomerPhoneLink'
-import { CustomerBookingCancellation } from './CustomerBookingCancellation'
+import { CustomerBooking } from './CustomerBooking'
 import { CalendarDays, ChevronLeft, ChevronRight, LogOut, RefreshCw, Users, Wallet, X } from 'lucide-react'
 import './StaffQueue.css'
 import { SheetBackdrop, SheetHandle } from './SheetBackdrop'
@@ -409,12 +409,6 @@ function App() {
   const [standbyModalBarberId, setStandbyModalBarberId] = useState<string | null>(null)
   const [standbyModalPriority, setStandbyModalPriority] = useState('1')
   const [standbyModalChairIds, setStandbyModalChairIds] = useState<string[]>([])
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
-  const [selectedBarberId, setSelectedBarberId] = useState('')
-  const [bookingDate, setBookingDate] = useState(getTomorrowDate())
-  const [availability, setAvailability] = useState<AvailabilitySlot[]>([])
-  const [myBookings, setMyBookings] = useState<Booking[]>([])
-  const [customerReceipt, setCustomerReceipt] = useState<Receipt | null>(null)
   const [isStaffBookingFormOpen, setIsStaffBookingFormOpen] = useState(false)
   const [staffBookingError, setStaffBookingError] = useState('')
   const [staffSlots, setStaffSlots] = useState<{ key: string; slots: AvailabilitySlot[]; error: string } | null>(null)
@@ -449,8 +443,6 @@ function App() {
     [paymentAccounts],
   )
 
-  const selectedServices = services.filter((service) => selectedServiceIds.includes(service.id))
-  const selectedTotal = selectedServices.reduce((total, service) => total + service.price, 0)
   const canManageStaff = auth?.role === 'Owner' || auth?.role === 'Admin'
   const staffBookingBarberOptionSet = new Set(staffBookingBarberOptions)
   const staffBookingSelectableBarbers = staffBookingBarberOptions.length > 0
@@ -550,9 +542,8 @@ function selectScheduleDate(dateValue: string) {
   useEffect(() => {
     if (!auth) return
 
-    if (auth.role === 'Customer') {
-      void refreshCustomerData()
-    } else if (auth.role === 'Barber') {
+    if (auth.role === 'Customer') return
+    if (auth.role === 'Barber') {
       void refreshBarberQueue(barberScheduleDate)
       void refreshBarberProfile()
     } else {
@@ -743,90 +734,6 @@ function selectScheduleDate(dateValue: string) {
       setMessage(`เข้าสู่ระบบแล้ว: ${result.fullName} (${result.role})`)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'เข้าสู่ระบบไม่สำเร็จ')
-    } finally {
-      setIsBusy(false)
-    }
-  }
-
-  async function refreshCustomerData() {
-    try {
-      const [serviceResult, barberResult, bookingResult] = await Promise.all([
-        api<Service[]>('/api/services'),
-        api<Barber[]>('/api/barbers'),
-        api<Booking[]>('/api/bookings/my'),
-      ])
-
-      setServices(serviceResult)
-      const sortedBarbers = sortBarbersByChair(barberResult)
-      setBarbers(sortedBarbers)
-      await refreshBarberSchedules(sortedBarbers)
-      await refreshScheduleChairConfigs(bookingDate)
-      setMyBookings(bookingResult)
-      setSelectedBarberId((current) => current || sortedBarbers[0]?.id || '')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'โหลดข้อมูลลูกค้าไม่สำเร็จ')
-    }
-  }
-
-  async function checkAvailability(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setIsBusy(true)
-    setMessage('')
-    setAvailability([])
-
-    try {
-      if (!selectedBarberId || selectedServiceIds.length === 0) {
-        throw new Error('กรุณาเลือกบริการและช่างก่อน')
-      }
-
-      const params = new URLSearchParams({ barberId: selectedBarberId, date: bookingDate })
-      selectedServiceIds.forEach((serviceId) => params.append('serviceIds', serviceId))
-
-      const result = await api<AvailabilitySlot[]>(`/api/bookings/availability?${params}`)
-      setAvailability(result.filter((slot) => slot.isAvailable))
-      setMessage(result.some((slot) => slot.isAvailable) ? 'เลือกเวลาที่ต้องการจองได้เลย' : 'วันนี้ยังไม่มีเวลาว่าง')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'เช็คเวลาว่างไม่สำเร็จ')
-    } finally {
-      setIsBusy(false)
-    }
-  }
-
-  async function createBooking(slot: AvailabilitySlot) {
-    setIsBusy(true)
-    setMessage('')
-
-    try {
-      await api('/api/bookings', {
-        method: 'POST',
-        body: JSON.stringify({
-          barberId: selectedBarberId,
-          startAt: slot.startAt,
-          serviceIds: selectedServiceIds,
-          customerNote: 'Booked from customer dashboard',
-        }),
-      })
-
-      setAvailability([])
-      await refreshCustomerData()
-      setMessage('จองคิวสำเร็จแล้ว')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'จองคิวไม่สำเร็จ')
-    } finally {
-      setIsBusy(false)
-    }
-  }
-
-  async function loadCustomerReceipt(booking: Booking) {
-    setIsBusy(true)
-    setCustomerReceipt(null)
-    setMessage('')
-
-    try {
-      const result = await api<Receipt>(`/api/payments/booking/${booking.id}/receipt`)
-      setCustomerReceipt(result)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'ยังไม่พบใบเสร็จของรายการนี้')
     } finally {
       setIsBusy(false)
     }
@@ -1912,12 +1819,9 @@ function selectScheduleDate(dateValue: string) {
     setBarberQueue([])
     setBarberProfile(null)
     setIsBarberProfileEditing(false)
-    setMyBookings([])
-    setAvailability([])
     setSelectedBooking(null)
     setSelectedBookingHistory([])
     setPaymentSummary(null)
-    setCustomerReceipt(null)
     setStaffReceipt(null)
   }
 
@@ -2241,127 +2145,7 @@ function selectScheduleDate(dateValue: string) {
   }
 
   if (auth.role === 'Customer') {
-    return (
-      <main className="dashboard-shell">
-        <Header auth={auth} eyebrow="Customer Booking" onLogout={logout} />
-        {message && <p className="notice">{message}</p>}
-
-        <section className="customer-grid">
-          <form className="booking-panel" onSubmit={checkAvailability}>
-            <div className="panel-heading">
-              <h2>จองคิว</h2>
-              <strong>{formatMoney(selectedTotal)}</strong>
-            </div>
-
-            <div className="service-choice-grid">
-              {services.map((service) => (
-                <label className="choice-card" key={service.id}>
-                  <input
-                    checked={selectedServiceIds.includes(service.id)}
-                    onChange={(event) => {
-                      setSelectedServiceIds((current) =>
-                        event.target.checked ? [...current, service.id] : current.filter((id) => id !== service.id),
-                      )
-                    }}
-                    type="checkbox"
-                  />
-                  <span>
-                    <strong>{service.name}</strong>
-                    <small>
-                      {formatMoney(service.price)} / {service.durationMinutes} นาที
-                    </small>
-                  </span>
-                </label>
-              ))}
-            </div>
-
-            <label>
-              เลือกช่าง
-              <select value={selectedBarberId} onChange={(event) => setSelectedBarberId(event.target.value)}>
-                {barbers.map((barber) => (
-                  <option key={barber.id} value={barber.id}>
-                    {barber.fullName} {barber.specialty ? `- ${barber.specialty}` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              วันที่
-              <input
-                min={getTodayDate()}
-                value={bookingDate}
-                onChange={(event) => setBookingDate(clampDateToToday(event.target.value))}
-                type="date"
-              />
-            </label>
-
-            <button disabled={isBusy} type="submit">
-              เช็คเวลาว่าง
-            </button>
-
-            {availability.length > 0 && (
-              <div className="slot-grid">
-                {availability.slice(0, 18).map((slot) => (
-                  <button className="secondary" disabled={isBusy} key={slot.startAt} onClick={() => createBooking(slot)} type="button">
-                    {formatTime(slot.startAt)}
-                  </button>
-                ))}
-              </div>
-            )}
-          </form>
-
-          <aside className="history-panel">
-            <div className="panel-heading">
-              <h2>ประวัติการจอง</h2>
-              <button className="secondary" disabled={isBusy} onClick={refreshCustomerData} type="button">
-                Refresh
-              </button>
-            </div>
-
-            <div className="queue-list">
-              {myBookings.length === 0 ? (
-                <p className="empty-state">ยังไม่มีประวัติการจอง</p>
-              ) : (
-                myBookings.map((booking) => (
-                  <article className="queue-item" key={booking.id}>
-                    <button type="button">
-                      <span className="booking-time">{formatDateTime(booking.startAt)}</span>
-                      <span>
-                        <strong>{booking.barberName}</strong>
-                        <small>{booking.bookingNumber}</small>
-                      </span>
-                      <span className={`status-pill status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
-                    </button>
-                    <CustomerBookingCancellation
-                      startAt={booking.startAt}
-                      status={booking.bookingStatus}
-                      onCancel={async (reason) => {
-                        const updated = await api<Booking>(`/api/bookings/${booking.id}/cancel`, {
-                          method: 'POST', body: JSON.stringify({ reason }),
-                        })
-                        setMyBookings(current => current.map(item => item.id === updated.id ? updated : item))
-                        setAvailability([])
-                        setMessage('ยกเลิกการจองแล้ว')
-                      }}
-                    />
-                    {booking.bookingStatus === 'Completed' && (
-                      <div className="inline-actions">
-                        <button className="secondary" disabled={isBusy} onClick={() => loadCustomerReceipt(booking)} type="button">
-                          ดูใบเสร็จ
-                        </button>
-                      </div>
-                    )}
-                  </article>
-                ))
-              )}
-            </div>
-
-            {customerReceipt && <ReceiptBox receipt={customerReceipt} />}
-          </aside>
-        </section>
-      </main>
-    )
+    return <CustomerBooking token={auth.accessToken} fullName={auth.fullName} onLogout={logout} statusLabels={statusLabels} renderReceipt={receipt => <ReceiptBox receipt={receipt} />} />
   }
 
   return (
@@ -4159,33 +3943,6 @@ function groupServicesForBooking(services: Service[]): ServiceGroup[] {
   return groups.filter((group) => group.services.length > 0)
 }
 
-function Header({
-  auth,
-  eyebrow,
-  onLogout,
-}: {
-  auth: AuthResponse
-  eyebrow: string
-  onLogout: () => void
-}) {
-  return (
-    <header className="topbar">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h1>Rodeo Barber Shop</h1>
-      </div>
-      <div className="user-box">
-        <span>{auth.fullName}</span>
-        <strong>{auth.role}</strong>
-        <button onClick={onLogout} type="button">
-          Logout
-        </button>
-      </div>
-    </header>
-  )
-}
-
-
 function ServiceList({ services }: { services: BookingService[] }) {
   return (
     <div className="service-list">
@@ -4824,12 +4581,6 @@ function getInitials(value: string) {
     .toUpperCase()
 }
 
-function getTomorrowDate() {
-  const date = new Date()
-  date.setDate(date.getDate() + 1)
-
-  return formatLocalDateInputValue(date)
-}
 
 function getTodayDate() {
   return formatLocalDateInputValue(new Date())

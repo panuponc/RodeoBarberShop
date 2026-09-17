@@ -105,10 +105,12 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 
 ### S06-03: Customer Availability Becomes Stale
 
-- Type: Partial. Status: Not Started.
-- Finding: customer availability filters `isAvailable` but not past start times; changing service/barber/date does not immediately clear the displayed old slots. Backend rejects invalid writes, but the UI can still offer stale choices.
+- Type: Partial. Status: Awaiting Verification.
+- Original finding: customer availability filtered `isAvailable` but not past start times; changing service/barber/date did not immediately clear displayed old slots. Backend rejected invalid writes, but the UI could still offer stale choices.
 - Evidence: [App.tsx](../frontend/src/App.tsx), `checkAvailability`, `createBooking` and customer input handlers; [BookingsController.cs](../backend/RodeoBarberShop.Api/Controllers/BookingsController.cs), `GetAvailability` and `ValidateBookingAvailability`.
 - Acceptance: changing inputs invalidates or refreshes slots; past starts cannot be selected; submitted date/barber/services match the displayed slot. Retain server-side validation for concurrent changes.
+- Implemented on `feature/customer-booking-ui`: customer-only workspace extracted to `CustomerBooking.tsx`; context-keyed, abortable availability; selection cleared on service/barber/date changes; future-start guard checked during rendering and submission; explicit review before writing; conflict feedback and recheck. API validators remain unchanged.
+- Verification: frontend build/lint and mocked browser workflow checks passed, including responsive transitions and selected/unselected screenshot inspection. See [Customer Booking UI Verification](CUSTOMER_BOOKING_UI_TESTS.md) for repeatable checks and limitations. Redesigned live customer/Owner flow and physical-device acceptance remain pending; no full-sprint completion claim.
 
 ### S07-01: Guest Booking With Email OTP
 
@@ -160,12 +162,22 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 - Evidence: [App.tsx](../frontend/src/App.tsx), `queueSummary`; [PaymentsController.cs](../backend/RodeoBarberShop.Api/Controllers/PaymentsController.cs) for payment records, corrections and voids.
 - Acceptance: distinguish appointment value from actual daily receipts. Define the intended revenue basis, timezone and void/correction handling; test cross-day payments and unpaid/completed records. Label metrics to match their calculation.
 
+### S09-01: Main Services And In-Shop Assessment
+
+- Type: Partial. Status: Not Started. Approved follow-up spanning Sprints 4, 6, 8-10.
+- Scope: [Service Assessment Scope](SERVICE_ASSESSMENT_SCOPE.md) records the seven-service catalogue, unresolved colouring prices, internal dynamic substeps and per-main-service duration calculation.
+- Existing baseline: `Service` and `BookingService` use numeric prices/durations; flat added-service support is not evidence of hierarchical steps or unresolved assessment pricing. Recheck existing service-add, extension and checkout validators before implementation.
+- Customer boundary: pre-booking shows only main services. After arrival, either barber or shop staff can assess, explain the work to the customer, and enter internal steps, charges and whole-hour durations. No default substep duration and no automatic addition on top of the base reservation.
+- Acceptance: follow the linked checklist, preserve historical snapshots and permissions, validate extensions atomically, and prevent payment with unresolved pricing. Existing customer cancellation and service/payment workflows must remain functional.
+- Delivery: keep the customer UI increment separate; review its acceptance/Git state before integrating and opening the service-assessment branch. No catalogue data has been replaced by recording this scope.
+
 ## Priority And Scope Decisions
 
 - Recommended first: S06-01, because customer cancellation is a core workflow with a missing backend business rule. This is a recommendation, not permission to start edits automatically.
 - Recheck S06-02/S08-01 against original scope before implementing unassigned booking.
 - Do not count this list as a fresh full security audit, or treat absence of an item as proof of correctness.
 - Sprint 14-17 remain visible in the sprint plan. Later work does not erase these earlier gaps.
+- Latest approved direction: preserve the customer UI increment, then pursue S09-01 catalogue/assessment work. S05-01 settings are deferred, not removed. The original first-item recommendation above is historical, not an instruction to restart cancellation work.
 
 ## Closure Log
 
@@ -175,3 +187,4 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 | S06-01 | Not Started -> Awaiting Verification | 2026-09-17 | CustomerCancellationTests.cs; frontend build; mocked browser checks; commit pending | Live customer/shop acceptance and real mobile check pending; PostgreSQL races not rerun |
 | S05-01 | Approved scope expanded; remains Not Started | 2026-09-17 | User-approved operating calendar, holiday ranges/recurrence and configurable cancellation; rechecked ShopController | Settings implementation and dynamic S06-01 integration pending |
 | S06-01 | Fixed-cutoff increment accepted; full item remains open | User confirmation in this session | `d5e1321`: user confirmed live customer cancellation and matching Owner status | Dynamic lead time under S05-01 pending; physical device unspecified; PostgreSQL races not rerun |
+| S06-03 | Not Started -> Awaiting Verification | Customer UI redesign session | CustomerBooking.tsx; frontend/tests/customer-booking.ui.cjs; commit pending | Mocked browser checks only; redesigned live/physical-device acceptance pending |
