@@ -3,6 +3,7 @@
 ## Scope And Milestones
 
 - Read the current milestone plan in `docs/05_SPRINT_PLAN.md` and inspect the implementation before reporting progress or choosing the next task.
+- Read `docs/IMPLEMENTATION_GAP_REVIEW.md` when reviewing remaining work or selecting follow-up tasks. Revalidate findings against current code; track work by its stable ID and update status, verification evidence and closure commits without deleting historical findings. Do not treat recommendations or unresolved scope questions as approved implementation.
 - Distinguish a project-wide question from a focused implementation request. Do not replace a broad progress report with only the most recently edited feature.
 - Keep planned work visible even when it belongs to a later phase. In particular, completing the barber queue/service flow does not complete barber leave management.
 - Separate implemented, verified, incomplete, and proposed work. Do not claim an entire milestone is complete when only one workflow is done.

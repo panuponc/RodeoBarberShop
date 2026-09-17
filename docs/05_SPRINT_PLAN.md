@@ -9,6 +9,14 @@ Status: Draft
 
 This sprint plan follows the approved project scope and separates work into Project 1 and Project 2.
 
+## Implementation Follow-Up
+
+See [Implementation Gap Review](IMPLEMENTATION_GAP_REVIEW.md) for the Sprint 1-12
+review, stable item IDs, remaining work and acceptance criteria. Recheck those
+findings against current code before choosing work, and update their status and
+closure evidence as fixes are completed. Sprint order or a merged branch does not
+mean earlier requirements are all complete.
+
 ## Project 1
 
 Goal: Build the core management and booking system.
