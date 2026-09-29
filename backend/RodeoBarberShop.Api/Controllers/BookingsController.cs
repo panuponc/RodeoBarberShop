@@ -436,7 +436,9 @@ public class BookingsController(ApplicationDbContext dbContext, TimeProvider? ti
             return Ok(Array.Empty<AvailabilitySlotResponse>());
         var dayStartUtc = dayStart.ToUniversalTime();
         var dayEndUtc = dayEnd.ToUniversalTime();
-        var resourceBarberIds = await GetBookingResourceBarberIds(barberId, cancellationToken);
+        var resourceBarberIds = await GetBookingResourceBarberIds(barberId, date, cancellationToken);
+        if (resourceBarberIds.Count == 0)
+            return Ok(Array.Empty<AvailabilitySlotResponse>());
         var existingBookings = await dbContext.Bookings
             .AsNoTracking()
             .Where(booking => booking.Id != excludedBookingId && booking.BarberId.HasValue
@@ -633,7 +635,12 @@ public class BookingsController(ApplicationDbContext dbContext, TimeProvider? ti
             return "Selected time is outside barber working hours.";
         }
 
-        var resourceBarberIds = await GetBookingResourceBarberIds(barberId, cancellationToken);
+        var resourceBarberIds = await GetBookingResourceBarberIds(barberId, bookingDate, cancellationToken);
+        if (resourceBarberIds.Count == 0)
+        {
+            return "ช่างยังไม่มีเก้าอี้สำหรับวันที่เลือก กรุณาเลือกช่างหรือวันอื่น";
+        }
+
         var overlaps = await dbContext.Bookings
             .AnyAsync(
                 booking => booking.Id != excludedBookingId && booking.BarberId.HasValue
@@ -646,23 +653,43 @@ public class BookingsController(ApplicationDbContext dbContext, TimeProvider? ti
         return overlaps ? "Selected time overlaps another booking." : null;
     }
 
-    private async Task<IReadOnlyList<Guid>> GetBookingResourceBarberIds(Guid barberId, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<Guid>> GetBookingResourceBarberIds(
+        Guid barberId,
+        DateOnly date,
+        CancellationToken cancellationToken)
     {
-        var barberName = await dbContext.BarberProfiles
+        var hasConfiguredChairs = await dbContext.Chairs
             .AsNoTracking()
-            .Where(barber => barber.Id == barberId)
-            .Select(barber => barber.User.FullName)
-            .FirstOrDefaultAsync(cancellationToken);
+            .AnyAsync(cancellationToken);
 
-        if (barberName is not ("ช่างนุค" or "ช่างนุ้ย"))
+        // Keep isolated test/dev stores usable until their first chair is configured.
+        if (!hasConfiguredChairs)
         {
             return [barberId];
         }
 
-        return await dbContext.BarberProfiles
+        var chairIds = await dbContext.BarberChairAssignments
             .AsNoTracking()
-            .Where(barber => barber.User.FullName == "ช่างนุค" || barber.User.FullName == "ช่างนุ้ย")
-            .Select(barber => barber.Id)
+            .Where(assignment => assignment.BarberId == barberId
+                && assignment.Chair.IsActive
+                && assignment.StartDate <= date
+                && (assignment.EndDate == null || assignment.EndDate >= date))
+            .Select(assignment => assignment.ChairId)
+            .ToListAsync(cancellationToken);
+
+        if (chairIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.BarberChairAssignments
+            .AsNoTracking()
+            .Where(assignment => chairIds.Contains(assignment.ChairId)
+                && assignment.Chair.IsActive
+                && assignment.StartDate <= date
+                && (assignment.EndDate == null || assignment.EndDate >= date))
+            .Select(assignment => assignment.BarberId)
+            .Distinct()
             .ToListAsync(cancellationToken);
     }
 

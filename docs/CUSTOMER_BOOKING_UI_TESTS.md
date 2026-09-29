@@ -24,6 +24,8 @@ Screenshots are written to the existing ignored `.tmp` directory. These are brow
 
 - Initial load failure/retry, no selection guard, service totals, large-catalogue search and no search matches.
 - Service/barber/date changes invalidate selection; aborted/stale availability responses cannot replace the current context.
+- Date selection precedes barber selection. Read that date's active chair assignments, then fetch availability only for assigned barbers before displaying them. Hide unassigned, off-day/leave, fully booked and past-only fixtures; a barber assigned and working on the next date reappears. Chair/availability failures show retry rather than an unverified barber list.
+- Backend availability and booking validation also require an active chair assignment when the store has configured chairs. Shared-chair overlap follows actual date-effective assignments instead of barber names. Dedicated tests cover no chair, ended/inactive assignment and shared-chair collision.
 - Past and unavailable starts are not selectable; expiry disables proceeding; no arbitrary first-18-slots truncation.
 - Tapping a time never writes a booking; review shows services, duration, barber, customer, date/time and estimated amount before explicit confirmation.
 - Conflict response stays actionable, clears selected time and reloads availability; retry succeeds.
@@ -34,6 +36,8 @@ Screenshots are written to the existing ignored `.tmp` directory. These are brow
 
 - User confirmed the redesigned booking flow works and the Owner view shows matching barber, date/time and services for increment `4033353`.
 - This confirms the live booking happy path only. Device type was not specified; it does not establish live conflict, cancellation, receipt or physical-mobile regression coverage.
+- Subsequent unavailable-barber fix: read-only live availability checks on 2026-09-17 for the active male haircut returned zero future available starts for both ช่างนุค and ช่างนุ้ย. Mocked UI tests passed for the new date-first filtering; live end-to-end acceptance of this follow-up is still pending. No real bookings were created by this check.
+- Chair follow-up verification: 117 backend tests passed; the PostgreSQL concurrency theory was skipped because its dedicated database was not started. Frontend build/lint and mocked browser flow passed. The browser check uses emulation, not physical hardware. Live acceptance of chair-filtered selection remains pending.
 
 ## Remaining Acceptance
 

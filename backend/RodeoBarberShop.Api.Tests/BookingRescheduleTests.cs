@@ -151,7 +151,12 @@ public class BookingRescheduleTests
     public async Task SharedChairStillBlocksOtherBarbersQueue()
     {
         using var f = new Fixture();
-        f.First.User.FullName = "ช่างนุค"; f.Second.User.FullName = "ช่างนุ้ย";
+        var date = DateOnly.FromDateTime(f.Booking.StartAt.ToOffset(TimeSpan.FromHours(7)).Date);
+        var chair = new Chair { Id = Guid.NewGuid(), Name = "Shared chair", IsActive = true };
+        f.Db.Chairs.Add(chair);
+        f.Db.BarberChairAssignments.AddRange(
+            new() { Id = Guid.NewGuid(), ChairId = chair.Id, BarberId = f.First.Id, StartDate = date.AddDays(-1) },
+            new() { Id = Guid.NewGuid(), ChairId = chair.Id, BarberId = f.Second.Id, StartDate = date.AddDays(-1) });
         f.Db.Bookings.Add(new() { Id = Guid.NewGuid(), BarberId = f.First.Id, StartAt = f.Booking.StartAt.AddHours(2), EndAt = f.Booking.StartAt.AddHours(3), BookingStatus = BookingStatus.Confirmed });
         await f.Db.SaveChangesAsync();
         Assert.IsType<BadRequestObjectResult>(await f.Controller.Reschedule(f.Booking.Id, f.Request(start: f.Booking.StartAt.AddHours(2)), default));

@@ -16,8 +16,9 @@ const url = process.env.UI_TEST_URL || 'http://127.0.0.1:5173';
       { id: 'color', name: 'ทำสีผม', description: 'ปรึกษาสีที่เหมาะกับคุณ', price: 1200, durationMinutes: 120 },
     ];
     const barbers = [{ id: 'a', fullName: 'ช่างบั๊ม', nickname: 'บ', specialty: 'ตัดผมชาย' }, { id: 'b', fullName: 'ช่างเค้ก', nickname: 'ค', specialty: 'ออกแบบทรงผม' }];
+    barbers.push({ id: 'off', fullName: 'ช่างนุค', nickname: 'น', specialty: '' }, { id: 'leave', fullName: 'ช่างนุ้ย', nickname: 'น', specialty: '' }, { id: 'full', fullName: 'ช่างคิวเต็ม', nickname: 'ต', specialty: '' }, { id: 'past', fullName: 'ช่างหมดเวลา', nickname: 'ม', specialty: '' }, { id: 'no-chair', fullName: 'ช่างไม่มีเก้าอี้', nickname: 'ก', specialty: '' });
     const slot = (date, hour, available = true) => ({ startAt: `${date}T${hour}:00:00+07:00`, endAt: `${date}T${String(Number(hour) + 1).padStart(2, '0')}:00:00+07:00`, isAvailable: available });
-    let bookings = [], writes = 0, cancels = 0, failLoad = true, availabilityError = false;
+    let bookings = [], writes = 0, cancels = 0, failLoad = true, availabilityError = false, noChairAvailabilityRequests = 0;
     await page.route('**/api/**', async route => {
       const request = route.request(), u = new URL(request.url());
       const reply = (json, status = 200) => route.fulfill({ status, json });
@@ -28,9 +29,20 @@ const url = process.env.UI_TEST_URL || 'http://127.0.0.1:5173';
       }
       if (u.pathname === '/api/barbers') return reply(barbers);
       if (u.pathname === '/api/bookings/my') return reply(bookings);
+      if (u.pathname === '/api/chairs/schedule') {
+        const date = u.searchParams.get('date');
+        const assigned = date.endsWith('-21') ? ['a', 'b', 'off'] : ['a', 'b', 'leave', 'full', 'past'];
+        return reply([{ id: 'chair', barbers: assigned.map(barberId => ({ barberId })) }]);
+      }
       if (u.pathname.endsWith('/availability')) {
         if (availabilityError) return reply({ message: 'ทดสอบเวลาว่างไม่สำเร็จ' }, 503);
         const date = u.searchParams.get('date');
+        const barberId = u.searchParams.get('barberId');
+        if (barberId === 'no-chair') { noChairAvailabilityRequests++; return reply([slot(date, '16')]); }
+        if (barberId === 'off') return reply(date.endsWith('-21') ? [slot(date, '16')] : []);
+        if (barberId === 'leave') return reply([]);
+        if (barberId === 'full') return reply([slot(date, '16', false)]);
+        if (barberId === 'past') return reply(date.endsWith('-20') ? [slot(date, '08')] : []);
         if (date.endsWith('-22')) return reply([]);
         // Delayed previous selection must never replace the new barber's slots.
         if (u.searchParams.get('barberId') === 'a') {
@@ -77,6 +89,11 @@ const url = process.env.UI_TEST_URL || 'http://127.0.0.1:5173';
     }
     await next.click(); assert(await next.isDisabled());
     await page.getByRole('radio', { name: /ช่างบั๊ม/ }).check();
+    assert.equal(await page.getByRole('radio', { name: /ช่างนุค|ช่างนุ้ย|ช่างคิวเต็ม|ช่างหมดเวลา|ช่างไม่มีเก้าอี้/ }).count(), 0);
+    assert.equal(noChairAvailabilityRequests, 0);
+    const dateBounds = await page.getByLabel('วันนัดหมาย', { exact: true }).boundingBox();
+    const barberBounds = await page.locator('.cb-barbers').boundingBox();
+    assert(dateBounds.y < barberBounds.y);
     await page.getByRole('radio', { name: '10:00', exact: true }).waitFor();
     assert.equal(await page.getByRole('radio', { name: '08:00', exact: true }).count(), 0);
     assert.equal(await page.getByRole('radio', { name: '11:00', exact: true }).count(), 0);
@@ -93,8 +110,12 @@ const url = process.env.UI_TEST_URL || 'http://127.0.0.1:5173';
     await page.waitForTimeout(400);
     assert.equal(await page.getByRole('radio', { name: '10:00', exact: true }).count(), 0);
     await page.getByLabel('วันนัดหมาย', { exact: true }).fill('2026-09-22');
-    await page.getByText('ไม่มีเวลาว่างสำหรับบริการที่เลือก', { exact: true }).waitFor();
+    await page.getByText('ไม่มีช่างว่างสำหรับบริการและวันที่เลือก', { exact: true }).waitFor();
+    assert.equal(await page.locator('.cb-barbers input').count(), 0);
+    await page.getByLabel('วันนัดหมาย', { exact: true }).fill('2026-09-21');
+    await page.getByRole('radio', { name: /ช่างนุค/ }).waitFor();
     await page.getByLabel('วันนัดหมาย', { exact: true }).fill('2026-09-20');
+    await page.getByRole('radio', { name: /ช่างเค้ก/ }).check();
     await page.getByRole('radio', { name: '14:00', exact: true }).check();
     await page.screenshot({ path: '.tmp/customer-time-mobile.png', fullPage: true });
     await next.click();
@@ -130,6 +151,7 @@ const url = process.env.UI_TEST_URL || 'http://127.0.0.1:5173';
     await page.getByLabel('วันนัดหมาย', { exact: true }).fill('2026-09-21');
     await page.getByRole('alert').waitFor(); availabilityError = false;
     await page.getByRole('button', { name: 'ลองอีกครั้ง', exact: true }).click();
+    await page.getByRole('radio', { name: /ช่างเค้ก/ }).check();
     await page.getByRole('radio', { name: '14:00', exact: true }).check();
     await page.clock.setFixedTime(new Date('2026-09-21T07:00:01Z'));
     await page.waitForTimeout(1200); assert(await next.isDisabled());

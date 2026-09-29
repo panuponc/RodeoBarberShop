@@ -7,6 +7,7 @@ import './CustomerBooking.css'
 
 type Service = { id: string; name: string; description: string | null; price: number; durationMinutes: number }
 type Slot = { startAt: string; endAt: string; isAvailable: boolean }
+type ChairSchedule = { barbers: Array<{ barberId: string }> }
 type Props = { token: string; fullName: string; onLogout: () => void; statusLabels: Record<string, string>; renderReceipt: (receipt: Receipt) => ReactNode }
 const money = (value: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(value)
 const dateText = (value: string) => new Date(value).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: '2-digit' })
@@ -29,7 +30,7 @@ export function CustomerBooking({ token, fullName, onLogout, statusLabels, rende
   const [day, setDay] = useState(localDay)
   const [now, setNow] = useState(Date.now)
   const [retry, setRetry] = useState(0)
-  const [slots, setSlots] = useState<{ key: string; items: Slot[]; error: string } | null>(null)
+  const [slots, setSlots] = useState<{ key: string; byBarber: Record<string, Slot[]>; error: string } | null>(null)
   const [choice, setChoice] = useState<{ key: string; slot: Slot } | null>(null)
   const [busy, setBusy] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -48,9 +49,12 @@ export function CustomerBooking({ token, fullName, onLogout, statusLabels, rende
   const matchingServices = services.filter(service => service.name.toLocaleLowerCase('th-TH').includes(search.trim().toLocaleLowerCase('th-TH')))
   const total = selected.reduce((sum, service) => sum + service.price, 0)
   const minutes = selected.reduce((sum, service) => sum + service.durationMinutes, 0)
-  const barber = barbers.find(item => item.id === barberId)
-  const key = JSON.stringify([barberId, day, [...ids].sort(), retry])
-  const currentSlots = slots?.key === key ? slots : null
+  const availabilityKey = JSON.stringify([day, [...ids].sort(), retry])
+  const key = JSON.stringify([barberId, availabilityKey])
+  const currentAvailability = slots?.key === availabilityKey ? slots : null
+  const availableBarbers = day >= localDay(now) ? barbers.filter(item => currentAvailability?.byBarber[item.id]?.some(slot => slot.isAvailable && Date.parse(slot.startAt) > now)) : []
+  const barber = availableBarbers.find(item => item.id === barberId)
+  const currentSlots = currentAvailability && barber ? { items: currentAvailability.byBarber[barber.id], error: currentAvailability.error } : null
   const selectedSlot = choice?.key === key && Date.parse(choice.slot.startAt) > now
     && currentSlots?.items.some(slot => slot.isAvailable && slot.startAt === choice.slot.startAt) ? choice.slot : null
   const upcoming = bookings.filter(booking => !closed.has(booking.bookingStatus)).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt))
@@ -85,19 +89,25 @@ export function CustomerBooking({ token, fullName, onLogout, statusLabels, rende
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer) }, [])
   useEffect(() => { heading.current?.focus() }, [step, view, success])
   useEffect(() => {
-    if (!barberId || !ids.length || day < localDay() || step === 0 || view !== 'book') return
+    if (!ids.length || day < localDay() || step === 0 || view !== 'book') return
     const controller = new AbortController()
-    const params = new URLSearchParams({ barberId, date: day })
-    ids.forEach(id => params.append('serviceIds', id))
-    request<Slot[]>(`/api/bookings/availability?${params}`, { signal: controller.signal }).then(items => {
-      if (!controller.signal.aborted) setSlots({ key, items, error: '' })
+    request<ChairSchedule[]>(`/api/chairs/schedule?date=${day}`, { signal: controller.signal }).then(schedule => {
+      const assignedIds = new Set(schedule.flatMap(chair => chair.barbers.map(item => item.barberId)))
+      return Promise.all(barbers.filter(item => assignedIds.has(item.id)).map(async item => {
+        const params = new URLSearchParams({ barberId: item.id, date: day })
+        ids.forEach(id => params.append('serviceIds', id))
+        const items = await request<Slot[]>(`/api/bookings/availability?${params}`, { signal: controller.signal })
+        return [item.id, items] as const
+      }))
+    }).then(entries => {
+      if (!controller.signal.aborted) setSlots({ key: availabilityKey, byBarber: Object.fromEntries(entries), error: '' })
     }).catch(error => {
-      if (!controller.signal.aborted) setSlots({ key, items: [], error: errorText(error) })
+      if (!controller.signal.aborted) setSlots({ key: availabilityKey, byBarber: {}, error: errorText(error) })
     })
     return () => controller.abort()
-  }, [barberId, day, ids, key, request, step, view])
+  }, [barbers, day, ids, availabilityKey, request, step, view])
 
-  function edit() { setChoice(null); setSubmitError(''); setSuccess(null) }
+  function edit() { setChoice(null); setBarberId(''); setSubmitError(''); setSuccess(null) }
   function navigate(target: 'book' | 'appointments') {
     setView(target)
     receiptRequest.current++
@@ -158,13 +168,17 @@ export function CustomerBooking({ token, fullName, onLogout, statusLabels, rende
             {submitError && <p className="cb-error" role="alert">{submitError}</p>}
             {step === 0 && <><div className="cb-section-heading"><h2>เลือกบริการ</h2><span className="cb-muted">เลือกได้มากกว่า 1 รายการ</span></div>{services.length > 8 && <input className="cb-search" type="search" aria-label="ค้นหาบริการ" placeholder="ค้นหาบริการ" value={search} onChange={event => setSearch(event.target.value)} />}{services.length > 0 && !matchingServices.length && <p className="cb-empty">ไม่พบบริการที่ค้นหา</p>}{!services.length ? <div className="cb-empty">ยังไม่มีบริการเปิดให้จอง</div> : <div className="cb-services">{matchingServices.map(service => <label key={service.id} className={`cb-service${ids.includes(service.id) ? ' selected' : ''}`}><input type="checkbox" checked={ids.includes(service.id)} onChange={event => { edit(); setIds(current => event.target.checked ? [...current, service.id] : current.filter(id => id !== service.id)) }} /><span className="cb-service-info"><strong>{service.name}</strong>{service.description && <small>{service.description}</small>}<span className="cb-muted"><Clock3 size={13} />{service.durationMinutes} นาที</span></span><strong className="cb-price">{money(service.price)}</strong></label>)}</div>}</>}
             {step === 1 && <>
-              <div className="cb-section-heading"><h2>เลือกช่าง</h2></div>
-              {!barbers.length && <p className="cb-empty">ยังไม่มีช่างเปิดให้จอง</p>}
-              <div className="cb-barbers" role="radiogroup" aria-label="เลือกช่าง">{barbers.map(item => <label className={barberId === item.id ? 'selected' : ''} key={item.id}><input type="radio" name="barber" checked={barberId === item.id} onChange={() => { edit(); setBarberId(item.id) }} /><span className="cb-avatar" aria-hidden="true">{(item.nickname || item.fullName).slice(0, 1)}</span><span><strong>{item.fullName}</strong>{item.specialty && <small>{item.specialty}</small>}</span></label>)}</div>
               <div className="cb-section-heading cb-date-heading"><h2>วันนัดหมาย</h2><input aria-label="วันนัดหมาย" type="date" min={localDay(now)} value={day} onChange={event => { edit(); setDay(event.target.value) }} /></div>
               <div className="cb-days">{Array.from({ length: 7 }, (_, index) => { const value = localDay(now + index * 86400000); return <button key={value} aria-pressed={day === value} className={day === value ? 'selected' : ''} onClick={() => { edit(); setDay(value) }}><span>{index === 0 ? 'วันนี้' : new Date(`${value}T12:00:00+07:00`).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', weekday: 'short' })}</span><strong>{Number(value.slice(-2))}</strong></button> })}</div>
-              <div className="cb-section-heading"><h2>เวลาที่ว่าง</h2><span className="cb-muted">ใช้เวลา {minutes} นาที</span></div>
-              {!barberId ? <p className="cb-empty">เลือกช่างเพื่อดูเวลาว่าง</p> : day < localDay(now) ? <p className="cb-error">กรุณาเลือกวันนี้หรือวันถัดไป</p> : !currentSlots ? <p className="cb-empty" role="status">กำลังตรวจสอบเวลาว่าง...</p> : currentSlots.error ? <div className="cb-empty"><p role="alert">{currentSlots.error}</p><button onClick={() => setRetry(value => value + 1)}><RefreshCw size={17} />ลองอีกครั้ง</button></div> : !visibleSlots.length ? <div className="cb-empty"><CalendarDays size={25} /><strong>ไม่มีเวลาว่างสำหรับบริการที่เลือก</strong><span>ลองเลือกวันอื่นหรือเปลี่ยนช่าง</span></div> : <div className="cb-slots" role="radiogroup" aria-label="เวลาที่ว่าง">{visibleSlots.map(slot => <label className={selectedSlot?.startAt === slot.startAt ? 'selected' : ''} key={slot.startAt}><input type="radio" name="slot" checked={selectedSlot?.startAt === slot.startAt} onChange={() => { setChoice({ key, slot }); setSubmitError('') }} /><span>{time(slot.startAt)}</span></label>)}</div>}
+              <div className="cb-section-heading"><h2>เลือกช่างที่ว่าง</h2><span className="cb-muted">สำหรับบริการ {minutes} นาที</span></div>
+              {day < localDay(now) ? <p className="cb-error">กรุณาเลือกวันนี้หรือวันถัดไป</p>
+                : !currentAvailability ? <p className="cb-empty" role="status">กำลังตรวจสอบช่างที่ว่าง...</p>
+                  : currentAvailability.error ? <div className="cb-empty"><p role="alert">{currentAvailability.error}</p><button onClick={() => setRetry(value => value + 1)}><RefreshCw size={17} />ลองอีกครั้ง</button></div>
+                    : !availableBarbers.length ? <div className="cb-empty"><CalendarDays size={25} /><strong>ไม่มีช่างว่างสำหรับบริการและวันที่เลือก</strong><span>ลองเลือกวันอื่นหรือเปลี่ยนบริการ</span></div> : <>
+              <div className="cb-barbers" role="radiogroup" aria-label="เลือกช่าง">{availableBarbers.map(item => <label className={barberId === item.id ? 'selected' : ''} key={item.id}><input type="radio" name="barber" checked={barberId === item.id} onChange={() => { edit(); setBarberId(item.id) }} /><span className="cb-avatar" aria-hidden="true">{(item.nickname || item.fullName).slice(0, 1)}</span><span><strong>{item.fullName}</strong>{item.specialty && <small>{item.specialty}</small>}</span></label>)}</div>
+              {barber ? <><div className="cb-section-heading"><h2>เวลาที่ว่าง</h2><span className="cb-muted">ใช้เวลา {minutes} นาที</span></div>
+              <div className="cb-slots" role="radiogroup" aria-label="เวลาที่ว่าง">{visibleSlots.map(slot => <label className={selectedSlot?.startAt === slot.startAt ? 'selected' : ''} key={slot.startAt}><input type="radio" name="slot" checked={selectedSlot?.startAt === slot.startAt} onChange={() => { setChoice({ key, slot }); setSubmitError('') }} /><span>{time(slot.startAt)}</span></label>)}</div></> : <p className="cb-muted">เลือกช่างเพื่อดูเวลาว่าง</p>}
+              </>}
             </>}
             {step === 2 && <><div className="cb-section-heading"><h2>ตรวจสอบก่อนยืนยัน</h2><button className="cb-text" disabled={busy} onClick={() => setStep(1)}>แก้ไขวันและเวลา</button></div><div className="cb-review-date"><CalendarDays size={28} /><div><strong>{selectedSlot ? dateText(selectedSlot.startAt) : 'กรุณาเลือกเวลาใหม่'}</strong><p>{selectedSlot && `${time(selectedSlot.startAt)} – ${time(selectedSlot.endAt)}`}</p></div></div><dl className="cb-review-details"><div><dt>ลูกค้า</dt><dd>{fullName}</dd></div><div><dt>ช่าง</dt><dd>{barber?.fullName}</dd></div></dl><div className="cb-review-services">{summary}</div><p className="cb-muted cb-policy">ยกเลิกออนไลน์ได้ก่อนนัดอย่างน้อย 1 ชั่วโมง หลังจากนั้นกรุณาติดต่อร้าน</p>{!selectedSlot && <p role="alert" className="cb-error">เวลาที่เลือกหมดอายุแล้ว กรุณากลับไปเลือกเวลาใหม่</p>}</>}
           </section><aside className="cb-summary">{summary}</aside></div>
