@@ -184,6 +184,63 @@ public class BarbersController(ApplicationDbContext dbContext) : ControllerBase
     }
 
     [Authorize(Roles = "Owner,Admin")]
+    [HttpPut("{id:guid}/services")]
+    public async Task<ActionResult<BarberResponse>> UpdateBarberServices(
+        Guid id,
+        UpdateBarberServicesRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await dbContext.BarberProfiles.AsNoTracking().AnyAsync(profile => profile.Id == id, cancellationToken))
+        {
+            return NotFound();
+        }
+
+        var distinctServiceIds = request.ServiceIds.Distinct().ToList();
+        if (distinctServiceIds.Count != request.ServiceIds.Count)
+        {
+            return BadRequest(new { message = "Service ids must not be duplicated." });
+        }
+
+        var activeServiceIds = await dbContext.Services
+            .Where(service => distinctServiceIds.Contains(service.Id) && service.IsActive)
+            .Select(service => service.Id)
+            .ToListAsync(cancellationToken);
+
+        if (activeServiceIds.Count != distinctServiceIds.Count)
+        {
+            return BadRequest(new { message = "Every service id must refer to an active service." });
+        }
+
+        var requestedServiceIds = activeServiceIds.ToHashSet();
+        var existingMappings = await dbContext.BarberServices
+            .Where(item => item.BarberId == id)
+            .ToListAsync(cancellationToken);
+        dbContext.BarberServices.RemoveRange(existingMappings.Where(item => !requestedServiceIds.Contains(item.ServiceId)));
+
+        var existingServiceIds = existingMappings.Select(item => item.ServiceId).ToHashSet();
+        var now = DateTimeOffset.UtcNow;
+        foreach (var serviceId in requestedServiceIds.Except(existingServiceIds))
+        {
+            dbContext.BarberServices.Add(new BarberService
+            {
+                Id = Guid.NewGuid(),
+                BarberId = id,
+                ServiceId = serviceId,
+                CreatedAt = now
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = await BaseBarberQuery()
+            .Where(profile => profile.Id == id)
+            .Select(profile => ToResponse(profile))
+            .FirstAsync(cancellationToken);
+
+        return Ok(response);
+    }
+
+    [Authorize(Roles = "Owner,Admin")]
     [HttpPut("{id:guid}/standby-priority")]
     public async Task<ActionResult<BarberResponse>> UpdateStandbyPriority(
         Guid id,

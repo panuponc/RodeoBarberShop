@@ -24,6 +24,20 @@ public class ServicesController(ApplicationDbContext dbContext) : ControllerBase
         return Ok(services);
     }
 
+    [Authorize(Roles = "Owner,Admin")]
+    [HttpGet("manage")]
+    public async Task<ActionResult<IReadOnlyList<ServiceResponse>>> GetManagedServices(CancellationToken cancellationToken)
+    {
+        var services = await dbContext.Services
+            .AsNoTracking()
+            .OrderByDescending(service => service.IsActive)
+            .ThenBy(service => service.Name)
+            .Select(service => ToResponse(service))
+            .ToListAsync(cancellationToken);
+
+        return Ok(services);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ServiceResponse>> GetService(Guid id, CancellationToken cancellationToken)
     {
@@ -48,11 +62,19 @@ public class ServicesController(ApplicationDbContext dbContext) : ControllerBase
             return BadRequest(new { message = validationError });
         }
 
+        var normalizedName = request.Name.Trim();
+        if (await dbContext.Services.AnyAsync(
+                service => service.Name.ToLower() == normalizedName.ToLower(),
+                cancellationToken))
+        {
+            return Conflict(new { message = "A service with this name already exists." });
+        }
+
         var now = DateTimeOffset.UtcNow;
         var service = new Service
         {
             Id = Guid.NewGuid(),
-            Name = request.Name.Trim(),
+            Name = normalizedName,
             Description = NormalizeOptionalText(request.Description),
             Price = request.Price,
             DurationMinutes = request.DurationMinutes,
@@ -87,7 +109,15 @@ public class ServicesController(ApplicationDbContext dbContext) : ControllerBase
             return NotFound();
         }
 
-        service.Name = request.Name.Trim();
+        var normalizedName = request.Name.Trim();
+        if (await dbContext.Services.AnyAsync(
+                other => other.Id != id && other.Name.ToLower() == normalizedName.ToLower(),
+                cancellationToken))
+        {
+            return Conflict(new { message = "A service with this name already exists." });
+        }
+
+        service.Name = normalizedName;
         service.Description = NormalizeOptionalText(request.Description);
         service.Price = request.Price;
         service.DurationMinutes = request.DurationMinutes;
@@ -147,9 +177,9 @@ public class ServicesController(ApplicationDbContext dbContext) : ControllerBase
             return "Service price must be zero or greater.";
         }
 
-        if (durationMinutes <= 0)
+        if (durationMinutes < 60 || durationMinutes > 720 || durationMinutes % 60 != 0)
         {
-            return "Service duration must be greater than zero.";
+            return "ระยะเวลาบริการต้องเป็นจำนวนเต็ม 1–12 ชั่วโมง";
         }
 
         return null;

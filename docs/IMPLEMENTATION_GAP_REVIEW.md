@@ -69,17 +69,21 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 
 ### S04-01: Service Management UI
 
-- Type: Partial. Status: Not Started.
+- Type: Partial. Status: Implemented on `feature/service-management`; pending user acceptance and integration.
 - Finding: create/edit/disable and active-service listing APIs exist, but the frontend service-management screen was not found.
 - Evidence: [ServicesController.cs](../backend/RodeoBarberShop.Api/Controllers/ServicesController.cs); [App.tsx](../frontend/src/App.tsx), service reads and staff navigation.
 - Acceptance: authorized staff can create, edit and disable services from the UI; validation and loading/error states work; disabled services cannot be newly booked and existing booking snapshots remain intact. Review how inactive services are listed before adding a reactivation control.
+- Implemented: Owner/Admin service workspace lists active and inactive services, supports create/edit/pause/reactivate, keeps the public endpoint active-only, and rejects duplicate names. Responsive loading, empty, success and error states are included.
+- Verification: frontend build/lint pass; backend suite passes 122 with one infrastructure-dependent Postgres concurrency test skipped; five focused service-management tests cover public/admin visibility, duplicate names, soft disable and barber mappings. Read-only Supabase verification returned 26 managed services, 21 public active services and 5 inactive services. Playwright verified the 390 px and desktop layouts, editor and mapping tab without horizontal overflow. No live service data was mutated during this verification.
 
 ### S04-02: Barber Service Mapping UI
 
-- Type: Partial. Status: Not Started.
+- Type: Partial. Status: Implemented on `feature/service-management`; pending user acceptance and integration.
 - Finding: `UpdateBarber` accepts service IDs, but a frontend editor for this mapping was not found.
 - Evidence: [BarbersController.cs](../backend/RodeoBarberShop.Api/Controllers/BarbersController.cs), `UpdateBarber`; [App.tsx](../frontend/src/App.tsx).
 - Acceptance: Owner/Admin can inspect and update mappings, changes persist, and booking/rescheduling honor eligible services. Confirm the meaning of an empty mapping before changing it; current backend treats it as unrestricted.
+- Implemented: the Owner/Admin workspace provides a barber selector and active-service checklist backed by a dedicated mapping endpoint, so profile/contact/availability fields are not rewritten as a side effect. Existing empty mappings remain unrestricted; the editor presents them as all active services and requires at least one choice before saving.
+- Verification: focused backend tests cover persistence and rejection of duplicate, inactive and unknown service IDs. Existing booking and rescheduling eligibility rules remain the enforcement path; full live save acceptance is still pending user testing.
 
 ### S05-01: Shop Settings, Operating Calendar And Cancellation Rules
 

@@ -1,0 +1,54 @@
+/* Management views share the queue shell and its colour tokens. */
+.staff-management-workspace .standby-modal :is(.modal-header, .modal-actions) { background: #1b1e25; border-color: var(--sq-border); }
+.staff-management-workspace .standby-modal .modal-header h2 { color: var(--sq-text); }
+.staff-management-workspace .standby-modal :is(.standby-barber-select, .standby-priority-picker, .standby-toolbar) { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.staff-management-workspace .standby-modal :is(.standby-toolbar span, .standby-priority-picker > span) { color: var(--sq-muted); font-weight: 400; }
+.staff-management-workspace .standby-modal :is(.standby-chair-option, .standby-priority-picker button) { background: #20252d; color: var(--sq-text); border: 1px solid var(--sq-border); border-radius: 8px; box-shadow: none; }
+.staff-management-workspace .standby-modal :is(.standby-chair-option.selected, .standby-priority-picker button.active) { background: #2b261c; border-color: #a48a4d; color: var(--sq-gold); }
+.staff-management-workspace .standby-modal .standby-chair-option b { background: #101318; color: var(--sq-muted); }
+.staff-management-workspace .standby-modal .standby-chair-option.selected b { background: var(--sq-gold); color: #211c0d; }
+.staff-management-workspace .standby-modal .standby-chair-option small { color: var(--sq-muted); }
+.staff-management-workspace .standby-modal .modal-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.staff-management-workspace .standby-modal .modal-actions button { flex: 1 1 160px; max-width: 280px; }
+.staff-management-workspace .standby-modal { overflow-y: auto; }
+.staff-management-workspace :is(.assignment-section, .chair-roster-card, .chair-roster-card.shared) { background: var(--sq-surface); border-color: var(--sq-border); border-radius: 8px; box-shadow: none; }
+.staff-management-workspace .assignment-section { background: transparent; border: 0; padding: 0; }
+.staff-management-workspace :is(.mini-avatar, .chair-icon, .standby-empty-state > span) { background: #2b261c; color: var(--sq-gold); border: 1px solid #635535; }
+.staff-management-workspace :is(.chair-share-toggle, .roster-check) { background: #20252d; color: var(--sq-muted); border: 1px solid var(--sq-border); }
+.staff-management-workspace .roster-check { width: 36px; min-height: 36px; }
+.staff-management-workspace :is(.chair-share-toggle.active, .roster-check.active) { background: #2b261c; color: var(--sq-gold); border-color: #635535; }
+.staff-management-workspace .panel-heading > button { background: #20252d; color: var(--sq-text); border: 1px solid var(--sq-border); }
+.staff-management-workspace .backoffice-main { height: auto; overflow: visible; }
+.staff-management-workspace :is(.accounts-grid, .service-management) { flex: none; min-width: 0; width: 100%; overflow: visible; }
+.staff-management-workspace :is(.account-form, .account-list, .master-roster-panel) { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 0; min-width: 0; }
+.staff-management-workspace :is(.account-card, .chair-assignment-card, .chair-management-panel, .standby-roster-card, .standby-empty-state, .staff-account-modal, .standby-modal) { background: var(--sq-surface); border: 1px solid var(--sq-border); border-radius: 8px; box-shadow: none; color: var(--sq-text); }
+.staff-management-workspace :is(input, select, textarea) { min-width: 0; min-height: 44px; border: 1px solid var(--sq-border); border-radius: 8px; background: #101318; color: var(--sq-text); padding: 10px 12px; font-size: 14px; box-shadow: none; }
+.staff-management-workspace input[type='checkbox'] { min-height: 18px; width: 18px; accent-color: var(--sq-gold); }
+.staff-management-workspace :is(.account-form, .staff-modal-grid, .service-editor) label { gap: 6px; font-size: 12px; }
+.staff-management-workspace button { min-height: 44px; border-radius: 8px; }
+.staff-management-workspace :is(.account-form, .modal-actions, .service-editor-actions, .header-actions) > button:not(.secondary),
+.staff-management-workspace :is(.service-add-button, .barber-service-save) { background: linear-gradient(110deg, #edcf86, #c8a52e); border: 1px solid #cfad4d; color: #211c0d; }
+.staff-management-workspace :is(.service-editor-head button, .modal-close) { background: #20252d; border: 1px solid var(--sq-border); color: var(--sq-muted); }
+.staff-management-workspace :is(.roster-table, .staff-derived-field, .chair-assignment-form, .qr-test-panel, .qr-preview-result) { background: #101318; border-color: var(--sq-border); border-radius: 8px; box-shadow: none; }
+.staff-management-workspace :is(.roster-row, .assignment-section, .modal-header, .modal-actions, .section-heading-inline, .staff-account-row) { border-color: var(--sq-border); }
+.staff-management-workspace .roster-head { background: #20252d; color: var(--sq-muted); }
+.staff-management-workspace :is(.roster-name, .staff-person-cell, .chair-card-heading, .section-heading-inline, .account-card, .staff-derived-field) :is(strong, h3, h4) { color: var(--sq-text); }
+.staff-management-workspace :is(.staff-role-pill, .muted-pill) { background: #20252d; color: var(--sq-muted); border-color: var(--sq-border); }
+.staff-management-workspace :is(.service-row-meta b, .service-summary strong) { color: var(--sq-gold); }
+.staff-management-workspace .service-editor { background: var(--sq-surface); }
+.staff-management-workspace .service-management { max-width: 1120px; }
+.staff-management-workspace .panel-heading { flex-wrap: wrap; }
+.staff-management-workspace .header-actions { flex-wrap: wrap; }
+.staff-management-workspace .staff-account-modal { max-height: calc(100dvh - 32px); overflow-y: auto; }
+@media (min-width: 1041px) {
+  .staff-management-workspace { height: 100dvh; overflow: hidden; }
+  .staff-management-workspace .backoffice-main { height: 100dvh; min-height: 0; overflow-y: auto; scrollbar-color: #5b6472 #0d0f12; scrollbar-width: thin; }
+  .staff-management-workspace .backoffice-header { flex-shrink: 0; }
+}
+@media (max-width: 640px) {
+  .staff-management-workspace :is(input, select, textarea) { font-size: 16px; }
+  .staff-management-workspace .accounts-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .staff-management-workspace .account-form { position: static; }
+  .staff-management-workspace .account-actions { flex-wrap: wrap; }
+  .staff-management-workspace .staff-account-modal { width: 100%; max-height: 90dvh; padding: 16px; }
+}

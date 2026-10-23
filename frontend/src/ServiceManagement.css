@@ -1,0 +1,82 @@
+.service-management { display: grid; gap: 16px; width: min(100%, 1120px); }
+.service-management-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.service-tabs { display: inline-grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border: 1px solid #303640; border-radius: 8px; background: #111419; }
+.service-tabs button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; padding: 8px 14px; border: 0; border-radius: 6px; background: transparent; color: #aeb7c5; box-shadow: none; font-size: 13px; }
+.service-tabs button.active { background: #252922; color: #edca75; }
+.service-add-button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; }
+.service-feedback { display: flex; align-items: center; gap: 8px; padding: 11px 13px; border: 1px solid; border-radius: 7px; font-size: 13px; }
+.service-feedback.success { border-color: #14654f; background: #0d2b24; color: #5ce0bb; }
+.service-feedback.error { border-color: #784251; background: #301c22; color: #f0b6c3; }
+.service-catalogue, .barber-service-panel { display: grid; gap: 14px; }
+.service-summary { display: flex; gap: 20px; color: #aeb7c5; font-size: 13px; }
+.service-summary span { display: flex; align-items: baseline; gap: 6px; }
+.service-summary strong { color: #f4f4f5; font-size: 20px; }
+.sm-service-list { display: grid; gap: 8px; }
+.service-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 15px 16px; border: 1px solid #303640; border-radius: 8px; background: #171a20; }
+.service-row.inactive { background: #12151a; opacity: .76; }
+.service-row-main { display: grid; grid-template-columns: 9px minmax(0, 1fr); gap: 12px; align-items: start; min-width: 0; }
+.service-state-dot { width: 9px; height: 9px; margin-top: 6px; border-radius: 50%; background: #707887; }
+.service-state-dot.active { background: #16c79a; box-shadow: 0 0 0 3px rgb(22 199 154 / 12%); }
+.service-row-title { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.service-row-title strong { color: #f7f7f8; font-size: 15px; }
+.service-row-title span { padding: 2px 7px; border: 1px solid #39404b; border-radius: 999px; color: #9ea8b7; font-size: 10px; }
+.service-row p { margin-top: 4px; color: #9ea8b7; font-size: 12px; }
+.service-row-meta { display: flex; gap: 16px; align-items: center; margin-top: 9px; }
+.service-row-meta b { color: #edca75; font-size: 14px; }
+.service-row-meta span { display: flex; align-items: center; gap: 5px; color: #aeb7c5; font-size: 12px; }
+.service-row-actions { display: flex; gap: 7px; }
+.service-row-actions button { display: flex; align-items: center; gap: 6px; min-height: 38px; padding: 8px 11px; font-size: 12px; }
+.service-row-actions .service-pause { border: 1px solid #64404b; background: #2c1d22; color: #eca6b7; }
+.service-row-actions .service-resume { border: 1px solid #256d59; background: #12372d; color: #5ce0bb; }
+.service-empty { padding: 42px 16px; border: 1px dashed #38404b; border-radius: 8px; color: #9ea8b7; text-align: center; }
+.barber-service-intro { display: flex; justify-content: space-between; gap: 24px; align-items: end; padding: 17px; border-bottom: 1px solid #303640; }
+.barber-service-intro h2 { color: #f4f4f5; font-size: 17px; }
+.barber-service-intro p { margin-top: 4px; color: #9ea8b7; font-size: 12px; }
+.barber-service-intro label { display: grid; gap: 6px; min-width: 220px; color: #aeb7c5; font-size: 11px; }
+.barber-service-intro select { min-height: 42px; }
+.barber-service-editor { display: grid; gap: 16px; padding: 17px; border: 1px solid #303640; border-radius: 8px; background: #171a20; }
+.barber-service-heading { display: flex; gap: 11px; align-items: center; }
+.service-barber-avatar { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid #876b2d; border-radius: 50%; background: #282318; color: #edca75; font-weight: 800; }
+.barber-service-heading > div { display: grid; }
+.barber-service-heading strong { color: #f4f4f5; }
+.barber-service-heading small { color: #9ea8b7; }
+.barber-service-checklist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.barber-service-checklist label { display: flex; align-items: center; gap: 10px; min-height: 58px; padding: 10px 12px; border: 1px solid #303640; border-radius: 7px; background: #111419; cursor: pointer; }
+.barber-service-checklist input { width: 18px; height: 18px; accent-color: #d8b13c; }
+.barber-service-checklist span { display: grid; gap: 2px; }
+.barber-service-checklist strong { color: #e9ebee; font-size: 13px; }
+.barber-service-checklist small { color: #929cab; font-size: 11px; }
+.barber-service-save { justify-self: end; min-width: 220px; }
+.service-editor-backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 18px; background: rgb(0 0 0 / 72%); }
+.service-editor { display: grid; gap: 15px; width: min(100%, 520px); max-height: calc(100dvh - 36px); overflow-y: auto; padding: 20px; border: 1px solid #39404b; border-radius: 8px; background: #191c22; box-shadow: 0 24px 80px rgb(0 0 0 / 48%); }
+.service-editor-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.service-editor-head span { color: #edca75; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.service-editor-head h2 { color: #fff; font-size: 22px; }
+.service-editor-head button { width: 42px; height: 42px; padding: 0; border: 1px solid #39404b; background: #232832; color: #b6bfcc; font-size: 24px; }
+.service-editor label { display: grid; gap: 6px; color: #c2c8d1; font-size: 12px; }
+.service-editor input, .service-editor textarea { width: 100%; }
+.service-editor textarea { resize: vertical; }
+.service-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.service-editor-note { color: #939daa; font-size: 11px; }
+.service-editor-actions { display: grid; grid-template-columns: minmax(0, .65fr) minmax(0, 1fr); gap: 9px; padding-top: 4px; }
+@media (min-width: 1041px) {
+  .service-management-workspace .backoffice-main { height: 100vh; min-height: 0; overflow: hidden; }
+  .service-management { min-height: 0; flex: 1; overflow-x: hidden; overflow-y: auto; padding: 2px 5px 24px 0; scrollbar-color: #5b6472 transparent; scrollbar-width: thin; }
+  .service-management::-webkit-scrollbar { width: 8px; }
+  .service-management::-webkit-scrollbar-thumb { border-radius: 8px; background: #5b6472; }
+}
+@media (max-width: 640px) {
+  .service-management-toolbar { align-items: stretch; flex-direction: column; }
+  .service-tabs { width: 100%; }
+  .service-add-button { width: 100%; }
+  .service-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .service-row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .service-row-actions button { justify-content: center; }
+  .barber-service-intro { align-items: stretch; flex-direction: column; }
+  .barber-service-intro label { min-width: 0; }
+  .barber-service-checklist { grid-template-columns: minmax(0, 1fr); }
+  .barber-service-save { justify-self: stretch; min-width: 0; }
+  .service-editor-backdrop { align-items: end; padding: 0; }
+  .service-editor { width: 100%; max-height: 88dvh; border-radius: 8px 8px 0 0; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+  .service-editor-grid { grid-template-columns: minmax(0, 1fr); }
+}

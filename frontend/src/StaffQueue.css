@@ -98,6 +98,9 @@
 .booking-closure-customer { display: flex; justify-content: space-between; gap: 12px; padding-block: 8px; border-bottom: 1px solid #303641; }
 .booking-closure-form .booking-detail-actions > p { grid-column: 1 / -1; }
 .staff-queue-workspace .schedule-leave-summary { grid-column: 1 / -1; display: grid; gap: 3px; color: #f0bdc7; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.staff-queue-workspace .schedule-cancelled-history { grid-column: 1 / -1; width: 100%; min-height: 44px; padding: 8px; border: 1px solid var(--sq-border); border-radius: 6px; background: transparent; color: var(--sq-muted); font-size: 11px; box-shadow: none; white-space: normal; }
+.staff-queue-workspace .schedule-cancelled-history:hover { background: #252931; color: var(--sq-text); }
+.staff-queue-workspace .schedule-cancelled-history:focus-visible { outline: 2px solid var(--sq-gold); outline-offset: 2px; }
 .staff-queue-workspace .schedule-leave-band { position: absolute; inset-inline: 0; z-index: 1; padding: 5px 8px; overflow: hidden; box-sizing: border-box; border-block: 1px dashed #996673; border-left: 3px solid #d49bab; background: repeating-linear-gradient(135deg, #30232b 0px, #30232b 7px, #272128 7px, #272128 14px); color: #f0bdc7; pointer-events: none; font-size: 11px; }
 .staff-queue-workspace .schedule-leave-band :is(span, small) { display: block; }
 .staff-queue-workspace .schedule-leave-conflict { color: #f0bdc7; font-size: 10px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

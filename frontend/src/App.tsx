@@ -12,10 +12,12 @@ import { BarberAddServices } from './BarberAddServices'
 import { BookingWorkSummary } from './BookingWorkSummary'
 import { CustomerPhoneLink } from './CustomerPhoneLink'
 import { CustomerBooking } from './CustomerBooking'
-import { CalendarDays, ChevronLeft, ChevronRight, LogOut, RefreshCw, Users, Wallet, X } from 'lucide-react'
+import { ServiceManagement } from './ServiceManagement'
+import { CalendarDays, ChevronLeft, ChevronRight, LogOut, RefreshCw, Scissors, Users, Wallet, X } from 'lucide-react'
 import './StaffQueue.css'
 import { SheetBackdrop, SheetHandle } from './SheetBackdrop'
 import './StaffNavigation.css'
+import './StaffManagementTheme.css'
 
 type AuthResponse = {
   fullName: string
@@ -51,6 +53,7 @@ export type Barber = {
   bio: string | null
   isAvailable: boolean
   acceptsBooking: boolean
+  services?: { serviceId: string; name: string; price: number; durationMinutes: number }[]
 }
 
 type BarberWorkingHour = {
@@ -347,7 +350,7 @@ function App() {
   const [qrTestAmount, setQrTestAmount] = useState('100')
   const [qrTestAccountId, setQrTestAccountId] = useState('')
   const [isQrTestOpen, setIsQrTestOpen] = useState(false)
-  const [activeStaffPanel, setActiveStaffPanel] = useState<'queue' | 'accounts' | 'staff' | 'leaves'>('queue')
+  const [activeStaffPanel, setActiveStaffPanel] = useState<'queue' | 'services' | 'accounts' | 'staff' | 'leaves'>('queue')
 
   function navigateStaffPanel(panel: typeof activeStaffPanel) {
     setActiveStaffPanel(panel)
@@ -503,7 +506,10 @@ function App() {
     [activeStandbyAssignments, standbyModalBarberId],
   )
   const staffPanelTitle =
-    activeStaffPanel === 'queue' ? 'จัดการคิววันนี้' : activeStaffPanel === 'accounts' ? 'บัญชีรับเงินร้าน' : activeStaffPanel === 'leaves' ? 'คำขอลาช่าง' : 'จัดการพนักงาน'
+    activeStaffPanel === 'queue' ? 'จัดการคิววันนี้'
+      : activeStaffPanel === 'services' ? 'จัดการบริการ'
+        : activeStaffPanel === 'accounts' ? 'บัญชีรับเงินร้าน'
+          : activeStaffPanel === 'leaves' ? 'คำขอลาช่าง' : 'จัดการพนักงาน'
   const queueSummary = {
     total: queue.length,
     confirmed: queue.filter((booking) => booking.bookingStatus === 'Confirmed' || booking.bookingStatus === 'WaitingService').length,
@@ -1676,7 +1682,7 @@ function selectScheduleDate(dateValue: string) {
         throw new Error('กรุณาเลือกช่างและบริการ')
       }
 
-      if (new Date(staffBookingForm.startAt) <= new Date()) {
+      if (!Number.isFinite(Date.parse(staffBookingForm.startAt)) || Date.parse(staffBookingForm.startAt) <= Date.now()) {
         throw new Error('กรุณาเลือกวันเวลาในอนาคต')
       }
 
@@ -1720,7 +1726,8 @@ function selectScheduleDate(dateValue: string) {
   }
 
   function openStaffBookingFormForChair(chair: ScheduleChair) {
-    const defaultBookingDate = clampDateToToday(scheduleDate)
+    if (!canStartStaffBookingOnDate(scheduleDate)) return
+    const defaultBookingDate = scheduleDate
     const workingChairBarbers = chair.barbers.filter((item) => item.isWorkingToday)
     const optionIds = workingChairBarbers.map((item) => item.barber.id)
     const defaultBarberId = optionIds.length === 1
@@ -2149,7 +2156,7 @@ function selectScheduleDate(dateValue: string) {
   }
 
   return (
-    <main className={`backoffice-shell staff-navigation-shell${activeStaffPanel === 'queue' || activeStaffPanel === 'leaves' ? ' staff-queue-workspace' : ''}`}>
+    <main className={`backoffice-shell staff-navigation-shell staff-queue-workspace${['services', 'accounts', 'staff'].includes(activeStaffPanel) ? ' staff-management-workspace' : ''}${activeStaffPanel === 'services' ? ' service-management-workspace' : ''}`}>
       <aside className="backoffice-sidebar">
         <div className="brand-block">
           <strong>Rodeo</strong>
@@ -2161,6 +2168,12 @@ function selectScheduleDate(dateValue: string) {
             <CalendarDays size={18} aria-hidden="true" />
             คิววันนี้
           </button>
+          {canManageStaff && (
+            <button aria-current={activeStaffPanel === 'services' ? 'page' : undefined} className={activeStaffPanel === 'services' ? 'active' : ''} onClick={() => navigateStaffPanel('services')} type="button">
+              <Scissors size={18} aria-hidden="true" />
+              บริการ
+            </button>
+          )}
           <button
             className={activeStaffPanel === 'accounts' ? 'active' : ''}
             aria-current={activeStaffPanel === 'accounts' ? 'page' : undefined}
@@ -2276,8 +2289,9 @@ function selectScheduleDate(dateValue: string) {
                   <button className="secondary staff-refresh" aria-label={isRefreshingStaffQueue ? 'กำลังรีเฟรชคิว' : 'รีเฟรชคิว'} title={isRefreshingStaffQueue ? 'กำลังรีเฟรชคิว' : 'รีเฟรชคิว'} aria-busy={isRefreshingStaffQueue} disabled={isBusy || isRefreshingStaffQueue} onClick={() => void refreshStaffQueue()} type="button">
                     <RefreshCw size={18} />
                   </button>
-                  <button className="primary-action" onClick={() => {
-                    const defaultBookingDate = clampDateToToday(scheduleDate)
+                  <button className="primary-action" disabled={!canStartStaffBookingOnDate(scheduleDate)} title={!canStartStaffBookingOnDate(scheduleDate) ? 'ไม่มีเวลาให้จองเหลือในวันที่เลือก' : undefined} onClick={() => {
+                    if (!canStartStaffBookingOnDate(scheduleDate)) return
+                    const defaultBookingDate = scheduleDate
                     if (isStaffBookingFormOpen) {
                       closeStaffBookingForm()
                       return
@@ -2313,7 +2327,9 @@ function selectScheduleDate(dateValue: string) {
                   <div className="schedule-fixed-grid">
                     <ScheduleTimeColumnHeader />
                     {scheduleChairs.map((chair) => (
-                      <ChairScheduleHeader chair={chair} windows={scheduleWindows.date === scheduleDate ? scheduleWindows.items.filter(w => chair.barbers.some(({barber}) => barber.id === w.barberId)) : []} date={scheduleDate} leaves={visibleScheduleLeaves.filter((leave) => chair.barbers.some(({ barber }) => barber.id === leave.barberId))} key={`${chair.id}-header`} onManageBooking={setClosureChair} onCreateBooking={openStaffBookingFormForChair} />
+                      <ChairScheduleHeader chair={chair} windows={scheduleWindows.date === scheduleDate ? scheduleWindows.items.filter(w => chair.barbers.some(({barber}) => barber.id === w.barberId)) : []} date={scheduleDate} leaves={visibleScheduleLeaves.filter((leave) => chair.barbers.some(({ barber }) => barber.id === leave.barberId))} key={`${chair.id}-header`} onManageBooking={setClosureChair} onCreateBooking={openStaffBookingFormForChair}
+                        cancelledBookings={queue.filter(booking => booking.bookingStatus === 'Cancelled' && chair.barbers.some(({ barber }) => barber.id === booking.barberId))}
+                        onSelectBooking={openBookingDetail} />
                     ))}
                   </div>
                   <div className="schedule-scroll-area">
@@ -2429,16 +2445,18 @@ function selectScheduleDate(dateValue: string) {
                         ))}
                       </select>
                     </label>
-                    {!staffBookingContext && (
+                    {(
                       <label>
                         วันที่
                         <input
                           min={getTodayDate()}
+                          required
+                          readOnly={Boolean(staffBookingContext)}
                           type="date"
                           value={staffBookingForm.startAt.slice(0, 10)}
                           onChange={(event) => setStaffBookingForm({
                             ...staffBookingForm,
-                            startAt: clampDateTimeToMinimum(buildBookingDateTime(event.target.value, getBookingHourValue(staffBookingForm.startAt))),
+                            startAt: buildBookingDateTime(event.target.value, getBookingHourValue(staffBookingForm.startAt)),
                           })}
                         />
                       </label>
@@ -2450,7 +2468,7 @@ function selectScheduleDate(dateValue: string) {
                         value={getBookingHourValue(staffBookingForm.startAt)}
                         onChange={(event) => setStaffBookingForm({
                           ...staffBookingForm,
-                          startAt: clampDateTimeToMinimum(buildBookingDateTime(staffBookingForm.startAt.slice(0, 10), event.target.value)),
+                          startAt: buildBookingDateTime(staffBookingForm.startAt.slice(0, 10), event.target.value),
                         })}
                       >
                         {bookingStartHours.map((hour) => {
@@ -2650,7 +2668,7 @@ function selectScheduleDate(dateValue: string) {
                 {selectedBookingHistory.length > 1 && (
                   <section className="booking-history-box">
                     <div className="booking-detail-section-title">
-                      <h3>ประวัติในช่วงเวลานี้</h3>
+                      <h3>ประวัติคิวที่ยกเลิก</h3>
                       <span>{selectedBookingHistory.length} รายการ</span>
                     </div>
                     <div className="booking-history-list">
@@ -2745,6 +2763,8 @@ function selectScheduleDate(dateValue: string) {
             )}</SheetBackdrop>
           )}
         </section>
+      ) : activeStaffPanel === 'services' ? (
+        canManageStaff && <ServiceManagement api={api} onServicesChanged={refreshServices} />
       ) : activeStaffPanel === 'accounts' ? (
         <section className="accounts-grid">
           <form className="account-form" onSubmit={savePaymentAccount}>
@@ -3109,7 +3129,10 @@ function selectScheduleDate(dateValue: string) {
             {staffAccounts.length === 0 ? (
               <p className="empty-state">ยังไม่มีบัญชีพนักงาน</p>
             ) : (
-              staffAccounts.map((staff) => (
+              [...staffAccounts].sort((a, b) =>
+                Number(b.accountStatus === 'Active') - Number(a.accountStatus === 'Active')
+                || a.fullName.localeCompare(b.fullName, 'th'),
+              ).map((staff) => (
                 <article className="account-card staff-account-row" key={staff.id}>
                   <div className="staff-card-summary">
                     <div className="staff-person-cell">
@@ -3579,6 +3602,8 @@ function scheduleLeaveLabel(leave: ScheduleLeave, date: string) {
 }
 
 function ChairScheduleHeader({
+  cancelledBookings,
+  onSelectBooking,
   chair,
   windows,
   date,
@@ -3586,6 +3611,8 @@ function ChairScheduleHeader({
   onCreateBooking,
   onManageBooking,
 }: {
+  cancelledBookings: Booking[]
+  onSelectBooking: (booking: Booking, history?: Booking[]) => void
   chair: ScheduleChair
   windows: ChairScheduleBarber[]
   date: string
@@ -3598,7 +3625,7 @@ function ChairScheduleHeader({
   const availability = scheduleAvailability(windows, leaves, date, now)
   const bookableBarbers = chair.barbers.filter(({ barber, isWorkingToday }) => {
     const window = windows.find(w => w.barberId === barber.id)
-    return isWorkingToday && window && hasRemainingBookingWindow(window, leaves, now)
+    return canStartStaffBookingOnDate(date) && isWorkingToday && window && hasRemainingBookingWindow(window, leaves, now)
   })
   const manageableBarbers = chair.barbers.filter(({ barber }) => {
     const window = windows.find(w => w.barberId === barber.id)
@@ -3649,6 +3676,15 @@ function ChairScheduleHeader({
           + จอง
         </button>
       )}
+      {cancelledBookings.length > 0 && <button
+        className="schedule-cancelled-history"
+        type="button"
+        aria-label={`ดูประวัติคิวที่ยกเลิกของ${chair.title} ${cancelledBookings.length} รายการ`}
+        onClick={() => {
+          const history = sortCancelledHistory(cancelledBookings).reverse()
+          onSelectBooking(history[0], history)
+        }}
+      >ประวัติยกเลิก ({cancelledBookings.length})</button>}
       {leaves.length > 0 && <div className="schedule-leave-summary">
         {leaves.map((leave) => <span key={leave.id}>
           {chair.barbers.length > 1 ? `${chair.barbers.find(({ barber }) => barber.id === leave.barberId)?.barber.fullName ?? ''} · ` : ''}
@@ -3676,25 +3712,6 @@ function ChairScheduleTimeline({
 }) {
   const sortedBookings = [...bookings].sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())
   const activeBookings = sortedBookings.filter((booking) => booking.bookingStatus !== 'Cancelled')
-  const cancelledBookings = sortedBookings.filter((booking) => booking.bookingStatus === 'Cancelled')
-  const cancelledBookingGroups = groupSameTimelineSlots(cancelledBookings).map(sortCancelledHistory)
-  const layeredCancelledBookingGroups = cancelledBookingGroups
-    .map((group) => {
-      const anchorBooking = group[0]
-      if (!anchorBooking) return []
-
-      const hasActiveBookingInSlot = activeBookings.some((activeBooking) => isSameTimelineSlot(activeBooking, anchorBooking))
-      return hasActiveBookingInSlot ? group : group.slice(0, -1)
-    })
-    .filter((group) => group.length > 0)
-  const standaloneCancelledBookingGroups = cancelledBookingGroups
-    .filter((group) => {
-      const anchorBooking = group[0]
-      if (!anchorBooking) return false
-
-      const hasActiveBookingInSlot = activeBookings.some((activeBooking) => isSameTimelineSlot(activeBooking, anchorBooking))
-      return !hasActiveBookingInSlot
-    })
   const columnClassName = [
     'barber-column',
     'barber-column-timeline',
@@ -3721,47 +3738,10 @@ function ChairScheduleTimeline({
               <span key={scheduleTimelineStartHour + index} />
             ))}
           </div>
-        {layeredCancelledBookingGroups.length > 0 && (
-          <>
-            {layeredCancelledBookingGroups.map((group) => {
-              const anchorBooking = group[0]
-              if (!anchorBooking) return null
-
-              const fullHistory = cancelledBookingGroups.find((candidateGroup) =>
-                candidateGroup.some((candidate) => isSameTimelineSlot(candidate, anchorBooking)),
-              ) ?? group
-              const placement = getCancelledStackTimelinePlacement(anchorBooking)
-              const hiddenCount = group.length
-
-              return (
-                <div
-                  className="cancelled-stack-hover-zone"
-                  key={`stack-${anchorBooking.startAt}-${anchorBooking.endAt}`}
-                  style={{ ...placement, zIndex: getCancelledStackLayerIndex(anchorBooking) }}
-                >
-                  <button
-                    aria-label={`ดูประวัติคิวที่ยกเลิก ${anchorBooking.customerName ?? 'Walk-in customer'}`}
-                    className="cancelled-stack-card"
-                    onClick={() => onSelectBooking(anchorBooking, fullHistory)}
-                    type="button"
-                  >
-                    <span className="cancelled-stack-row">
-                      <span>{formatTime(anchorBooking.startAt)} - {formatTime(anchorBooking.endAt)}</span>
-                      <strong>{statusLabels[anchorBooking.bookingStatus]}</strong>
-                    </span>
-                    <small>{anchorBooking.customerName ?? 'Walk-in customer'}</small>
-                    {hiddenCount > 1 && <span className="cancelled-stack-count">+{hiddenCount - 1}</span>}
-                  </button>
-                </div>
-              )
-            })}
-          </>
-        )}
         {activeBookings.length > 0 && (
           <>
             {activeBookings.map((booking) => {
               const placement = getBookingTimelinePlacement(booking)
-              const hasCancelledHistory = cancelledBookings.some((cancelledBooking) => isSameTimelineSlot(booking, cancelledBooking))
               const blockingPeriods = leaves.filter(leave => leave.barberId === booking.barberId
                 && new Date(leave.startAt) < new Date(booking.endAt) && new Date(leave.endAt) > new Date(booking.startAt))
               const conflictLabel = blockingPeriods.length
@@ -3772,7 +3752,6 @@ function ChairScheduleTimeline({
                 <button
                   className={[
                     selectedBookingId === booking.id ? 'schedule-card selected' : `schedule-card status-border-${booking.bookingStatus}`,
-                    hasCancelledHistory ? 'has-cancelled-history' : '',
                   ].filter(Boolean).join(' ')}
                   key={booking.id}
                   onClick={() => onSelectBooking(booking)}
@@ -3791,57 +3770,12 @@ function ChairScheduleTimeline({
             })}
           </>
         )}
-        {standaloneCancelledBookingGroups.length > 0 && (
-          <div className="cancelled-booking-layer" aria-label="ประวัติคิวที่ยกเลิก">
-            {standaloneCancelledBookingGroups.map((group) => {
-              const booking = group.at(-1)
-              if (!booking) return null
-
-              const placement = getBookingTimelinePlacement(booking)
-
-              return (
-                <button
-                  className={selectedBookingId === booking.id ? 'cancelled-schedule-card selected' : 'cancelled-schedule-card'}
-                  key={booking.id}
-                  onClick={() => onSelectBooking(booking, group)}
-                  style={{ ...placement, zIndex: getBookingLayerIndex(booking) }}
-                  type="button"
-                >
-                  <span className="schedule-time">{formatTime(booking.startAt)} - {formatTime(booking.endAt)}</span>
-                  <strong>{booking.customerName ?? 'Walk-in customer'}</strong>
-                  <small>{booking.services.map((service) => service.serviceName).join(' + ')}</small>
-                  <span className={`schedule-card-status status-${booking.bookingStatus}`}>{statusLabels[booking.bookingStatus]}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
         </div>
       </div>
     </article>
   )
 }
 
-function isSameTimelineSlot(left: Booking, right: Booking) {
-  return left.startAt === right.startAt && left.endAt === right.endAt
-}
-
-function groupSameTimelineSlots(bookings: Booking[]) {
-  const groups: Booking[][] = []
-
-  bookings.forEach((booking) => {
-    const group = groups.find((candidateGroup) => candidateGroup.some((candidate) => isSameTimelineSlot(candidate, booking)))
-
-    if (group) {
-      group.push(booking)
-      return
-    }
-
-    groups.push([booking])
-  })
-
-  return groups
-}
 
 function sortCancelledHistory(bookings: Booking[]) {
   return [...bookings].sort((left, right) => {
@@ -3863,20 +3797,6 @@ function getBookingLayerIndex(booking: Booking) {
   return 20 + getTimelineStartOffsetMinutes(booking) * 2 + 1
 }
 
-function getCancelledStackLayerIndex(booking: Booking) {
-  return 20 + getTimelineStartOffsetMinutes(booking) * 2
-}
-
-function getCancelledStackTimelinePlacement(booking: Booking): CSSProperties {
-  const start = new Date(booking.startAt)
-  const startMinutes = start.getHours() * 60 + start.getMinutes()
-  const offsetMinutes = Math.max(0, startMinutes - scheduleTimelineStartHour * 60)
-  const top = (offsetMinutes / 60) * scheduleHourHeightPx
-
-  return {
-    top: `${Math.max(0, top - 46)}px`,
-  }
-}
 
 function getBookingTimelinePlacement(booking: Booking, stackIndex = 0): CSSProperties {
   const start = new Date(booking.startAt)
@@ -4640,6 +4560,10 @@ function getDefaultBookingDateTime(dateValue: string) {
   return `${dateValue}T10:00`
 }
 
+function canStartStaffBookingOnDate(dateValue: string) {
+  return dateValue >= getTodayDate() && new Date(getDefaultBookingDateTime(dateValue)).getTime() > Date.now()
+}
+
 function getMinimumStaffBookingDateTime(dateValue = getTodayDate()) {
   const today = getTodayDate()
 
@@ -4657,20 +4581,10 @@ function getMinimumStaffBookingDateTime(dateValue = getTodayDate()) {
   }
 
   if (nextAvailableDate > today || nextAvailableHour > lastBookingStartHour) {
-    return `${addDays(today, 1)}T10:00`
+    return `${today}T${String(lastBookingStartHour).padStart(2, '0')}:00`
   }
 
   return formatLocalDateTimeInputValue(nextAvailableSlot)
-}
-
-function clampDateTimeToMinimum(dateTimeValue: string) {
-  const dateValue = clampDateToToday(dateTimeValue.slice(0, 10))
-  const normalizedValue = dateTimeValue.slice(0, 10) < dateValue
-    ? getDefaultBookingDateTime(dateValue)
-    : normalizeBookingDateTimeToHour(dateTimeValue)
-  const minimumValue = getMinimumStaffBookingDateTime(dateValue)
-
-  return normalizedValue < minimumValue ? minimumValue : normalizedValue
 }
 
 function createEmptyStaffBookingForm(barberId = '', startAt = getDefaultBookingDateTime(getTodayDate())) {
@@ -4690,7 +4604,7 @@ function buildBookingDateTime(dateValue: string, hourValue: string) {
   const hour = Number.parseInt(hourValue, 10)
   const normalizedHour = bookingStartHours.includes(hour) ? hour : scheduleTimelineStartHour
 
-  return `${clampDateToToday(dateValue)}T${String(normalizedHour).padStart(2, '0')}:00`
+  return `${dateValue}T${String(normalizedHour).padStart(2, '0')}:00`
 }
 
 function getBookingHourValue(dateTimeValue: string) {
@@ -4698,10 +4612,6 @@ function getBookingHourValue(dateTimeValue: string) {
   const normalizedHour = bookingStartHours.includes(hour) ? hour : scheduleTimelineStartHour
 
   return String(normalizedHour).padStart(2, '0')
-}
-
-function normalizeBookingDateTimeToHour(dateTimeValue: string) {
-  return buildBookingDateTime(dateTimeValue.slice(0, 10), getBookingHourValue(dateTimeValue))
 }
 
 function roundUpToNextSlot(value: Date, intervalMinutes: number) {
