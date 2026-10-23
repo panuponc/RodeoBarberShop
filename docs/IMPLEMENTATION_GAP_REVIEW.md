@@ -1,5 +1,37 @@
 # Implementation Gap Review
 
+## Current Scope Authority
+
+As of 2026-10-24, use [V42 Scope Alignment](V42_SCOPE_ALIGNMENT.md) and the user's
+`Rodeo_Barber_Shop_V42.docx` for exam scope, not historical sprint priorities.
+The original findings and closure log below are retained. This update reconciles
+scope at code baseline `b650b37`; it is not a new full acceptance run.
+
+- S04-01/S04-02 implementation is integrated into main at b650b37; full live acceptance remains pending. The latest focused service test run passed 10 cases; earlier five-test and catalogue-count entries below are historical snapshots, not current database counts.
+- S06-03 implementation is integrated through df9be5a (already an ancestor of main); its old integration-pending text is superseded. Existing verification limits remain.
+- S05-01: split V42 8.1-8.2.3 baseline acceptance from additional holiday range/recurrence and configurable-cancellation work. Settings remain incomplete; do not require the entire expansion to claim the explicit Word baseline is met.
+- S06-01: V42 4.6.3 requires a fixed one-hour minimum and cancellation reason. Fixed-rule acceptance and the later dynamic-setting follow-up must be reported separately.
+- S06-02/S08-01: V42 4.2.2 and 5.5.1 explicitly require no-barber-preference booking and shop assignment. The historical question about whether this is mandatory is resolved: it is required. Reservation and assignment behavior still needs design; do not assume random automatic assignment satisfies it.
+- S07-01: Guest Email OTP is mandatory Project 1 under V42 4.7.1.
+- S10-01: verify all three front-desk methods under V42 7.4, including bank-account display; also check discount/net amount and summary fields under 7.3/7.6, independently of the Project 2 promotion engine.
+- S09-01: hierarchical assessment is an additional shop agreement; V42 6.2 requires adding services with conflict checks, not this specific substep model.
+
+### V42-01: Personnel Phase And Privilege Clarification
+
+- Status: Awaiting Verification. Scope question, not approved new functionality.
+- V42 1.5 lists personnel accounts, while table 1.2 schedules that module in Project 2. Keep already delivered accounts. Check exact role/field restrictions and the highest-admin reset rule (1.5.9.2) against StaffController before declaring complete; do not invent a new role from the wording alone.
+
+### V42-02: Front-Desk Working Schedule Coverage
+
+- Status: Awaiting Verification. V42 2.4.1-2.4.3 require days, start/end times and days off for both barbers and front-desk staff.
+- Barber working-hours implementation is not proof of front-desk scheduling. Audit models/API/UI and verify each specified operation before closing this item; implement missing coverage only after scope review.
+
+### V42-03: Cancelled-Slot Offer Workflow Conflict
+
+- Status: Not Started; unresolved scope conflict. V42 5.4.2-5.4.4 specifies customer notifications, first-confirmation priority and queue movement. Later conversation specified shop-only rescheduling after contacting the customer.
+- Staff rescheduling is not equivalent to the written requirement. General notifications are also scheduled in Project 2 table 1.2. Obtain explicit clarification/approved document revision; until then keep the Word requirement visible, not waived, closed or silently implemented.
+- Acceptance after resolution: trace the agreed behavior to the exam document and test the complete flow, including concurrent first-confirmation handling if that requirement remains.
+
 ## Review Baseline
 
 - Review date: 2026-09-17.
@@ -69,7 +101,7 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 
 ### S04-01: Service Management UI
 
-- Type: Partial. Status: Implemented on `feature/service-management`; pending user acceptance and integration.
+- Type: Partial. Status: Awaiting Verification. Implementation integrated into `main` at `b650b37`; full user acceptance pending.
 - Finding: create/edit/disable and active-service listing APIs exist, but the frontend service-management screen was not found.
 - Evidence: [ServicesController.cs](../backend/RodeoBarberShop.Api/Controllers/ServicesController.cs); [App.tsx](../frontend/src/App.tsx), service reads and staff navigation.
 - Acceptance: authorized staff can create, edit and disable services from the UI; validation and loading/error states work; disabled services cannot be newly booked and existing booking snapshots remain intact. Review how inactive services are listed before adding a reactivation control.
@@ -78,7 +110,7 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 
 ### S04-02: Barber Service Mapping UI
 
-- Type: Partial. Status: Implemented on `feature/service-management`; pending user acceptance and integration.
+- Type: Partial. Status: Awaiting Verification. Implementation integrated into `main` at `b650b37`; full user acceptance pending.
 - Finding: `UpdateBarber` accepts service IDs, but a frontend editor for this mapping was not found.
 - Evidence: [BarbersController.cs](../backend/RodeoBarberShop.Api/Controllers/BarbersController.cs), `UpdateBarber`; [App.tsx](../frontend/src/App.tsx).
 - Acceptance: Owner/Admin can inspect and update mappings, changes persist, and booking/rescheduling honor eligible services. Confirm the meaning of an empty mapping before changing it; current backend treats it as unrestricted.
@@ -105,11 +137,11 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 - Finding: current booking validation requires a non-empty barber ID; a nullable entity field alone does not implement unassigned booking.
 - Evidence: [BookingsController.cs](../backend/RodeoBarberShop.Api/Controllers/BookingsController.cs), `ValidateCreateBookingRequest`; [App.tsx](../frontend/src/App.tsx), customer barber selector.
 - Acceptance: first confirm whether "no preference" means automatic assignment or a genuinely unassigned queue. Then implement the agreed flow with valid service duration/capacity and no double booking. Track front-desk completion under S08-01.
-- Scope note: the sprint plan says "barber selection or unassigned booking"; review the original requirement before treating unassigned booking as mandatory rather than an alternative.
+- Scope correction (2026-10-24): V42 4.2.2 explicitly requires booking without selecting a barber for shop assignment. The former uncertainty about whether it is required is resolved; exact reservation/assignment behavior remains to be designed.
 
 ### S06-03: Customer Availability Becomes Stale
 
-- Type: Partial. Status: Done on `feature/customer-booking-ui`; integration pending.
+- Type: Partial. Status: Done. Integrated into `main` through `df9be5a`; prior verification limits remain.
 - Original finding: customer availability filtered `isAvailable` but not past start times; changing service/barber/date did not immediately clear displayed old slots. Backend rejected invalid writes, but the UI could still offer stale choices.
 - Evidence: [App.tsx](../frontend/src/App.tsx), `checkAvailability`, `createBooking` and customer input handlers; [BookingsController.cs](../backend/RodeoBarberShop.Api/Controllers/BookingsController.cs), `GetAvailability` and `ValidateBookingAvailability`.
 - Acceptance: changing inputs invalidates or refreshes slots; past starts cannot be selected; submitted date/barber/services match the displayed slot. Retain server-side validation for concurrent changes.
@@ -185,6 +217,12 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 
 ## Priority And Scope Decisions
 
+Current recommendation (2026-10-24): close the V42 baseline of S05-01 first,
+then select from the remaining mandatory gaps using the V42 matrix. This is a
+recommendation only. V42-01/02/03 and S07-01, S06-02/S08-01, S10-01 and S11
+acceptance stay visible. The older recommendations below are historical and do
+not override Word V42 or authorize a new feature.
+
 - Recommended first: S06-01, because customer cancellation is a core workflow with a missing backend business rule. This is a recommendation, not permission to start edits automatically.
 - Recheck S06-02/S08-01 against original scope before implementing unassigned booking.
 - Do not count this list as a fresh full security audit, or treat absence of an item as proof of correctness.
@@ -196,6 +234,9 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 | Item ID | Status change | Verified on | Evidence / commit | Remaining limits |
 | --- | --- | --- | --- | --- |
 | Baseline | Review recorded; no gaps closed by this document | 2026-09-17 | Static review of `bbd8560` | Recheck before implementation |
+| V42 baseline | Word becomes exam authority; phase/conflict matrix recorded | 2026-10-24 | V42 1.3 and 1.4 tables 1.1/1.2; static baseline b650b37; documentation commit pending | No new end-to-end test; V42-01/02/03 remain open |
+| S04-01 / S04-02 | Implementation integrated; awaiting full live acceptance | 2026-10-24 | b650b37; prior focused backend run 10 passed; frontend build/lint passed | Earlier catalogue snapshots are historical; not full Project 1 acceptance |
+| S06-03 | Integration recorded | 2026-10-24 | df9be5a is included in main at b650b37 | Prior live/emulation evidence retained; no new physical-device or concurrency run |
 | S06-01 | Not Started -> Awaiting Verification | 2026-09-17 | CustomerCancellationTests.cs; frontend build; mocked browser checks; commit pending | Live customer/shop acceptance and real mobile check pending; PostgreSQL races not rerun |
 | S05-01 | Approved scope expanded; remains Not Started | 2026-09-17 | User-approved operating calendar, holiday ranges/recurrence and configurable cancellation; rechecked ShopController | Settings implementation and dynamic S06-01 integration pending |
 | S06-01 | Fixed-cutoff increment accepted; full item remains open | User confirmation in this session | `d5e1321`: user confirmed live customer cancellation and matching Owner status | Dynamic lead time under S05-01 pending; physical device unspecified; PostgreSQL races not rerun |

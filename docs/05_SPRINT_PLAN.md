@@ -2,12 +2,21 @@
 
 ## Version
 
-Version: 1.0  
-Status: Draft
+Version: 1.1
+
+Status: V42-aligned planning baseline; implementation acceptance remains separate
 
 ## Overview
 
-This sprint plan follows the approved project scope and separates work into Project 1 and Project 2.
+The exam scope authority is `Rodeo_Barber_Shop_V42.docx`, chapter 1 section 1.3
+and section 1.4 tables 1.1/1.2, reviewed on 2026-10-24. See
+[V42 Scope Alignment](V42_SCOPE_ALIGNMENT.md) for clause-level traceability,
+phase overlaps, additional shop agreements and unresolved conflicts.
+
+Sprint IDs below are retained for historical tracking; they do not override V42.
+Project 1 covers V42 groups 1-8, with personnel-account management explicitly
+scheduled in Project 2 table 1.2 despite its placement under group 1. Keep early
+Project 2 implementation. Do not declare a whole phase complete from sprint order.
 
 ## Implementation Follow-Up
 
@@ -48,6 +57,10 @@ Goal: Build the core management and booking system.
 
 ### Sprint 3: Personnel And Barber Management
 
+V42 group 2 is Project 1. Personnel-account management (1.5) is scheduled in
+Project 2 table 1.2 but was implemented early here; retain it. Audit front-desk
+staff working days/hours/days off under 2.4 separately from barber schedules.
+
 - Personnel account management
 - Role assignment
 - Account status management
@@ -73,7 +86,11 @@ Goal: Build the core management and booking system.
 - Barber weekly working hours
 - Available slot calculation
 
-Approved follow-up scope (2026-09-17), tracked in S05-01 of
+V42 baseline: clauses 8.1-8.2.3 require shop information, operating hours/days,
+weekly holidays and special holidays. The expanded shop agreements below are
+not all explicit V42 requirements and must not delay closing that baseline.
+
+Approved additional scope (2026-09-17), tracked in S05-01 of
 [Implementation Gap Review](IMPLEMENTATION_GAP_REVIEW.md):
 
 - Owner shop settings screen: shop information, operating days/hours, and booking/cancellation rules; retain existing Owner/Admin API permissions.
@@ -97,13 +114,15 @@ are not yet implemented.
 - Multiple service selection
 - Estimated price calculation
 - Estimated duration calculation
-- Barber selection or unassigned booking
+- Named barber selection AND an option to omit the barber for shop assignment (V42 4.2.1-4.2.2; assignment/capacity design remains to be agreed)
 - Date and time selection
 - Booking overlap validation
 - Customer booking history
-- Customer cancellation with shop-configured lead time (default 1 hour) and reason; configuration tracked under S05-01
+- Customer cancellation at least 1 hour before service, with reason (V42 4.6.3); no customer self-rescheduling (4.6.4). Configurable lead time is a separate shop agreement under S05-01, not the exam baseline.
 
 ### Sprint 7: Guest Booking
+
+Required in Project 1 by V42 4.7.1, not optional and not satisfied by staff-entered walk-ins.
 
 - Guest booking form
 - Email OTP send and verify
@@ -118,6 +137,7 @@ are not yet implemented.
 - Walk-in customer creation
 - Assign barber to unassigned booking
 - Change barber with availability validation
+- V42 5.4.2-5.4.4: cancelled-slot notification, first-confirming customer priority and queue update. Unresolved conflict with the later staff-only rescheduling agreement; track V42-03 before implementation or exam sign-off. General notifications remain in Sprint 14.
 
 ### Sprint 9: Barber Service Flow
 
@@ -268,18 +288,22 @@ Concurrency verification checkpoint (2026-09-17):
 
 ### Must Have
 
+For the Project 1 exam, use V42 clauses and the alignment matrix, not these
+historical product-priority tiers, to determine mandatory acceptance.
+
 - Authentication and roles
 - Service management
 - Barber management
 - Shop settings
 - Online booking
+- Guest booking with Email OTP (V42 4.7.1)
+- No-barber-preference booking and shop assignment (V42 4.2.2, 5.5.1)
 - Queue management
 - Walk-in
 - Payment recording
 
 ### Should Have
 
-- Guest booking with Email OTP
 - Dashboard
 - Barber leave management
 - Notifications
@@ -294,5 +318,6 @@ Concurrency verification checkpoint (2026-09-17):
 
 - Build and test one complete workflow before adding advanced features.
 - Keep database migrations small and reviewable.
-- Treat the PDF scope document as the source of truth.
+- Treat Word V42 as the exam scope source of truth; the earlier PDF is historical.
+- Keep V42 requirements, additional shop agreements and verification results distinct.
 - Update documents whenever scope changes.

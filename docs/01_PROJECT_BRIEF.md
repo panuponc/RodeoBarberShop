@@ -6,7 +6,18 @@ Rodeo Barber Shop Management System
 
 ## Source Document
 
-This project brief is based on the approved project scope document:
+Current exam scope authority (confirmed by the user and reviewed 2026-10-24):
+
+```text
+Rodeo_Barber_Shop_V42.docx
+```
+
+Use chapter 1 section 1.3 and section 1.4 tables 1.1/1.2, with
+[V42 Scope Alignment](V42_SCOPE_ALIGNMENT.md), to determine Project 1 requirements.
+Capabilities described below include later-phase and additional shop agreements;
+their presence here is not evidence of implementation or Project 1 acceptance.
+
+Historical source used before V42 (not the current exam authority):
 
 ```text
 2569-1-O1007_01_ระบบจัดการร้านตัดผม Rodeo Barber Shop3.pdf
