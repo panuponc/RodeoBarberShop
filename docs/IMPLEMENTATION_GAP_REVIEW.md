@@ -105,14 +105,14 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 
 ### S06-03: Customer Availability Becomes Stale
 
-- Type: Partial. Status: Awaiting Verification.
+- Type: Partial. Status: Done on `feature/customer-booking-ui`; integration pending.
 - Original finding: customer availability filtered `isAvailable` but not past start times; changing service/barber/date did not immediately clear displayed old slots. Backend rejected invalid writes, but the UI could still offer stale choices.
 - Evidence: [App.tsx](../frontend/src/App.tsx), `checkAvailability`, `createBooking` and customer input handlers; [BookingsController.cs](../backend/RodeoBarberShop.Api/Controllers/BookingsController.cs), `GetAvailability` and `ValidateBookingAvailability`.
 - Acceptance: changing inputs invalidates or refreshes slots; past starts cannot be selected; submitted date/barber/services match the displayed slot. Retain server-side validation for concurrent changes.
 - Implemented on `feature/customer-booking-ui`: customer-only workspace extracted to `CustomerBooking.tsx`; context-keyed, abortable availability; selection cleared on service/barber/date changes; future-start guard checked during rendering and submission; explicit review before writing; conflict feedback and recheck. API validators remain unchanged.
-- Follow-up after live UI acceptance: date now precedes barber selection; the list is filtered by each barber's service/date availability and future starts before selection. Customer-reported off-day barbers are no longer offered simply because they appear in the public barber catalogue. Mocked off-day/leave/full/past-only/next-day tests pass; read-only live API checks returned zero starts for the two reported barbers on 2026-09-17. This follow-up still awaits user acceptance.
-- Chair follow-up: customer selection now starts from date-effective active chair assignments. Backend availability/create/reschedule also reject an unassigned barber once any chair is configured, and shared resource conflicts derive from real chair assignments rather than hard-coded names. Verification: 117 backend tests passed, one PostgreSQL theory skipped without its database; frontend build/lint and mocked responsive flow passed. Live acceptance remains pending.
-- Verification: frontend build/lint and mocked browser workflow checks passed, including responsive transitions and selected/unselected screenshot inspection. See [Customer Booking UI Verification](CUSTOMER_BOOKING_UI_TESTS.md) for repeatable checks and limitations. Redesigned live customer/Owner flow and physical-device acceptance remain pending; no full-sprint completion claim.
+- Follow-up after live UI acceptance: date now precedes barber selection; the list is filtered by each barber's service/date availability and future starts before selection. Customer-reported off-day barbers are no longer offered simply because they appear in the public barber catalogue. Mocked off-day/leave/full/past-only/next-day tests pass; read-only live API checks returned zero starts for the two reported barbers on 2026-09-17.
+- Chair follow-up: customer selection now starts from date-effective active chair assignments. Backend availability/create/reschedule also reject an unassigned barber once any chair is configured, and shared resource conflicts derive from real chair assignments rather than hard-coded names. Verification: 117 backend tests passed, one PostgreSQL theory skipped without its database; frontend build/lint and mocked responsive flow passed.
+- Live verification on 2026-10-23 used existing Customer and Owner accounts against Supabase development data. The rendered customer list exactly matched date/service availability, hid one assigned-but-unavailable barber and one no-chair barber, created a real appointment, and showed matching booking details in the Owner timeline. The appointment was cancelled through the customer UI and retained as `Cancelled`; no active test appointment remains. See [Customer Booking UI Verification](CUSTOMER_BOOKING_UI_TESTS.md). Physical-device and live concurrent-conflict checks remain limitations, not blockers for this focused item.
 
 ### S07-01: Guest Booking With Email OTP
 
@@ -176,7 +176,7 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 ## Customer UI Acceptance Update
 
 - User confirmed live booking through the redesigned customer UI and matching barber, date/time and services in the Owner view for `4033353`. The focused customer UI increment is ready for integration.
-- This supersedes the pending live booking happy-path note under S06-03, but does not claim physical-device or live conflict/cancellation/receipt testing. Those limits remain in [Customer Booking UI Verification](CUSTOMER_BOOKING_UI_TESTS.md).
+- A second live acceptance run on 2026-10-23 verified the chair/date/service filtering follow-up, matching Owner details and customer cancellation with cleanup. This closes S06-03 on the feature branch and makes the focused increment ready for integration. It does not claim physical-device, live concurrent-conflict or receipt acceptance.
 - S09-01 assessment/catalogue work and S05-01 shop settings are still not implemented; merging this UI branch does not complete them.
 
 ## Priority And Scope Decisions
@@ -196,3 +196,4 @@ Finding types: **Missing** = no implementation found for the flow; **Partial** =
 | S05-01 | Approved scope expanded; remains Not Started | 2026-09-17 | User-approved operating calendar, holiday ranges/recurrence and configurable cancellation; rechecked ShopController | Settings implementation and dynamic S06-01 integration pending |
 | S06-01 | Fixed-cutoff increment accepted; full item remains open | User confirmation in this session | `d5e1321`: user confirmed live customer cancellation and matching Owner status | Dynamic lead time under S05-01 pending; physical device unspecified; PostgreSQL races not rerun |
 | S06-03 | Not Started -> Awaiting Verification | Customer UI redesign session | CustomerBooking.tsx; frontend/tests/customer-booking.ui.cjs; commit pending | Mocked browser checks only; redesigned live/physical-device acceptance pending |
+| S06-03 | Awaiting Verification -> Done on feature branch | 2026-10-23 | Live Customer booking, exact availability filtering, matching Owner detail and customer cancellation; implementation `df9be5a` | Integration commit pending; physical device, live conflict and receipt checks remain |

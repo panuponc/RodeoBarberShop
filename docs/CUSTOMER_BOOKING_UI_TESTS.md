@@ -38,10 +38,13 @@ Screenshots are written to the existing ignored `.tmp` directory. These are brow
 - This confirms the live booking happy path only. Device type was not specified; it does not establish live conflict, cancellation, receipt or physical-mobile regression coverage.
 - Subsequent unavailable-barber fix: read-only live availability checks on 2026-09-17 for the active male haircut returned zero future available starts for both ช่างนุค and ช่างนุ้ย. Mocked UI tests passed for the new date-first filtering; live end-to-end acceptance of this follow-up is still pending. No real bookings were created by this check.
 - Chair follow-up verification: 117 backend tests passed; the PostgreSQL concurrency theory was skipped because its dedicated database was not started. Frontend build/lint and mocked browser flow passed. The browser check uses emulation, not physical hardware. Live acceptance of chair-filtered selection remains pending.
+- Live chair-filtered acceptance passed on 2026-10-23 against the Supabase development data using the existing Customer and Owner accounts. For 2026-10-24 and the selected `ตัดผมชาย` service, the customer UI showed exactly the five barbers with a future available slot, hid ช่างเปิ้ล because no slot was available, and hid ช่างไปป์ because he had no date-effective chair assignment.
+- The customer booked ช่างเค้ก at 10:00 through the rendered UI. The Owner timeline and detail sheet showed the same booking number, customer, barber, service, date and time. The test then logged back in as the customer and cancelled the appointment through the UI; the Owner API retained the record as `Cancelled`. Screenshots were inspected at a 390 x 844 emulated viewport. No active test appointment remains.
+- The live data check also found 21 active services and the exact `ตัดผมชาย` entry configured as 30 minutes. This is catalogue data debt tracked separately under S09-01; it does not invalidate the barber/chair filtering acceptance.
 
 ## Remaining Acceptance
 
-- Live booking/Owner happy-path acceptance is recorded above. Cancellation, receipts and negative-path checks for this redesign remain browser-mocked evidence.
+- Live booking, matching Owner visibility and customer cancellation are recorded above. Receipts and concurrent conflict recovery for this redesign remain browser-mocked or backend-test evidence.
 - Physical touch devices, virtual keyboard and mobile Safari have not been tested.
 - Backend collision/status guards are retained, not replaced by UI validation. This browser suite is not a database concurrency test.
 - Shop-configured cancellation deadlines, catalogue administration, profile/password editing and guest OTP remain separate tracked work.
