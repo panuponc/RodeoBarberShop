@@ -352,6 +352,7 @@ function App() {
   const paymentSubmitting = useRef(false)
   const [staffReceiptPaymentId, setStaffReceiptPaymentId] = useState<string | null>(null)
   const [staffReceipt, setStaffReceipt] = useState<Receipt | null>(null)
+  const receiptRequest = useRef(0)
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([])
   const [qrPreview, setQrPreview] = useState<QrPreview | null>(null)
   const [qrTestAmount, setQrTestAmount] = useState('100')
@@ -1778,6 +1779,7 @@ function selectScheduleDate(dateValue: string) {
   }
 
   function openBookingDetail(booking: Booking, history: Booking[] = [booking]) {
+    receiptRequest.current += 1
     setStaffReceiptPaymentId(null)
     setStaffPaymentError('')
     setSelectedBooking(booking)
@@ -1789,12 +1791,38 @@ function selectScheduleDate(dateValue: string) {
   }
 
   function closeBookingDetail() {
+    receiptRequest.current += 1
     setSelectedBooking(null)
     setSelectedBookingHistory([])
     setPaymentSummary(null)
     setStaffReceipt(null)
+    setStaffReceiptPaymentId(null)
+    setStaffPaymentError('')
     setIsCancelBookingOpen(false)
     setCancelReason('')
+  }
+
+  async function loadBookingReceipt(booking: Booking) {
+    const requestId = ++receiptRequest.current
+    setStaffPaymentError('')
+    setIsBusy(true)
+    try {
+      const receipt = await api<Receipt>(`/api/payments/booking/${booking.id}/receipt`)
+      if (requestId !== receiptRequest.current) return
+      setStaffReceipt(receipt)
+      requestAnimationFrame(() => {
+        if (requestId === receiptRequest.current) staffDetailBodyRef.current?.scrollTo({ top: staffDetailBodyRef.current.scrollHeight, behavior: 'smooth' })
+      })
+    } catch (error) {
+      if (requestId === receiptRequest.current) {
+        setStaffPaymentError(error instanceof Error ? error.message : 'โหลดใบเสร็จไม่สำเร็จ กรุณาลองอีกครั้ง')
+        requestAnimationFrame(() => {
+          if (requestId === receiptRequest.current) staffDetailBodyRef.current?.scrollTo({ top: staffDetailBodyRef.current.scrollHeight, behavior: 'smooth' })
+        })
+      }
+    } finally {
+      if (requestId === receiptRequest.current) setIsBusy(false)
+    }
   }
 
   function openBarberCheckout(booking: Booking) {
@@ -2690,8 +2718,15 @@ function selectScheduleDate(dateValue: string) {
                       {selectedBookingHistory.map((booking, index) => (
                         <button
                           className={booking.id === selectedBooking.id ? 'selected' : ''}
+                          disabled={isBusy}
                           key={booking.id}
-                          onClick={() => setSelectedBooking(booking)}
+                          onClick={() => {
+                            receiptRequest.current += 1
+                            setSelectedBooking(booking)
+                            setStaffReceipt(null)
+                            setStaffReceiptPaymentId(null)
+                            setStaffPaymentError('')
+                          }}
                           type="button"
                         >
                           <span>{index + 1}</span>
@@ -2779,6 +2814,12 @@ function selectScheduleDate(dateValue: string) {
                 {staffReceipt && <ReceiptBox receipt={staffReceipt} />}
                 </div>
                 <div className="booking-detail-actions staff-booking-detail-actions">
+                  {selectedBooking.paymentStatus === 'Paid' && (
+                    <button className="status-next-button" disabled={isBusy} onClick={() => {
+                      if (staffReceipt) setStaffReceipt(null)
+                      else void loadBookingReceipt(selectedBooking)
+                    }} type="button">{staffReceipt ? 'ซ่อนใบเสร็จ' : isBusy ? 'กำลังโหลด...' : 'ดูใบเสร็จ'}</button>
+                  )}
                   {!paymentSummary && !staffReceipt && selectedBooking.paymentStatus !== 'Paid' && previousStatus[selectedBooking.bookingStatus] && (
                     <button className="secondary status-back-button" disabled={isBusy} onClick={() => moveStatus(selectedBooking, previousStatus[selectedBooking.bookingStatus])} type="button">
                       ย้อนกลับเป็น {statusLabels[previousStatus[selectedBooking.bookingStatus]]}
