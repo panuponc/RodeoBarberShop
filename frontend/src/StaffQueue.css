@@ -140,6 +140,15 @@
 .staff-queue-workspace .error { background: #321e25; color: #f5a9b3; border-color: #6b3d46; }
 
 /* Dialogs use the same surfaces and compact fields as the barber checkout. */
+.staff-queue-workspace .staff-payment-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.staff-queue-workspace .payment-box .staff-payment-methods button { min-height: 44px; padding: 8px; background: #20252d; color: var(--sq-text); border: 1px solid var(--sq-border); border-radius: 6px; box-shadow: none; }
+.staff-queue-workspace .payment-box .staff-payment-methods button[aria-pressed="true"] { background: #302a1c; color: var(--sq-gold); border-color: var(--sq-gold); }
+.staff-queue-workspace .staff-payment-totals { width: 100%; margin: 8px 0; }
+.staff-queue-workspace .staff-payment-totals div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; }
+.staff-queue-workspace .staff-payment-totals dd { margin: 0; }
+.staff-queue-workspace .staff-payment-totals div:last-child { color: var(--sq-gold); font-weight: 600; border-top: 1px solid var(--sq-border); }
+.staff-queue-workspace .staff-transfer-account { display: grid; gap: 8px; width: 100%; overflow-wrap: anywhere; user-select: text; }
+.staff-queue-workspace .staff-payment-box > p { color: var(--sq-muted); font-size: 12px; }
 .staff-queue-workspace .staff-edit-appointment { margin: 12px 18px 0; min-height: 44px; width: calc(100% - 36px); background: #20252d; border: 1px solid var(--sq-border); color: var(--sq-gold); border-radius: 8px; }
 .staff-queue-workspace .sheet-body > .bq-phone-copy-full { margin: 16px 18px 0; }
 .staff-queue-workspace .bq-customer-phone { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 10px 12px; background: #20252d; border: 1px solid var(--sq-border); border-radius: 8px; color: var(--sq-gold); box-shadow: none; user-select: text; }
@@ -168,11 +177,11 @@ body:has(.staff-queue-workspace .modal-backdrop) { overflow: hidden; }
 .staff-queue-workspace :is(.booking-detail-actions, .action-row, .payment-box) button { min-height: 44px; padding: 10px; border: 1px solid #cfad4d; border-radius: 8px; background: linear-gradient(110deg, #edcf86, #c8a52e); color: #211c0d; font-size: 12px; box-shadow: none; }
 .staff-queue-workspace :is(.booking-detail-actions, .action-row) button.secondary { background: #20252d; border-color: var(--sq-border); color: var(--sq-muted); }
 .staff-queue-workspace .booking-detail-actions button.danger { background: #321e25; border-color: #6b3d46; color: #f5a9b3; }
-.staff-queue-workspace .staff-booking-detail-actions { grid-template-columns: minmax(0, 1fr); }
-.staff-queue-workspace .staff-booking-detail-actions:has(.cancel-booking-button):has(.status-next-button) { grid-template-columns: minmax(88px, 1fr) minmax(0, 2fr); }
+.staff-queue-workspace .app-sheet-backdrop .booking-detail-actions.staff-booking-detail-actions { grid-template-columns: minmax(0, 1fr); }
+.staff-queue-workspace .app-sheet-backdrop .booking-detail-actions.staff-booking-detail-actions:has(> button + button) { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: stretch; }
 .staff-queue-workspace .staff-booking-detail-actions:empty { display: none; }
 .staff-queue-workspace .staff-booking-detail-actions button { order: 0; white-space: normal; min-width: 0; }
-.staff-queue-workspace .staff-booking-detail-actions .status-back-button { grid-column: 1 / -1; }
+.staff-queue-workspace .staff-booking-detail-actions .status-back-button { grid-column: auto; }
 .staff-queue-workspace .staff-booking-detail-actions button.cancel-booking-button { background: #20252d; border-color: var(--sq-border); }
 .staff-queue-workspace .staff-booking-card { margin: 0 18px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--sq-border); border-radius: 0; background: transparent; box-shadow: none; }
 .staff-queue-workspace .staff-booking-field-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
@@ -194,6 +203,7 @@ body:has(.staff-queue-workspace .modal-backdrop) { overflow: hidden; }
 .staff-queue-workspace .staff-booking-feedback:empty { display: none; }
 .staff-queue-workspace :is(.payment-box, .receipt-box, .cancel-booking-box, .booking-history-box, .cancel-reason-note) { margin: 16px 18px; padding: 14px; background: #101318; color: var(--sq-text); border-color: var(--sq-border); border-radius: 8px; box-shadow: none; }
 .staff-queue-workspace .payment-box img { max-width: 100%; background: white; border: 12px solid white; }
+.staff-queue-workspace .staff-payment-box > img { justify-self: center; }
 .staff-queue-workspace :is(.cancel-booking-box p, .cancel-reason-note strong, .receipt-box p) { color: var(--sq-muted); }
 .staff-queue-workspace :is(.cancel-reason-options button, .booking-history-list button, .staff-customer-suggestions) { background: #20252d; color: var(--sq-text); border-color: var(--sq-border); box-shadow: none; }
 .staff-queue-workspace .cancel-reason-options button.selected { background: #321e25; color: #f5a9b3; border-color: #6b3d46; }

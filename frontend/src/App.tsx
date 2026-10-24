@@ -204,6 +204,9 @@ export type Booking = {
 }
 
 export type PaymentSummary = {
+  subtotalAmount: number
+  discountAmount: number
+  transferAccount?: { id: string; accountName: string; accountNumber: string; bankName: string | null } | null
   bookingId: string
   bookingStatus: string
   paymentStatus: string
@@ -344,6 +347,10 @@ function App() {
   const [isCancelBookingOpen, setIsCancelBookingOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null)
+  const [staffPaymentMethod, setStaffPaymentMethod] = useState<'Cash' | 'BankTransfer' | 'QrPayment'>('Cash')
+  const [staffPaymentError, setStaffPaymentError] = useState('')
+  const paymentSubmitting = useRef(false)
+  const [staffReceiptPaymentId, setStaffReceiptPaymentId] = useState<string | null>(null)
   const [staffReceipt, setStaffReceipt] = useState<Receipt | null>(null)
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([])
   const [qrPreview, setQrPreview] = useState<QrPreview | null>(null)
@@ -440,11 +447,6 @@ function App() {
   const [staffBookingForm, setStaffBookingForm] = useState({
     ...createEmptyStaffBookingForm('', getDefaultBookingDateTime(getTodayDate())),
   })
-
-  const defaultPaymentAccount = useMemo(
-    () => paymentAccounts.find((account) => account.isActive && account.isDefault),
-    [paymentAccounts],
-  )
 
   const canManageStaff = auth?.role === 'Owner' || auth?.role === 'Admin'
   const staffBookingBarberOptionSet = new Set(staffBookingBarberOptions)
@@ -1368,6 +1370,8 @@ function selectScheduleDate(dateValue: string) {
   }
 
   async function loadPaymentSummary(booking: Booking) {
+    setStaffPaymentError('')
+    setStaffPaymentMethod('Cash')
     setSelectedBooking(booking)
     setStaffReceipt(null)
     setIsBusy(true)
@@ -1377,14 +1381,18 @@ function selectScheduleDate(dateValue: string) {
       const result = await api<PaymentSummary>(`/api/payments/booking/${booking.id}`)
       setPaymentSummary(result)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'โหลด QR ไม่สำเร็จ')
+      setStaffPaymentError(error instanceof Error ? error.message : 'โหลดข้อมูลรับชำระไม่สำเร็จ')
     } finally {
       setIsBusy(false)
     }
   }
 
   async function confirmPayment() {
-    if (!selectedBooking) return
+    if (!selectedBooking || !paymentSummary || paymentSubmitting.current || isBusy) return
+    if (staffPaymentMethod === 'BankTransfer' && !paymentSummary.transferAccount) return
+    if (staffPaymentMethod === 'QrPayment' && !paymentSummary.qrImageDataUrl) return
+    paymentSubmitting.current = true
+    setStaffPaymentError('')
 
     setIsBusy(true)
     setMessage('')
@@ -1394,20 +1402,25 @@ function selectScheduleDate(dateValue: string) {
         method: 'POST',
         body: JSON.stringify({
           bookingId: selectedBooking.id,
-          paymentAccountId: paymentSummary?.paymentAccount?.id ?? defaultPaymentAccount?.id,
-          paymentMethod: 'QrPayment',
-          note: 'Staff verified customer slip manually',
+          paymentAccountId: staffPaymentMethod === 'Cash' ? null : staffPaymentMethod === 'BankTransfer' ? paymentSummary.transferAccount?.id : paymentSummary.paymentAccount?.id,
+          paymentMethod: staffPaymentMethod,
+          note: staffPaymentMethod === 'Cash' ? 'Staff confirmed cash received' : 'Staff manually verified incoming funds',
         }),
       })
-      const receiptResult = await api<Receipt>(`/api/payments/${payment.id}/receipt`)
-
-      setStaffReceipt(receiptResult)
       setPaymentSummary(null)
+      setSelectedBooking({ ...selectedBooking, bookingStatus: 'Completed', paymentStatus: 'Paid' })
+      setStaffReceiptPaymentId(payment.id)
+      try {
+        setStaffReceipt(await api<Receipt>(`/api/payments/${payment.id}/receipt`))
+      } catch {
+        setStaffPaymentError('รับเงินสำเร็จแล้ว แต่โหลดใบเสร็จไม่สำเร็จ กดโหลดใบเสร็จอีกครั้งได้ ไม่ต้องรับเงินซ้ำ')
+      }
       await refreshQueue()
-      setMessage('ยืนยันชำระเงินและออกใบเสร็จแล้ว')
+      setMessage('บันทึกรับชำระเงินแล้ว')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'ยืนยันชำระเงินไม่สำเร็จ')
+      setStaffPaymentError(error instanceof Error ? error.message : 'ยืนยันชำระเงินไม่สำเร็จ กรุณาตรวจสถานะก่อนลองอีกครั้ง')
     } finally {
+      paymentSubmitting.current = false
       setIsBusy(false)
     }
   }
@@ -1765,6 +1778,8 @@ function selectScheduleDate(dateValue: string) {
   }
 
   function openBookingDetail(booking: Booking, history: Booking[] = [booking]) {
+    setStaffReceiptPaymentId(null)
+    setStaffPaymentError('')
     setSelectedBooking(booking)
     setSelectedBookingHistory(history)
     setPaymentSummary(null)
@@ -2723,18 +2738,40 @@ function selectScheduleDate(dateValue: string) {
                   </section>
                 )}
 
+                {staffPaymentError && <p className="error" role="alert">{staffPaymentError}</p>}
+                {staffReceiptPaymentId && !staffReceipt && <button type="button" disabled={isBusy} onClick={async () => {
+                  setIsBusy(true)
+                  try { setStaffReceipt(await api<Receipt>(`/api/payments/${staffReceiptPaymentId}/receipt`)); setStaffPaymentError('') }
+                  catch { setStaffPaymentError('โหลดใบเสร็จไม่สำเร็จ แต่บันทึกรับเงินแล้ว ไม่ต้องรับเงินซ้ำ') }
+                  finally { setIsBusy(false) }
+                }}>โหลดใบเสร็จอีกครั้ง</button>}
                 {paymentSummary && (
-                  <section className="payment-box">
-                    <h3>QR ชำระเงิน</h3>
-                    {paymentSummary.qrImageDataUrl ? (
+                  <section className="payment-box staff-payment-box">
+                    <h3>รับชำระเงิน</h3>
+                    <div className="staff-payment-methods" role="group" aria-label="วิธีชำระเงิน">
+                      {(['Cash', 'BankTransfer', 'QrPayment'] as const).map(method => <button key={method} type="button" aria-pressed={staffPaymentMethod === method} disabled={isBusy} onClick={() => { setStaffPaymentMethod(method); setStaffPaymentError('') }}>
+                        {method === 'Cash' ? 'เงินสด' : method === 'BankTransfer' ? 'โอนเงิน' : 'QR'}
+                      </button>)}
+                    </div>
+                    <dl className="staff-payment-totals">
+                      <div><dt>ค่าบริการ</dt><dd>{formatMoney(paymentSummary.subtotalAmount)}</dd></div>
+                      <div><dt>ส่วนลด</dt><dd>{formatMoney(paymentSummary.discountAmount)}</dd></div>
+                      <div><dt>ยอดที่ต้องรับ</dt><dd>{formatMoney(paymentSummary.totalAmount)}</dd></div>
+                    </dl>
+                    {staffPaymentMethod === 'BankTransfer' && (paymentSummary.transferAccount ? <div className="staff-transfer-account">
+                      <span>{paymentSummary.transferAccount.bankName}</span>
+                      <strong>{paymentSummary.transferAccount.accountNumber}</strong>
+                      <span>{paymentSummary.transferAccount.accountName}</span>
+                    </div> : <p role="status">ยังไม่มีบัญชีธนาคารรับโอนที่เปิดใช้งาน กรุณาให้เจ้าของร้านเพิ่มบัญชี หรือเลือกวิธีอื่น</p>)}
+                    {staffPaymentMethod === 'QrPayment' && (paymentSummary.qrImageDataUrl ? (
                       <img alt="Payment QR code" src={paymentSummary.qrImageDataUrl} />
                     ) : (
                       <p className="empty-state">ยังไม่มีบัญชี PromptPay ที่ใช้งานอยู่</p>
-                    )}
-                    <strong>{formatMoney(paymentSummary.totalAmount)}</strong>
-                    <small>{paymentSummary.paymentAccount?.accountName}</small>
-                    <button disabled={isBusy || !paymentSummary.qrImageDataUrl} onClick={confirmPayment} type="button">
-                      ยืนยันรับเงินแล้ว
+                    ))}
+                    {staffPaymentMethod === 'QrPayment' && <small>{paymentSummary.paymentAccount?.accountName}</small>}
+                    <p>{staffPaymentMethod === 'Cash' ? 'ยืนยันเมื่อได้รับเงินสดครบแล้ว' : 'ตรวจยอดเงินเข้าบัญชีร้านให้ตรงก่อนยืนยัน'}</p>
+                    <button disabled={isBusy || (staffPaymentMethod === 'QrPayment' && !paymentSummary.qrImageDataUrl) || (staffPaymentMethod === 'BankTransfer' && !paymentSummary.transferAccount)} onClick={confirmPayment} type="button">
+                      {isBusy ? 'กำลังบันทึก...' : staffPaymentMethod === 'Cash' ? 'ยืนยันรับเงินสด' : staffPaymentMethod === 'BankTransfer' ? 'ยืนยันรับเงินโอน' : 'ยืนยันรับเงินผ่าน QR'}
                     </button>
                   </section>
                 )}
@@ -2742,7 +2779,7 @@ function selectScheduleDate(dateValue: string) {
                 {staffReceipt && <ReceiptBox receipt={staffReceipt} />}
                 </div>
                 <div className="booking-detail-actions staff-booking-detail-actions">
-                  {previousStatus[selectedBooking.bookingStatus] && (
+                  {!paymentSummary && !staffReceipt && selectedBooking.paymentStatus !== 'Paid' && previousStatus[selectedBooking.bookingStatus] && (
                     <button className="secondary status-back-button" disabled={isBusy} onClick={() => moveStatus(selectedBooking, previousStatus[selectedBooking.bookingStatus])} type="button">
                       ย้อนกลับเป็น {statusLabels[previousStatus[selectedBooking.bookingStatus]]}
                     </button>
@@ -2755,8 +2792,8 @@ function selectScheduleDate(dateValue: string) {
                       {selectedBooking.bookingStatus === 'PendingConfirmation' ? 'ลูกค้ามาถึงแล้ว' : `เปลี่ยนเป็น ${statusLabels[nextStatus[selectedBooking.bookingStatus]]}`}
                     </button>
                   )}
-                  {selectedBooking.bookingStatus === 'WaitingPayment' && (
-                    <button className="status-next-button" disabled={isBusy} onClick={() => loadPaymentSummary(selectedBooking)} type="button">แสดง QR</button>
+                  {selectedBooking.bookingStatus === 'WaitingPayment' && !paymentSummary && (
+                    <button className="status-next-button" disabled={isBusy} onClick={() => loadPaymentSummary(selectedBooking)} type="button">รับชำระเงิน</button>
                   )}
                 </div>
               </article>
@@ -3882,6 +3919,7 @@ function ReceiptBox({ receipt }: { receipt: Receipt }) {
       <h3>ใบเสร็จ</h3>
       <p>{receipt.paymentNumber}</p>
       <p>{receipt.shopName}</p>
+      <p>วิธีชำระ: {receipt.paymentMethod === 'Cash' ? 'เงินสด' : receipt.paymentMethod === 'BankTransfer' ? 'โอนเงิน' : receipt.paymentMethod === 'QrPayment' ? 'QR' : receipt.paymentMethod}</p>
       <small>
         {receipt.customerName} / {receipt.barberName} / {formatDateTime(receipt.paidAt)}
       </small>

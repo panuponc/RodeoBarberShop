@@ -203,13 +203,16 @@ body:has(.bq-workspace .modal-backdrop) { overflow: hidden; }
 .bq-checkout-total { display: grid; justify-items: center; gap: 2px; margin-bottom: 18px; }
 .bq-checkout-total > span { color: var(--bq-muted); font-size: 12px; }
 .bq-checkout-total > strong { color: var(--bq-gold); font-size: 30px; font-weight: 500; }
-.bq-payment-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.bq-workspace .bq-payment-methods button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 8px; border: 1px solid var(--bq-border); border-radius: 8px; background: #101318; color: var(--bq-muted); font-size: 12px; font-weight: 400; box-shadow: none; }
+.bq-payment-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.bq-workspace .bq-payment-methods button { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 44px; padding: 8px 4px; border: 1px solid var(--bq-border); border-radius: 8px; background: #101318; color: var(--bq-muted); font-size: 11px; font-weight: 400; line-height: 1.3; text-align: center; box-shadow: none; }
 .bq-workspace .bq-payment-methods button[aria-pressed='true'] { border-color: #8a7343; color: var(--bq-gold); background: #2b261c; }
 .bq-payment-qr { display: grid; justify-items: center; gap: 5px; margin: 20px 0; text-align: center; }
 .bq-payment-qr img { display: block; width: min(100%, 224px); aspect-ratio: 1; object-fit: contain; border: 12px solid #fff; border-radius: 8px; background: #fff; margin-bottom: 8px; }
 .bq-payment-qr > span { color: var(--bq-muted); font-size: 11px; }
 .bq-payment-qr > strong { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.bq-transfer-account { display: grid; justify-items: center; gap: 7px; margin: 20px 0; padding: 18px 12px; border: 1px solid var(--bq-border); border-radius: 8px; background: #101318; color: var(--bq-text); text-align: center; overflow-wrap: anywhere; user-select: text; }
+.bq-transfer-account > strong { color: var(--bq-gold); font-size: 20px; }
+.bq-transfer-account > span { font-size: 12px; }
 .bq-payment-confirmation { display: grid; justify-items: center; gap: 16px; padding: 12px 0; text-align: center; }
 .bq-payment-confirmation .bq-checkout-total { margin-bottom: 0; }
 .bq-payment-confirmation h3:focus { outline: none; }

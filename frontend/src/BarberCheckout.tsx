@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Banknote, Check, CircleCheck, QrCode, RefreshCw, X } from 'lucide-react'
+import { Banknote, Check, CircleCheck, Landmark, QrCode, RefreshCw, X } from 'lucide-react'
 import type { Booking, PaymentSummary, Receipt } from './App'
 import { SheetBackdrop, SheetHandle } from './SheetBackdrop'
 
@@ -18,7 +18,7 @@ const methods: Record<string, string> = { QrPayment: 'QR พร้อมเพ�
 export function BarberCheckout({ booking, api, onClose, onPaid, onCorrected }: Props) {
   const [summary, setSummary] = useState<PaymentSummary | null>(null)
   const [receipt, setReceipt] = useState<Receipt | null>(null)
-  const [method, setMethod] = useState<'QrPayment' | 'Cash'>('QrPayment')
+  const [method, setMethod] = useState<'QrPayment' | 'Cash' | 'BankTransfer'>('QrPayment')
   const [confirming, setConfirming] = useState(false)
   const [correcting, setCorrecting] = useState(false)
   const [reason, setReason] = useState('')
@@ -179,7 +179,7 @@ export function BarberCheckout({ booking, api, onClose, onPaid, onCorrected }: P
 
   async function confirm(event: FormEvent) {
     event.preventDefault()
-    if (submittingRef.current || paidRef.current || !summary || !confirming || loading || (method === 'QrPayment' && !summary.qrImageDataUrl)) return
+    if (submittingRef.current || paidRef.current || !summary || !confirming || loading || (method === 'QrPayment' && !summary.qrImageDataUrl) || (method === 'BankTransfer' && !summary.transferAccount)) return
     submittingRef.current = true
     setSubmitting(true)
     setError('')
@@ -188,9 +188,9 @@ export function BarberCheckout({ booking, api, onClose, onPaid, onCorrected }: P
         method: 'POST',
         body: JSON.stringify({
           bookingId: booking.id,
-          paymentAccountId: method === 'QrPayment' ? summary.paymentAccount?.id : null,
+          paymentAccountId: method === 'QrPayment' ? summary.paymentAccount?.id : method === 'BankTransfer' ? summary.transferAccount?.id : null,
           paymentMethod: method,
-          note: method === 'Cash' ? 'Barber confirmed cash received in full' : 'Barber verified payment to shop account',
+          note: method === 'Cash' ? 'Barber confirmed cash received in full' : 'Barber verified incoming funds in shop account',
         }),
       })
       // Keep the payment final even if the following receipt request fails.
@@ -233,14 +233,16 @@ export function BarberCheckout({ booking, api, onClose, onPaid, onCorrected }: P
               <div className="bq-payment-methods" role="group" aria-label="วิธีชำระเงิน">
                 <button type="button" aria-pressed={method === 'QrPayment'} disabled={submitting} onClick={() => setMethod('QrPayment')}><QrCode size={18} />QR พร้อมเพย์</button>
                 <button type="button" aria-pressed={method === 'Cash'} disabled={submitting} onClick={() => setMethod('Cash')}><Banknote size={18} />เงินสด</button>
+                <button type="button" aria-pressed={method === 'BankTransfer'} disabled={submitting} onClick={() => setMethod('BankTransfer')}><Landmark size={18} />โอนเงิน</button>
               </div>
-              {method === 'QrPayment' ? summary.qrImageDataUrl ? <div className="bq-payment-qr"><img src={summary.qrImageDataUrl} alt={`QR พร้อมเพย์ชำระ ${money(summary.totalAmount)}`} /><span>บัญชีรับเงินของร้าน</span><strong>{summary.paymentAccount?.accountName}</strong></div> : <p className="bq-payment-unavailable">ยังไม่มีบัญชีพร้อมเพย์ที่ใช้งานได้ ให้เจ้าของร้านตั้งค่าบัญชีรับเงิน หรือเลือกรับเงินสด</p> : <div className="bq-cash-note"><Banknote size={30} /><span>รับเงินสด {money(summary.totalAmount)}</span></div>}
+              {method === 'QrPayment' ? summary.qrImageDataUrl ? <div className="bq-payment-qr"><img src={summary.qrImageDataUrl} alt={`QR พร้อมเพย์ชำระ ${money(summary.totalAmount)}`} /><span>บัญชีรับเงินของร้าน</span><strong>{summary.paymentAccount?.accountName}</strong></div> : <p className="bq-payment-unavailable">ยังไม่มีบัญชีพร้อมเพย์ที่ใช้งานได้ ให้เจ้าของร้านตั้งค่าบัญชีรับเงิน หรือเลือกวิธีอื่น</p> : method === 'BankTransfer' ? summary.transferAccount ? <div className="bq-transfer-account"><span>{summary.transferAccount.bankName}</span><strong>{summary.transferAccount.accountNumber}</strong><span>{summary.transferAccount.accountName}</span></div> : <p className="bq-payment-unavailable">ยังไม่มีบัญชีธนาคารที่เปิดใช้งาน ให้เจ้าของร้านตั้งค่าบัญชีรับเงิน หรือเลือกวิธีอื่น</p> : <div className="bq-cash-note"><Banknote size={30} /><span>รับเงินสด {money(summary.totalAmount)}</span></div>}
             </>}
             {!paid && summary && confirming && <section className="bq-payment-confirmation">
               <h3 id="bq-confirm-prompt" tabIndex={-1} ref={confirmationTitle}>ได้รับเงินครบแล้วใช่ไหม?</h3>
               <div className="bq-checkout-total"><strong>{money(summary.totalAmount)}</strong></div>
-              <span className="bq-confirm-method">{method === 'Cash' ? <Banknote size={20} /> : <QrCode size={20} />}{methods[method]}</span>
+              <span className="bq-confirm-method">{method === 'Cash' ? <Banknote size={20} /> : method === 'BankTransfer' ? <Landmark size={20} /> : <QrCode size={20} />}{methods[method]}</span>
               {method === 'QrPayment' && <p className="bq-confirm-account">{summary.paymentAccount?.accountName}</p>}
+              {method === 'BankTransfer' && <p className="bq-confirm-account">{summary.transferAccount?.bankName} {summary.transferAccount?.accountNumber} · {summary.transferAccount?.accountName}</p>}
               <p className="bq-confirm-note">{method === 'Cash' ? 'ยืนยันว่าได้รับเงินสดครบตามยอดแล้ว' : 'ยืนยันว่าเงินเข้าบัญชีร้านครบตามยอดแล้ว'}</p>
             </section>}
             {receipt && !correcting && <section className="bq-receipt" aria-label="ใบเสร็จ">
@@ -260,7 +262,7 @@ export function BarberCheckout({ booking, api, onClose, onPaid, onCorrected }: P
             </> : confirming ? <>
               <button key="back" className="secondary" type="button" disabled={submitting} onClick={() => setConfirming(false)}>กลับไปตรวจสอบ</button>
               <button key="confirm" type="submit" disabled={loading || submitting || !summary}><Check size={17} />{submitting ? 'กำลังบันทึก...' : 'ยืนยันและจบคิว'}</button>
-            </> : <button key="received" ref={receivedButton} type="button" disabled={loading || submitting || !summary || (method === 'QrPayment' && !summary.qrImageDataUrl)} onClick={() => setConfirming(true)}><Check size={17} />{summary ? `ได้รับเงินแล้ว · ${money(summary.totalAmount, 0)}` : 'ได้รับเงินแล้ว'}</button>}
+            </> : <button key="received" ref={receivedButton} type="button" disabled={loading || submitting || !summary || (method === 'QrPayment' && !summary.qrImageDataUrl) || (method === 'BankTransfer' && !summary.transferAccount)} onClick={() => setConfirming(true)}><Check size={17} />{summary ? `ได้รับเงินแล้ว · ${money(summary.totalAmount, 0)}` : 'ได้รับเงินแล้ว'}</button>}
           </div>
         </form>
       </article>

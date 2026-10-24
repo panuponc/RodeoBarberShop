@@ -11,4 +11,5 @@ public record PaymentSummaryResponse(
     PaymentAccountSummaryResponse? PaymentAccount,
     string? QrPayload,
     string? QrImageDataUrl,
-    IReadOnlyList<PaymentBookingServiceResponse> Services);
+    IReadOnlyList<PaymentBookingServiceResponse> Services,
+    PaymentAccountSummaryResponse? TransferAccount = null);

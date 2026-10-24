@@ -19,6 +19,77 @@ public class BarberPaymentTests
 {
     [Theory]
     [InlineData("Cash")]
+    [InlineData("BankTransfer")]
+    [InlineData("QrPayment")]
+    public async Task FrontDeskRecordsMethodAccountReceiptAndRejectsRepeat(string method)
+    {
+        using var fixture = new Fixture();
+        if (method == "BankTransfer")
+        {
+            fixture.Account.AccountType = PaymentAccountType.BankAccount;
+            fixture.Account.AccountNumber = "1234567890";
+            fixture.Account.BankName = "Test bank";
+            await fixture.Db.SaveChangesAsync();
+        }
+        var controller = fixture.Controller("FrontDeskStaff");
+        var summary = Assert.IsType<PaymentSummaryResponse>(Assert.IsType<OkObjectResult>(
+            (await controller.GetBookingPaymentSummary(fixture.Booking.Id, default)).Result).Value);
+        if (method == "BankTransfer") Assert.Equal(fixture.Account.Id, summary.TransferAccount!.Id);
+        Assert.IsType<CreatedAtActionResult>((await controller.CreatePayment(fixture.Request(method), default)).Result);
+        var payment = Assert.Single(fixture.Db.Payments);
+        Assert.Equal(method, payment.PaymentMethod.ToString());
+        Assert.Equal(method == "Cash" ? (Guid?)null : fixture.Account.Id, payment.PaymentAccountId);
+        Assert.Equal(fixture.BarberUser.Id, payment.ReceivedByUserId);
+        var receipt = Assert.IsType<OkObjectResult>((await controller.GetReceipt(payment.Id, default)).Result);
+        Assert.Contains(method, System.Text.Json.JsonSerializer.Serialize(receipt.Value));
+        Assert.IsType<ConflictObjectResult>((await controller.CreatePayment(fixture.Request(method), default)).Result);
+    }
+
+    [Fact]
+    public async Task BarberPaymentSummaryIncludesActiveTransferAccountForOwnBooking()
+    {
+        using var fixture = new Fixture();
+        fixture.Account.AccountType = PaymentAccountType.BankAccount;
+        await fixture.Db.SaveChangesAsync();
+        var summary = Assert.IsType<PaymentSummaryResponse>(Assert.IsType<OkObjectResult>(
+            (await fixture.Controller().GetBookingPaymentSummary(fixture.Booking.Id, default)).Result).Value);
+        Assert.Equal(fixture.Account.Id, summary.TransferAccount!.Id);
+    }
+
+    [Fact]
+    public async Task BarberCanConfirmBankTransferAndReadReceipt()
+    {
+        using var fixture = new Fixture();
+        fixture.Account.AccountType = PaymentAccountType.BankAccount;
+        await fixture.Db.SaveChangesAsync();
+        var controller = fixture.Controller();
+        Assert.IsType<CreatedAtActionResult>((await controller.CreatePayment(fixture.Request("BankTransfer"), default)).Result);
+        var payment = Assert.Single(fixture.Db.Payments);
+        Assert.Equal(PaymentMethod.BankTransfer, payment.PaymentMethod);
+        Assert.Equal(fixture.Account.Id, payment.PaymentAccountId);
+        Assert.Equal(fixture.BarberUser.Id, payment.ReceivedByUserId);
+        var receipt = Assert.IsType<OkObjectResult>((await controller.GetReceipt(payment.Id, default)).Result);
+        Assert.Contains("BankTransfer", System.Text.Json.JsonSerializer.Serialize(receipt.Value));
+        Assert.Equal(BookingStatus.Completed, fixture.Booking.BookingStatus);
+        Assert.IsType<ConflictObjectResult>((await controller.CreatePayment(fixture.Request("BankTransfer"), default)).Result);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TransferRejectsInactiveOrNonBankAccount(bool active)
+    {
+        using var fixture = new Fixture();
+        fixture.Account.IsActive = active;
+        if (!active) fixture.Account.AccountType = PaymentAccountType.BankAccount;
+        await fixture.Db.SaveChangesAsync();
+        Assert.IsType<BadRequestObjectResult>((await fixture.Controller("FrontDeskStaff")
+            .CreatePayment(fixture.Request("BankTransfer"), default)).Result);
+        Assert.Empty(fixture.Db.Payments);
+    }
+
+    [Theory]
+    [InlineData("Cash")]
     [InlineData("QrPayment")]
     public async Task BarberCanCollectOwnPaymentAndReadReceipt(string method)
     {

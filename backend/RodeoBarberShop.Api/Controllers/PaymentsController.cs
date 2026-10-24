@@ -47,7 +47,14 @@ public class PaymentsController(
             ? null
             : thaiQrPaymentService.CreatePromptPayQr(paymentAccount, booking.TotalAmount);
 
-        return Ok(ToSummaryResponse(booking, paymentAccount, qr));
+        var transferAccount = await dbContext.PaymentAccounts.AsNoTracking()
+            .Where(account => account.IsActive && account.AccountType == PaymentAccountType.BankAccount)
+            .OrderByDescending(account => account.IsDefault).ThenBy(account => account.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        return Ok(ToSummaryResponse(booking, paymentAccount, qr) with
+        {
+            TransferAccount = transferAccount is null ? null : ToSummaryResponse(transferAccount)
+        });
     }
 
     [Authorize(Roles = "Barber,FrontDeskStaff,Owner,Admin")]
@@ -94,6 +101,15 @@ public class PaymentsController(
         var paymentAccount = paymentMethod == PaymentMethod.QrPayment
             ? await GetPaymentAccountForQr(request.PaymentAccountId, cancellationToken)
             : null;
+
+        if (paymentMethod == PaymentMethod.BankTransfer)
+        {
+            paymentAccount = await dbContext.PaymentAccounts.FirstOrDefaultAsync(account =>
+                account.Id == request.PaymentAccountId && account.IsActive
+                && account.AccountType == PaymentAccountType.BankAccount, cancellationToken);
+            if (paymentAccount is null)
+                return BadRequest(new { message = "An active bank account is required for bank transfer." });
+        }
 
         if (paymentMethod == PaymentMethod.QrPayment && paymentAccount is null)
         {
