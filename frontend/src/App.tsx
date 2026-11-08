@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, FormEvent, PointerEvent } from 'react'
+import type { CSSProperties, FormEvent, PointerEvent, Ref } from 'react'
 import './App.css'
 import { BarberQueue } from './BarberQueue'
 import { BarberCheckout } from './BarberCheckout'
@@ -315,7 +315,11 @@ function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [confirmPasswordError, setConfirmPasswordError] = useState('')
   const [isAuthPasswordVisible, setIsAuthPasswordVisible] = useState(false)
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false)
+  const confirmPasswordRef = useRef<HTMLInputElement>(null)
   const [fullName, setFullName] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [message, setMessage] = useState('')
@@ -726,6 +730,11 @@ function selectScheduleDate(dateValue: string) {
 
   async function submitAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (authMode === 'register' && password !== confirmPassword) {
+      setConfirmPasswordError('รหัสผ่านทั้งสองช่องไม่ตรงกัน')
+      confirmPasswordRef.current?.focus()
+      return
+    }
     setIsBusy(true)
     setMessage('')
 
@@ -753,9 +762,12 @@ function selectScheduleDate(dateValue: string) {
     setAuthMode(mode)
     setEmail('')
     setPassword('')
+    setConfirmPassword('')
+    setConfirmPasswordError('')
     setFullName('')
     setPhoneNumber('')
     setIsAuthPasswordVisible(false)
+    setIsConfirmPasswordVisible(false)
     setMessage('')
   }
 
@@ -1878,7 +1890,10 @@ function selectScheduleDate(dateValue: string) {
     setAuthMode('login')
     setEmail('')
     setPassword('')
+    setConfirmPassword('')
+    setConfirmPasswordError('')
     setIsAuthPasswordVisible(false)
+    setIsConfirmPasswordVisible(false)
     setFullName('')
     setPhoneNumber('')
     setMessage('')
@@ -1933,7 +1948,7 @@ function selectScheduleDate(dateValue: string) {
                 autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
                 isVisible={isAuthPasswordVisible}
                 minLength={authMode === 'register' ? 8 : undefined}
-                onChange={setPassword}
+                onChange={(value) => { setPassword(value); setConfirmPasswordError('') }}
                 onToggleVisibility={() => setIsAuthPasswordVisible((current) => !current)}
                 placeholder="กรอกรหัสผ่าน"
                 required
@@ -1941,6 +1956,25 @@ function selectScheduleDate(dateValue: string) {
               />
               {authMode === 'register' && <small>อย่างน้อย 8 ตัวอักษร</small>}
             </label>
+            {authMode === 'register' && (
+              <label className={confirmPasswordError ? 'auth-field-error' : undefined}>
+                ยืนยันรหัสผ่าน
+                <PasswordInput
+                  ariaDescribedBy={confirmPasswordError ? 'auth-confirm-password-error' : undefined}
+                  ariaInvalid={Boolean(confirmPasswordError)}
+                  autoComplete="new-password"
+                  inputRef={confirmPasswordRef}
+                  isVisible={isConfirmPasswordVisible}
+                  minLength={8}
+                  onChange={(value) => { setConfirmPassword(value); setConfirmPasswordError('') }}
+                  onToggleVisibility={() => setIsConfirmPasswordVisible((current) => !current)}
+                  placeholder="กรอกรหัสผ่านอีกครั้ง"
+                  required
+                  value={confirmPassword}
+                />
+                {confirmPasswordError && <small id="auth-confirm-password-error" role="alert">{confirmPasswordError}</small>}
+              </label>
+            )}
             {message && <p className="auth-error" role="alert">{message}</p>}
             <button className="auth-submit" disabled={isBusy} type="submit">
               {isBusy ? 'กำลังดำเนินการ...' : authMode === 'login' ? 'เข้าสู่ระบบ' : 'สร้างบัญชี'}
@@ -3641,7 +3675,10 @@ function selectScheduleDate(dateValue: string) {
 }
 
 function PasswordInput({
+  ariaDescribedBy,
+  ariaInvalid,
   autoComplete,
+  inputRef,
   isVisible,
   minLength,
   onChange,
@@ -3650,7 +3687,10 @@ function PasswordInput({
   required,
   value,
 }: {
+  ariaDescribedBy?: string
+  ariaInvalid?: boolean
   autoComplete?: 'current-password' | 'new-password'
+  inputRef?: Ref<HTMLInputElement>
   isVisible: boolean
   minLength?: number
   onChange: (value: string) => void
@@ -3662,9 +3702,12 @@ function PasswordInput({
   return (
     <div className="password-input-row">
       <input
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
         autoComplete={autoComplete}
         minLength={minLength}
         placeholder={placeholder}
+        ref={inputRef}
         required={required}
         type={isVisible ? 'text' : 'password'}
         value={value}

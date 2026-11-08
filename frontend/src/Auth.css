@@ -74,6 +74,9 @@
 }
 
 .auth-form .password-input-row:focus-within { border-color: #e5c378; outline: 2px solid #e5c378; outline-offset: 2px; box-shadow: none; }
+.auth-form .auth-field-error .password-input-row { border-color: #d88995; }
+.auth-form .auth-field-error .password-input-row:focus-within { outline-color: #d88995; }
+.auth-form .auth-field-error small { color: #f5a9b3; }
 .auth-form .password-input-row input { border: 0; border-radius: 0; outline: 0; background: transparent; }
 .auth-form .password-input-row input:focus { border: 0; outline: 0; box-shadow: none; }
 .auth-form .password-input-row button {
