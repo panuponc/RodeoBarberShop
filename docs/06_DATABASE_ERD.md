@@ -1,23 +1,37 @@
 # Database ERD
 
-## Version
+## Version And Source
 
-Version: 1.0  
-Status: Draft  
-Source: 03_DATABASE_DESIGN.md
+Version: 1.1 (2026-11-09)
 
-## Overview
+Status: Aligned with the current EF Core model and migration snapshot. The live
+Supabase database has not been introspected for this update. Compare its applied
+migrations before claiming that the deployed schema is identical.
 
-This document shows the Entity Relationship Diagram for Rodeo Barber Shop Management System.
+Source: `backend/RodeoBarberShop.Api/Data/ApplicationDbContext.cs` and
+`backend/RodeoBarberShop.Api/Migrations/ApplicationDbContextModelSnapshot.cs`.
+The model defines 23 mapped tables and 33 foreign-key relationships. This ERD
+describes the physical data model, not completion of every planned UI workflow.
 
-The ERD is written with Mermaid so it can be viewed directly in Markdown-supported tools.
+## Reading The Diagram
+
+- `PK` is a primary key; `FK` points to a primary key in another table.
+- `||--o{` means one parent can have zero or many child rows. `||--o|` means
+  one parent can have zero or one child row.
+- `o|` at the parent end marks a nullable FK: a child row may have no related
+  parent row in that role. Optional relationships are also listed below.
+- Column names are case-sensitive in PostgreSQL. Most PK columns are `Id`, not
+  `id`; `barber_booking_closures` also retains PascalCase column names because
+  its properties were not explicitly mapped to snake_case.
+- Each entity shows its key columns and representative business fields, not
+  every column. Consult the model snapshot for the complete column inventory.
 
 ## Mermaid ERD
 
 ```mermaid
 erDiagram
     users {
-        uuid id PK
+        uuid Id PK
         varchar full_name
         varchar nickname
         varchar phone_number
@@ -25,107 +39,95 @@ erDiagram
         text password_hash
         varchar role
         varchar account_status
-        text profile_image_url
-        date start_date
-        text note
         timestamptz created_at
-        timestamptz updated_at
     }
 
     customer_profiles {
-        uuid id PK
+        uuid Id PK
         uuid user_id FK
         timestamptz created_at
-        timestamptz updated_at
     }
 
     barber_profiles {
-        uuid id PK
+        uuid Id PK
         uuid user_id FK
         text specialty
         int experience_years
-        text bio
+        int standby_priority
         boolean is_available
         boolean accepts_booking
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    shop_settings {
-        uuid id PK
-        varchar shop_name
-        text address
-        varchar phone_number
-        text facebook_url
-        text instagram_url
-        varchar line_official
-        text website_url
-        text logo_url
-        time opening_time
-        time closing_time
-        int booking_advance_days
-        int cancellation_deadline_hours
-        int slot_interval_minutes
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    shop_holidays {
-        uuid id PK
-        varchar holiday_type
-        int day_of_week
-        date holiday_date
-        text reason
-        timestamptz created_at
-        timestamptz updated_at
     }
 
     services {
-        uuid id PK
+        uuid Id PK
         varchar name
-        text description
         numeric price
         int duration_minutes
         boolean is_active
-        timestamptz created_at
-        timestamptz updated_at
     }
 
     barber_services {
-        uuid id PK
+        uuid Id PK
         uuid barber_id FK
         uuid service_id FK
-        timestamptz created_at
     }
 
     barber_working_hours {
-        uuid id PK
+        uuid Id PK
         uuid barber_id FK
         int day_of_week
         time start_time
         time end_time
         boolean is_working_day
-        timestamptz created_at
-        timestamptz updated_at
+    }
+
+    chairs {
+        uuid Id PK
+        varchar name
+        int sort_order
+        boolean is_active
+    }
+
+    barber_chair_assignments {
+        uuid Id PK
+        uuid chair_id FK
+        uuid barber_id FK
+        date start_date
+        date end_date
+        boolean is_primary
     }
 
     leave_requests {
-        uuid id PK
+        uuid Id PK
         uuid barber_id FK
         varchar leave_type
         timestamptz start_at
         timestamptz end_at
-        text reason
         varchar status
         uuid reviewed_by_user_id FK
-        timestamptz reviewed_at
-        text review_note
+    }
+
+    leave_events {
+        uuid Id PK
+        uuid leave_request_id FK
+        uuid actor_user_id FK
+        varchar action
         timestamptz created_at
-        timestamptz updated_at
+    }
+
+    barber_booking_closures {
+        uuid Id PK
+        uuid BarberId FK
+        timestamptz StartAt
+        timestamptz EndAt
+        varchar Reason
+        uuid ClosedByUserId FK
+        uuid ReopenedByUserId FK
+        timestamptz ReopenedAt
     }
 
     bookings {
-        uuid id PK
+        uuid Id PK
         varchar booking_number
         varchar booking_source
         uuid customer_id FK
@@ -133,27 +135,16 @@ erDiagram
         varchar guest_phone_number
         varchar guest_email
         uuid barber_id FK
+        uuid created_by_user_id FK
         timestamptz start_at
         timestamptz end_at
-        int estimated_duration_minutes
-        numeric subtotal_amount
-        numeric discount_amount
-        numeric total_amount
         varchar booking_status
         varchar payment_status
-        text customer_note
-        text cancel_reason
-        timestamptz cancelled_at
-        timestamptz checked_in_at
-        timestamptz service_started_at
-        timestamptz service_completed_at
-        uuid created_by_user_id FK
-        timestamptz created_at
-        timestamptz updated_at
+        numeric total_amount
     }
 
     booking_services {
-        uuid id PK
+        uuid Id PK
         uuid booking_id FK
         uuid service_id FK
         varchar service_name
@@ -163,32 +154,40 @@ erDiagram
         numeric line_total
         boolean added_during_service
         uuid added_by_user_id FK
-        timestamptz created_at
     }
 
     queue_events {
-        uuid id PK
+        uuid Id PK
         uuid booking_id FK
         varchar from_status
         varchar to_status
         uuid changed_by_user_id FK
-        text note
         timestamptz created_at
     }
 
     barber_assignment_events {
-        uuid id PK
+        uuid Id PK
         uuid booking_id FK
         uuid from_barber_id FK
         uuid to_barber_id FK
         uuid changed_by_user_id FK
-        text reason
         timestamptz created_at
     }
 
+    payment_accounts {
+        uuid Id PK
+        varchar account_name
+        varchar account_type
+        varchar account_number
+        varchar bank_name
+        boolean is_active
+        boolean is_default
+    }
+
     payments {
-        uuid id PK
+        uuid Id PK
         uuid booking_id FK
+        uuid payment_account_id FK
         varchar payment_number
         varchar payment_method
         varchar payment_status
@@ -197,105 +196,133 @@ erDiagram
         numeric total_amount
         timestamptz paid_at
         uuid received_by_user_id FK
-        text note
-        timestamptz created_at
-        timestamptz updated_at
+    }
+
+    shop_settings {
+        uuid Id PK
+        varchar shop_name
+        text address
+        varchar phone_number
+        time opening_time
+        time closing_time
+        int booking_advance_days
+        int cancellation_deadline_hours
+        int slot_interval_minutes
+    }
+
+    shop_holidays {
+        uuid Id PK
+        varchar holiday_type
+        int day_of_week
+        date holiday_date
+        text reason
     }
 
     promotions {
-        uuid id PK
+        uuid Id PK
         varchar name
-        text description
         date start_date
         date end_date
         varchar discount_type
         numeric discount_value
         boolean is_active
-        timestamptz created_at
-        timestamptz updated_at
     }
 
     promotion_services {
-        uuid id PK
+        uuid Id PK
         uuid promotion_id FK
         uuid service_id FK
-        timestamptz created_at
     }
 
     notifications {
-        uuid id PK
+        uuid Id PK
         uuid recipient_user_id FK
         varchar recipient_role
-        varchar title
-        text message
-        varchar notification_type
         uuid related_booking_id FK
+        varchar title
+        varchar notification_type
         boolean is_read
-        timestamptz read_at
-        timestamptz created_at
     }
 
     email_otps {
-        uuid id PK
+        uuid Id PK
         varchar email
         text otp_hash
         varchar purpose
         timestamptz expires_at
         timestamptz verified_at
-        timestamptz created_at
     }
 
-    users ||--o| customer_profiles : has
-    users ||--o| barber_profiles : has
-    users ||--o{ bookings : customer
-    users ||--o{ bookings : created_by
-    users ||--o{ leave_requests : reviews
-    users ||--o{ booking_services : adds
-    users ||--o{ queue_events : changes
-    users ||--o{ barber_assignment_events : changes
-    users ||--o{ payments : receives
-    users ||--o{ notifications : receives
-
-    barber_profiles ||--o{ barber_services : can_perform
-    services ||--o{ barber_services : performed_by
-
-    barber_profiles ||--o{ barber_working_hours : works
-    barber_profiles ||--o{ leave_requests : requests
-    barber_profiles ||--o{ bookings : assigned_to
-    barber_profiles ||--o{ barber_assignment_events : from_barber
-    barber_profiles ||--o{ barber_assignment_events : to_barber
+    users ||--o| customer_profiles : has_customer_profile
+    users ||--o| barber_profiles : has_barber_profile
+    users o|--o{ bookings : customer
+    users o|--o{ bookings : created_by
+    barber_profiles o|--o{ bookings : assigned_barber
 
     bookings ||--o{ booking_services : contains
     services ||--o{ booking_services : selected_as
+    users o|--o{ booking_services : added_by
+    bookings ||--o{ queue_events : status_history
+    users o|--o{ queue_events : changed_by
+    bookings ||--o{ barber_assignment_events : assignment_history
+    barber_profiles o|--o{ barber_assignment_events : from_barber
+    barber_profiles o|--o{ barber_assignment_events : to_barber
+    users ||--o{ barber_assignment_events : changed_by
 
-    bookings ||--o{ queue_events : has
-    bookings ||--o{ barber_assignment_events : has
-    bookings ||--o{ payments : has_payment_history
-    bookings ||--o{ notifications : related_to
+    barber_profiles ||--o{ barber_services : can_perform
+    services ||--o{ barber_services : performed_by
+    barber_profiles ||--o{ barber_working_hours : works
+    barber_profiles ||--o{ barber_chair_assignments : assigned_to
+    chairs ||--o{ barber_chair_assignments : used_by
+    barber_profiles ||--o{ leave_requests : requests
+    users o|--o{ leave_requests : reviewed_by
+    leave_requests ||--o{ leave_events : has_history
+    users ||--o{ leave_events : acted_by
+    barber_profiles ||--o{ barber_booking_closures : unavailable_periods
+    users ||--o{ barber_booking_closures : closed_by
+    users o|--o{ barber_booking_closures : reopened_by
 
+    bookings ||--o{ payments : payment_history
+    payment_accounts o|--o{ payments : received_into
+    users ||--o{ payments : received_by
     promotions ||--o{ promotion_services : includes
     services ||--o{ promotion_services : included_in
+    users o|--o{ notifications : recipient
+    bookings o|--o{ notifications : related_booking
 ```
 
-## Relationship Notes
+## Important Constraints And Behavior
 
-- A user can be a customer, barber, front desk staff, owner, or admin.
-- A user can have one customer profile.
-- A user can have one barber profile.
-- A booking can belong to a registered customer or store guest information directly.
-- A booking can have no barber at first when the customer chooses shop assignment.
-- A booking contains one or more booking service rows.
-- Booking service rows store service name, price, and duration snapshots.
-- A booking should have only one active paid payment record.
-- A corrected payment is retained as Voided. A filtered unique index on payments.booking_id where payment_status = 'Paid' permits replacement payments without losing history. Correction reasons and actors are recorded in queue_events.
-- Queue changes and barber assignment changes are stored as event history.
-- Promotions can apply to multiple services.
-- Notifications can target a specific user or a role.
+- `bookings.customer_id` references `users.Id` directly, not
+  `customer_profiles.Id`. It can be null when guest contact fields are stored
+  on the booking. `bookings.barber_id` is also nullable in the database, but
+  the current customer booking flow still requires choosing a barber.
+- `booking_services` is the many-to-many bridge between bookings and services.
+  It stores the service name, price, duration and total as booking-time
+  snapshots; later edits to `services` do not rewrite existing line items.
+- `barber_services` is the many-to-many bridge between barbers and services.
+  `barber_chair_assignments` connects barbers to chairs for a date range;
+  `is_primary` distinguishes primary from standby assignments.
+- `leave_requests` records the leave period and review status; `leave_events`
+  records actions taken on a request. `barber_booking_closures` records a
+  separate staff-controlled closure and optional reopening. These tables do
+  not automatically move existing bookings to another barber.
+- A booking can have multiple `payments` rows as history, including voided
+  corrections. A filtered unique index permits **at most one** row with
+  `payment_status = 'Paid'` per booking. Cash payments need no
+  `payment_account_id`; bank transfer and QR payments use an account. A receipt
+  is derived from booking/payment data; there is no separate `receipts` table.
+- `shop_settings`, `shop_holidays` and `email_otps` have no FK connecting them
+  to other tables. Shop opening hours and holidays are combined with barber
+  schedules, leave, closures and chairs in booking-availability logic, not by
+  a direct database relationship.
+- The presence of `promotions`, `notifications` and `email_otps` tables does
+  not mean their complete customer-facing workflows are implemented.
 
-## ERD Review Checklist
+## Live Database Verification
 
-- [ ] Confirm whether one user can have both customer and barber roles.
-- [ ] Confirm whether walk-in customers need reusable customer profiles.
-- [ ] Confirm whether bank transfer or QR Payment needs slip image upload.
-- [ ] Confirm whether promotions apply during booking or only during payment.
-- [ ] Confirm whether report export needs stored report history.
+This file was checked against the current code model and migration snapshot,
+not a live Supabase schema dump. Before using it as proof of the deployed DB,
+compare the Supabase `__EFMigrationsHistory` entries and actual tables, columns,
+foreign keys and indexes with the repository migrations. In particular, check
+the case-sensitive `Id` and `barber_booking_closures` column names.
