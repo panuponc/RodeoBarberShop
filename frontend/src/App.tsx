@@ -13,11 +13,12 @@ import { BookingWorkSummary } from './BookingWorkSummary'
 import { CustomerPhoneLink } from './CustomerPhoneLink'
 import { CustomerBooking } from './CustomerBooking'
 import { ServiceManagement } from './ServiceManagement'
-import { CalendarDays, ChevronLeft, ChevronRight, LogOut, RefreshCw, Scissors, Users, Wallet, X } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Eye, EyeOff, LogOut, RefreshCw, Scissors, Users, Wallet, X } from 'lucide-react'
 import './StaffQueue.css'
 import { SheetBackdrop, SheetHandle } from './SheetBackdrop'
 import './StaffNavigation.css'
 import './StaffManagementTheme.css'
+import './Auth.css'
 
 type AuthResponse = {
   fullName: string
@@ -740,12 +741,22 @@ function selectScheduleDate(dateValue: string) {
       })
 
       setAuth(result)
-      setMessage(`เข้าสู่ระบบแล้ว: ${result.fullName} (${result.role})`)
+      setMessage('')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'เข้าสู่ระบบไม่สำเร็จ')
     } finally {
       setIsBusy(false)
     }
+  }
+
+  function changeAuthMode(mode: 'login' | 'register') {
+    setAuthMode(mode)
+    setEmail('')
+    setPassword('')
+    setFullName('')
+    setPhoneNumber('')
+    setIsAuthPasswordVisible(false)
+    setMessage('')
   }
 
   async function refreshQueue(targetDate = scheduleDate) {
@@ -1864,6 +1875,13 @@ function selectScheduleDate(dateValue: string) {
   function logout() {
     setBarberCheckoutBooking(null)
     setIsBarberLeaveOpen(false)
+    setAuthMode('login')
+    setEmail('')
+    setPassword('')
+    setIsAuthPasswordVisible(false)
+    setFullName('')
+    setPhoneNumber('')
+    setMessage('')
     setAuth(null)
     setQueue([])
     setBarberQueue([])
@@ -1877,75 +1895,77 @@ function selectScheduleDate(dateValue: string) {
 
   if (!auth) {
     return (
-      <main className="login-shell">
-        <section className="login-panel">
-          <div className="login-brand">
-            <span className="login-logo">Rodeo</span>
-            <small>Barber Shop</small>
+      <main className="auth-page">
+        <div className="auth-layout">
+          <div className="auth-brand" aria-label="Rodeo Barber Shop">
+            <strong>Rodeo</strong>
+            <span>BARBER SHOP</span>
           </div>
-          <div className="login-heading">
-            <p className="eyebrow">{authMode === 'login' ? 'Welcome back' : 'Customer account'}</p>
-            <h1>{authMode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก'}</h1>
-            <p className="muted">
-              {authMode === 'login'
-                ? 'เข้าสู่ระบบเพื่อจัดการคิว จองบริการ หรือดูข้อมูลร้านตามสิทธิ์บัญชี'
-                : 'สร้างบัญชีลูกค้าเพื่อจองคิวออนไลน์และติดตามประวัติบริการ'}
-            </p>
-          </div>
+          <section className="auth-panel" aria-labelledby="auth-title">
+            <div className="auth-heading">
+              <span>{authMode === 'login' ? 'ยินดีต้อนรับ' : 'บัญชีลูกค้า'}</span>
+              <h1 id="auth-title">{authMode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก'}</h1>
+              <p>{authMode === 'login' ? 'จองคิวและจัดการงานร้าน' : 'สร้างบัญชีเพื่อจองคิวและดูประวัติบริการ'}</p>
+            </div>
 
-          <form className="login-form" onSubmit={submitAuth}>
+            <form key={authMode} autoComplete={authMode === 'register' ? 'off' : 'on'} className="auth-form" onSubmit={submitAuth} aria-busy={isBusy}>
             {authMode === 'register' && (
               <>
                 <label>
-                  ชื่อ-นามสกุล
-                  <input value={fullName} onChange={(event) => setFullName(event.target.value)} />
+                  ชื่อที่ใช้จอง
+                  <input autoComplete="name" placeholder="เช่น ไปป์ หรือ เจมส์" required value={fullName} onChange={(event) => setFullName(event.target.value)} />
+                  <small>ใส่ชื่อเล่นได้ ร้านจะใช้ชื่อนี้เรียกคิว</small>
                 </label>
                 <label>
-                  เบอร์โทร
-                  <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} />
+                  เบอร์มือถือ
+                  <input autoComplete="tel" inputMode="numeric" pattern="0[0-9]{9}" placeholder="0812345678" required title="กรอกเบอร์มือถือ 10 หลัก ขึ้นต้นด้วย 0" type="tel" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value.replace(/\D/g, '').slice(0, 10))} />
+                  <small>10 หลัก ขึ้นต้นด้วย 0 เช่น 081-234-5678</small>
                 </label>
               </>
             )}
             <label>
-              Email
-              <input autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} />
+              อีเมล
+              <input autoComplete={authMode === 'register' ? 'off' : 'email'} name={authMode === 'register' ? 'registration-email' : 'login-email'} placeholder="you@example.com" required type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
             </label>
             <label>
-              Password
+              รหัสผ่าน
               <PasswordInput
-                buttonLabel={isAuthPasswordVisible ? 'ซ่อน' : 'ดู'}
+                autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
                 isVisible={isAuthPasswordVisible}
+                minLength={authMode === 'register' ? 8 : undefined}
                 onChange={setPassword}
                 onToggleVisibility={() => setIsAuthPasswordVisible((current) => !current)}
-                placeholder="อย่างน้อย 8 ตัวอักษร"
+                placeholder="กรอกรหัสผ่าน"
+                required
                 value={password}
               />
+              {authMode === 'register' && <small>อย่างน้อย 8 ตัวอักษร</small>}
             </label>
-            <button className="login-submit" disabled={isBusy} type="submit">
-              {isBusy ? 'กำลังดำเนินการ...' : authMode === 'login' ? 'Login' : 'Register'}
+            {message && <p className="auth-error" role="alert">{message}</p>}
+            <button className="auth-submit" disabled={isBusy} type="submit">
+              {isBusy ? 'กำลังดำเนินการ...' : authMode === 'login' ? 'เข้าสู่ระบบ' : 'สร้างบัญชี'}
             </button>
-          </form>
+            </form>
 
-          <div className="auth-switch">
+            <div className="auth-switch">
             {authMode === 'login' ? (
               <>
                 <span>ยังไม่มีบัญชีลูกค้า?</span>
-                <button className="link-button" onClick={() => setAuthMode('register')} type="button">
+                <button onClick={() => changeAuthMode('register')} type="button">
                   สมัครสมาชิก
                 </button>
               </>
             ) : (
               <>
                 <span>มีบัญชีแล้ว?</span>
-                <button className="link-button" onClick={() => setAuthMode('login')} type="button">
-                  กลับไป Login
+                <button onClick={() => changeAuthMode('login')} type="button">
+                  เข้าสู่ระบบ
                 </button>
               </>
             )}
-          </div>
-
-          {message && <p className="notice">{message}</p>}
-        </section>
+            </div>
+          </section>
+        </div>
       </main>
     )
   }
@@ -3621,30 +3641,37 @@ function selectScheduleDate(dateValue: string) {
 }
 
 function PasswordInput({
-  buttonLabel,
+  autoComplete,
   isVisible,
+  minLength,
   onChange,
   onToggleVisibility,
   placeholder,
+  required,
   value,
 }: {
-  buttonLabel?: string
+  autoComplete?: 'current-password' | 'new-password'
   isVisible: boolean
+  minLength?: number
   onChange: (value: string) => void
   onToggleVisibility: () => void
   placeholder?: string
+  required?: boolean
   value: string
 }) {
   return (
     <div className="password-input-row">
       <input
+        autoComplete={autoComplete}
+        minLength={minLength}
         placeholder={placeholder}
+        required={required}
         type={isVisible ? 'text' : 'password'}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      <button className="secondary" onClick={onToggleVisibility} type="button">
-        {buttonLabel ?? (isVisible ? 'ซ่อน' : 'ดู')}
+      <button aria-label={isVisible ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'} aria-pressed={isVisible} className="secondary" onClick={onToggleVisibility} title={isVisible ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'} type="button">
+        {isVisible ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
       </button>
     </div>
   )
